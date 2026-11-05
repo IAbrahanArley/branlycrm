@@ -32,6 +32,8 @@ Data de todos os registros: 04/11/2026.
 
 ## ADR-002 — Isolamento entre clínicas
 
+> Substituída pela ADR-014 em 05/11/2026. O texto abaixo permanece como histórico.
+
 **Status:** Aceita.
 
 **Contexto:** Várias clínicas utilizarão a plataforma, inclusive a base de conhecimento e o processamento em segundo plano.
@@ -165,3 +167,39 @@ Data de todos os registros: 04/11/2026.
 **Alternativas:** Manter projeto no caminho anterior; repositório separado para frontend.
 
 **Consequências:** Frontend movido e registrado no commit 557a1ca. Compilação de produção permanece pendente de validação. Fontes do sistema evitam download obrigatório durante build. Versões instaladas e situação detalhadas em ../projeto.md.
+
+## ADR-013 — Contêineres e Nginx como proxy
+
+**Data:** 05/11/2026. **Status:** Adotada nesta implementação.
+
+**Contexto:** Executar frontend, API e banco juntos, com um endereço de acesso.
+
+**Decisão:** Compose na raiz com PostgreSQL 17/pgvector, backend Java 21, Next.js standalone em Node 24 e Nginx como proxy de entrada. /api/ é encaminhado sem remover o prefixo; perfil docker do Spring define context-path /api. Apenas Nginx publica porta local. Banco persistente em volume, credenciais via ambiente e healthchecks para ordenar inicialização. Flyway habilita vector. Containers de aplicações executam sem root.
+
+**Alternativas:** Exportação estática de Next servida pelo Nginx; exposição independente de frontend/API/banco; Compose separado no backend.
+
+**Consequências:** Nginx não substitui o servidor Next. Chamadas do navegador usam origem comum; chamadas internas usam nomes dos serviços. O contexto /api deve ser considerado nos futuros mapeamentos para evitar /api/api. O prefixo padrão das controllers passa a /v1, relativo ao contexto da aplicação. Autenticação completa permanece pendente; apenas saúde é pública. Detalhes em ../docker.md.
+
+## ADR-014 — Banco exclusivo por clínica e registro central
+
+**Data:** 05/11/2026. **Status:** Aceita por instrução do usuário. **Substitui:** ADR-002 quanto ao banco compartilhado de dados comerciais.
+
+**Decisão:** Cada clínica recebe UUID permanente e banco PostgreSQL próprio. Um banco central guarda apenas registro, estado de provisionamento e participações; dados comerciais, conversas, agenda e vetores pertencem aos bancos das clínicas. Cada banco terá credencial própria e papel sem privilégios administrativos. O tenant_id identifica a clínica e não funciona como senha.
+
+**Implementação inicial:** Registro central com nomes de banco/papel derivados do UUID e imutáveis, referências de segredo sem senha no banco, estados PROVISIONING/ACTIVE/SUSPENDED/FAILED, autorização por participação ativa e conexão explícita com conferência de identidade no banco de destino. Não há fallback para o banco central nem tenant padrão. Credenciais são resolvidas na configuração do servidor, nunca recebidas do navegador.
+
+**Consequências:** Migrações separadas para banco central e bancos de clínicas; provisionamento, migração e restauração por clínica exigem orquestração. O registro só pode virar ACTIVE após banco, identidade, migrações e permissões verificados. Não realizar CREATE DATABASE dentro de transação de cadastro: PostgreSQL exige operação fora de transação, com retomada e compensação. UUID deve ser preservado entre tentativas.
+
+**Limites atuais:** Fundação implementada; cadastro/login, provisionador de banco/papel, rotação de segredos, pools limitados e integração JPA multitenant ainda serão implementados. Nenhum endpoint permite selecionar tenant por header. O banco central atual continua com credencial administrativa do ambiente Docker local; antes de expor cadastro ou dados reais, separar papel de execução do papel provisionador. Entidades de domínio NÃO devem usar o EntityManager central. Workers e IA precisam de identidade de serviço e autorização próprias.
+
+**Qualidade:** Constraints, relações e índices no banco central; conferência de UUID no banco conectado; ausência/inatividade/segredo ausente causam falha fechada. Detalhes em ../multitenancy.md.
+
+## ADR-015 — Identidade global e autenticação por sessão
+
+**Data:** 05/11/2026. **Status:** Adotada para a primeira entrega de acesso.
+
+**Decisão:** Identidade global no banco central, participação/papel por clínica, autenticação por sessão de servidor com cookie HttpOnly/SameSite e CSRF habilitado. Usar filtros nativos de login/logout com respostas HTTP sem redirects. Sem JWT em armazenamento do navegador. Seleção de clínica exige participação ativa e não atribui autoridade global. Versão e estado da conta são revalidados em cada requisição; tenant selecionado também é revalidado.
+
+**Alternativas:** JWT em localStorage; confiar em tenant informado por header; atribuir papel de clínica globalmente ao usuário.
+
+**Consequências:** Sessões atualmente em memória atendem uma instância e se perdem no reinício; armazenamento compartilhado é necessário para escalar. HTTPS e Secure cookie necessários na hospedagem. Limitação de login é local inicialmente. Login/logout executados por filtros constituem operações de infraestrutura e não recebem implementação fictícia de controller; controllers reais preservam interface documentada e Override. Cadastro, MFA e recuperação ainda pendentes. Detalhes em ../autenticacao.md.

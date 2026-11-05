@@ -159,3 +159,11 @@ Cada AC é identificado pelo cenário e número: SC-001/AC-01, por exemplo. Os c
 - **AC-03:** Dado backup de ambiente de teste, quando restaurado, então a consistência dos dados será verificada e o resultado documentado antes do piloto.
 - **AC-04:** Dada migração de banco, quando aplicada em ambiente de validação, então será reproduzível e terá procedimento documentado de recuperação em caso de falha.
 - **AC-05:** Dado acesso administrativo da plataforma, quando utilizado, então exigirá autorização própria e produzirá trilha de auditoria; não haverá consulta irrestrita implícita aos dados clínicos.
+
+## Revisão de isolamento — 05/11/2026
+
+ADR-014 substitui a estratégia de banco compartilhado. SC-003/AC-04 deve ser validado entre bancos distintos. SC-017 e SC-018 estão detalhados em multitenancy.md e incluem requisitos ainda não implementados.
+
+## Entrega parcial de acesso — 05/11/2026
+
+SC-001: login implementado, cadastro/verificação/MFA pendentes. SC-002: logout implementado, recuperação pendente. SC-003: participação, seleção e validação implementadas; convite e permissões granulares pendentes. Ver autenticacao.md para protocolo e testes. Não considerar os cenários completos.

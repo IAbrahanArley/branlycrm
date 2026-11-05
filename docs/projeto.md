@@ -29,3 +29,8 @@ Nenhuma tela funcional de login, agenda ou atendimento foi implementada. Não ho
 ## Inicialização local
 
 Dentro de frontend: npm install e npm run dev. Verificações: npm run lint, npx tsc --noEmit e npm run build. Dependências e artefatos gerados não devem ser versionados.
+
+
+## Validação Docker — 05/11/2026
+
+A compilação de produção do frontend passou dentro do Docker. Backend compilado, PostgreSQL conectado, Flyway V1 aplicado e vector 0.8.7 habilitado. Página e saúde da API retornaram HTTP 200 via Nginx em localhost:8088. A chamada interna frontend → backend também retornou 200/UP. Isso resolve a validação da imagem de produção; a falha anterior da compilação nativa no Windows não foi reavaliada.

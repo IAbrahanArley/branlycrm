@@ -69,3 +69,7 @@ Prioridade de prototipação: caixa de entrada e agenda. Lovable foi oferecido p
 ## Validação
 
 Detalhes verificáveis e exceções estão em cenarios-e-aceitacao.md. O piloto exige o fluxo completo, isolamento, concorrência de reservas, revogação de acesso, repetição de eventos e falhas de provedores verificados.
+
+## Decisão posterior de isolamento
+
+Em 05/11/2026 foi definido banco próprio por clínica, com tenant_id UUID e registro central. ADR-014 substitui a estratégia anterior de banco compartilhado; ver multitenancy.md.

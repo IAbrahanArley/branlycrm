@@ -5,7 +5,7 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 ## Leitura
 
 - [Escopo funcional](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-012](adr/decisoes.md)
+- [Decisões arquiteturais — ADR-001 a ADR-015](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
 - [Entregas e pendências](entregas-e-pendencias.md)
@@ -14,3 +14,9 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 SC significa cenário; AC significa critério de aceitação. Propostas e detalhes ainda não confirmados estão identificados como pendências. Regras propostas nos ACs não constituem aprovação comercial automática.
 
 Os documentos originais foram preservados e complementados. ADRs históricas mantêm suas datas; decisões novas estão datadas separadamente. Mudanças futuras devem registrar qual decisão substituem.
+
+- [Ambiente Docker e conexões](docker.md)
+
+- [Multitenancy: banco por clínica](multitenancy.md)
+
+- [Identidade e Spring Security](autenticacao.md)
