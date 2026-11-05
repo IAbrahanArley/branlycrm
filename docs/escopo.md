@@ -1,5 +1,7 @@
 # Escopo funcional do MVP
 
+> **Substituído em parte (ADR-019, 05/11/2026):** o escopo do MVP passou a ser [planejamento-crm-clinicas-estetica.md](planejamento-crm-clinicas-estetica.md). WhatsApp, automações e campanhas foram para a Fase 2 e IA para a Fase 3. Este texto permanece como histórico e como referência de requisitos dessas fases.
+
 Consolidado em 05/11/2026 a partir das decisões da conversa.
 
 ## Objetivo e jornada
