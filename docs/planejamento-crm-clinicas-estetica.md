@@ -52,7 +52,7 @@
 
 **Regra:** implementar RBAC e isolamento por clínica em todas as operações de backend e banco de dados. Um usuário pode ter papéis distintos em clínicas diferentes.
 
-**Estado atual:** o banco central aceita hoje os papéis `ADMIN`, `RECEPTION` e `PROFESSIONAL` (V2). Adotar os cinco perfis acima exige migração do catálogo e mapeamento (proposta: Proprietário→`OWNER`, Gerente→`MANAGER`, Recepcionista→`RECEPTION`, Vendedor→`SALES`, Profissional→`PROFESSIONAL`; `ADMIN` atual→`OWNER`). Decisão pendente registrada em CRM-012. Super Admin é autorização própria da plataforma, nunca um papel de clínica.
+**Decidido (ADR-020):** Proprietário→`OWNER`, Gerente→`MANAGER`, Recepcionista→`RECEPTION`, Vendedor→`SALES`, Profissional→`PROFESSIONAL`; o `ADMIN` atual vira `OWNER`. Responsabilidades e matriz de permissões em [permissoes.md](permissoes.md); a migração do catálogo é parte de CRM-012. Super Admin é autorização própria da plataforma, nunca um papel de clínica.
 
 ## 3. Jornada comercial do paciente
 
@@ -260,7 +260,8 @@ A sugestão original (NestJS, Supabase Auth, Redis/BullMQ) foi substituída pela
 | Autenticação | Spring Security com sessão de servidor, cookie HttpOnly e CSRF | ADR-015 |
 | Jobs | Processos Java separados e fila persistente no PostgreSQL (ex.: provisionador); Redis/broker só com necessidade real | ADR-005, ADR-018 |
 | Ambiente local | Docker Compose com Nginx como proxy | ADR-013 |
-| Deploy | Pendente: plataforma com containers e PostgreSQL gerenciado | CRM-001 |
+| E-mail transacional | Resend, por API HTTP | ADR-021 |
+| Deploy | AWS Lightsail (backend e PostgreSQL) + Vercel (Next.js) | ADR-022 |
 | Mensageria futura | WhatsApp Business Platform oficial | Fase 2 (ADR-005/007 como desenho prévio) |
 | Cobrança futura | Asaas, Pagar.me ou Stripe, conforme validação | Fase 2 |
 
@@ -379,7 +380,9 @@ Entrega: código, migrations, testes e breve documentação.
 - [x] Política de multiunidades: uma unidade por clínica no MVP, estrutura preparada para expansão ([escopo.md](escopo.md)).
 - [ ] Modelo de cobrança, preços e limites dos planos.
 - [x] Agendamento nativo no CRM (ADR-004).
-- [ ] Catálogo final de papéis (ver seção 2.3 e CRM-012).
+- [x] Catálogo de papéis (ADR-020, [permissoes.md](permissoes.md)).
+- [x] E-mail transacional pelo Resend (ADR-021).
+- [x] Hospedagem: Lightsail e Vercel (ADR-022).
 - [ ] Campos e nomenclatura final dos procedimentos.
 - [ ] Definições exatas das métricas e atribuição de vendas.
 - [ ] Política de retenção, exportação e exclusão de dados.

@@ -18,7 +18,7 @@
 **Depende de:** nenhuma.
 **Entregas:** ADR com stack final, monorepo ou repositórios separados, ORM, provedor de autenticação, deploy, estratégia de isolamento e fuso horário.
 **Aceite:** decisões aprovadas e registradas; dúvidas explicitadas; nenhuma tecnologia suposta como existente.
-**Estado:** decididos stack (ADR-001, ADR-012, ADR-017), monorepo (ADR-011), persistência JDBC em identidade/registro e JPA de clínica adiada (ADR-017, ADR-018), autenticação por sessão (ADR-015), banco por clínica (ADR-014), UTC no banco e fuso da clínica (ADR-004) e escopo do MVP (ADR-019). **Falta:** hospedagem/deploy e armazenamento gerenciado de segredos.
+**Estado:** decididos stack (ADR-001, ADR-012, ADR-017), monorepo (ADR-011), persistência JDBC em identidade/registro e JPA de clínica adiada (ADR-017, ADR-018), autenticação por sessão (ADR-015), banco por clínica (ADR-014), UTC no banco e fuso da clínica (ADR-004) e escopo do MVP (ADR-019). Papéis (ADR-020), e-mail com Resend (ADR-021) e hospedagem (ADR-022: Lightsail para o backend e Vercel para o Next.js) decididos. **Falta:** armazenamento de segredos na VM (permissões, backup e rotação) e a configuração de proxy confiável descrita na ADR-022, ambos em CRM-072.
 
 ### [-] CRM-002 — Criar estrutura do repositório e CI (P0)
 **Depende de:** CRM-001.
@@ -52,11 +52,24 @@
 **Aceite:** usuário não autenticado não acessa recursos protegidos; sessões inválidas são rejeitadas; testes passam.
 **Estado:** login/logout por filtros do Spring Security, CSRF, cookie HttpOnly/SameSite, revogação por `auth_version`, limite de tentativas ([autenticacao.md](docs/autenticacao.md)). **Falta:** recuperação de senha, convite, segundo fator para administradores, sessões compartilhadas para múltiplas réplicas.
 
-### [-] CRM-012 — Implementar contexto tenant e RBAC (P0)
+### [x] CRM-012 — Implementar contexto tenant e RBAC (P0)
 **Depende de:** CRM-010, CRM-011.
 **Entregas:** resolução de clínica ativa, guards/policies por papel e helpers de acesso com escopo.
 **Aceite:** usuário da clínica A não acessa recursos da B, mesmo com IDs conhecidos ou parâmetros manipulados; testes de negação e permissão passam.
-**Estado:** seleção de clínica revalidada a cada requisição; acesso ao banco da clínica só por `TenantConnectionRepository(tenant, sujeito)`; prova A/B física com papéis sem superusuário ([provisionamento-clinicas.md](docs/provisionamento-clinicas.md)). **Falta:** decidir o catálogo de papéis (5 perfis do planejamento × `ADMIN`/`RECEPTION`/`PROFESSIONAL` atuais), matriz de permissões e sua aplicação no servidor.
+**Estado (05/11/2026):** concluída na branch `feat/crm-012-rbac`.
+- Seleção de clínica revalidada a cada requisição e prova A/B física (ADR-014, ADR-018).
+- Cinco papéis e matriz executável em `tenant/domain/ClinicRole` (ADR-020, [permissoes.md](docs/permissoes.md)); `TenantAccessService.require` e `ClinicAccess` como helpers de escopo.
+- V6: catálogo novo, `ADMIN`→`OWNER`, triggers de último proprietário e de ativação, runtime sem `DELETE` e com `UPDATE (role, active)` em participações.
+- Gestão de equipe na clínica selecionada: `GET /v1/auth/clinic` e `GET`/`PUT`/`DELETE` em `/v1/clinic/team`.
+- **Testes:** `./mvnw -B -ntp clean verify` → 44 unitários (2 ignorados no Windows) e 22 de integração passaram, entre eles `ClinicRoleTest`, `TeamPolicyTest`, `TeamManagementIT` (A/B, CSRF, papéis, último proprietário, concorrência e revogação) e `TeamRuntimeGrantsIT`. No Compose, V6 aplicada e `verify-roles.sh` passou.
+- **Revisões:** `architect` antes, `security` (achados baixos corrigidos) e `reviewer` (sugestões aplicadas).
+- **Pendências levadas adiante:**
+  - cálculo de "próprios" em cada módulo de negócio;
+  - auditoria das ações de equipe (CRM-070);
+  - convite e reativação de membros (CRM-013);
+  - desativação de contas pela plataforma travando a clínica (antes de existir esse fluxo);
+  - e-mail de ex-membros (CRM-073);
+  - decidir antes da CRM-013 se a gestão de equipe fica toda no módulo `tenant` (hoje o controller está em `identity`).
 
 ### [-] CRM-013 — Onboarding e configurações básicas da clínica (P1)
 **Depende de:** CRM-012, CRM-014.
@@ -66,7 +79,7 @@
 
 ### [ ] CRM-014 — Cadastro público e verificação de e-mail (P0)
 **Depende de:** CRM-011.
-**Entregas:** pedido de cadastro idempotente, token de verificação aleatório guardado só como hash, reenvio limitado, criação da tarefa de provisionamento na mesma transação ([plano-onboarding.md](docs/plano-onboarding.md), etapas 2–3).
+**Entregas:** pedido de cadastro idempotente, token de verificação aleatório guardado só como hash, reenvio limitado, criação da tarefa de provisionamento na mesma transação ([plano-onboarding.md](docs/plano-onboarding.md), etapas 2–3). Envio pelo Resend com adaptador local em desenvolvimento (ADR-021).
 **Aceite:** cadastro repetido ou concorrente não duplica identidade, clínica ou tarefa; token vencido, reutilizado ou incorreto é recusado; respostas não revelam se o e-mail existe; não é possível tomar conta existente informando seu e-mail.
 
 ### [ ] CRM-015 — Persistência JPA da clínica (P0)
@@ -186,7 +199,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 ### [ ] CRM-072 — Backup, restauração e operação (P0)
 **Depende de:** CRM-003, CRM-070.
-**Entregas:** documentação de deploy, variáveis de ambiente, backups e procedimento de restauração (central e por clínica).
+**Entregas:** documentação de deploy na VM Lightsail e na Vercel (ADR-022): rewrite `/api`, TLS, firewall, proxy confiável para o IP real do cliente, variáveis de ambiente, backups fora da VM e procedimento de restauração (central e por clínica).
 **Aceite:** restauração realizada em ambiente isolado; monitoramento e recuperação operacional documentados.
 
 ### [ ] CRM-073 — Revisão de privacidade e LGPD (P0)
@@ -211,9 +224,11 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 ## Decisões pendentes para o responsável pelo produto
 
 - [-] Nome e identidade do SaaS ("Branly CRM" em uso).
-- [x] Stack final, ORM e provedor de autenticação (ADR-001, ADR-015, ADR-017, ADR-018). [ ] Hospedagem.
+- [x] Stack final, ORM e provedor de autenticação (ADR-001, ADR-015, ADR-017, ADR-018).
+- [x] Hospedagem: Lightsail e Vercel (ADR-022).
+- [x] E-mail transacional: Resend (ADR-021).
 - [x] Uma unidade por clínica no MVP.
-- [ ] Catálogo final de papéis e matriz de permissões (CRM-012).
+- [x] Catálogo de papéis e matriz de permissões (ADR-020, [permissoes.md](docs/permissoes.md)).
 - [ ] Planos, preços, limites e política de suspensão.
 - [x] Agenda própria (ADR-004).
 - [ ] Definições exatas das métricas e atribuição comercial (CRM-050).
@@ -236,4 +251,4 @@ PR ou commit (se houver):
 
 ## Primeira instrução para um agente
 
-> Leia `AGENTS.md`, `docs/planejamento-crm-clinicas-estetica.md` e `TASKS.md`. Inspecione o repositório e confirme o estado das tarefas `[-]`. Proponha a próxima tarefa desbloqueada (hoje: CRM-014 ou a decisão de papéis de CRM-012), com plano, arquivos, riscos e testes, e indique quais papéis de agente participam. Aguarde aprovação antes de implementar.
+> Leia `AGENTS.md`, `docs/planejamento-crm-clinicas-estetica.md` e `TASKS.md`. Inspecione o repositório e confirme o estado das tarefas `[-]`. Proponha a próxima tarefa desbloqueada (hoje: CRM-004, CI de CRM-002 ou CRM-015), com plano, arquivos, riscos e testes, e indique quais papéis de agente participam. Aguarde aprovação antes de implementar.

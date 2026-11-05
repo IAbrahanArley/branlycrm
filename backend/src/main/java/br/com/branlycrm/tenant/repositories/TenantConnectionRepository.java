@@ -40,7 +40,8 @@ public class TenantConnectionRepository {
     TenantDatabase database =
         registry
             .findAuthorized(tenantId, authenticatedSubject)
-            .orElseThrow(TenantAccessException::new);
+            .orElseThrow(TenantAccessException::new)
+            .database();
     TenantSecret secret =
         secrets
             .read(database)

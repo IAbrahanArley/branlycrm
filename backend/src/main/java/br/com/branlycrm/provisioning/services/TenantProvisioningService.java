@@ -139,6 +139,10 @@ public class TenantProvisioningService {
             throw new ProvisioningException("ADMIN_NOT_ELIGIBLE");
           }
           registry.addAdmin(task.tenantId(), task.adminSubjectId());
+          // ON CONFLICT DO NOTHING keeps an existing membership; it must be an active OWNER.
+          if (!registry.isActiveOwner(task.tenantId(), task.adminSubjectId())) {
+            throw new ProvisioningException("ADMIN_NOT_OWNER");
+          }
           if (!registry.changeStatus(task.tenantId(), "PROVISIONING", "ACTIVE")) {
             throw new ProvisioningException("TENANT_NOT_PROVISIONING");
           }
