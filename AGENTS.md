@@ -77,7 +77,7 @@ Módulos existentes: `identity`, `tenant`, `provisioning`, `config`. Novos módu
 ## 8. Padrão de desenvolvimento e qualidade
 
 **Backend** ([padroes-backend.md](docs/padroes-backend.md)), por módulo: `controllers/`, `services/`, `repositories/`, `domain/`, `dto/request`, `dto/response`, `exceptions/` e, quando necessário, `security/`, `config/`, `secrets/`.
-- Controllers `public final`, OpenAPI nos métodos e um `*ErrorHandler` por controller (`{"message"}`, 503 com `Retry-After` em falha de banco).
+- Controllers `public final`, OpenAPI nos métodos e um `*ErrorHandler` por controller, com o corpo de erro `{code, message, fields}` e paginação de [api-convencoes.md](docs/api-convencoes.md).
 - Services com regras e transações, sem SQL, JDBC ou JPA, e devolvem DTOs `*View`.
 - Repositories com SQL parametrizado, sem HTTP, DTOs ou services. Identificadores SQL só derivados do UUID, validados e citados.
 - Domain em records com invariantes, sem Spring, e `toString` sem segredos.
@@ -90,7 +90,8 @@ Módulos existentes: `identity`, `tenant`, `provisioning`, `config`. Novos módu
 
 **Checks canônicos** (o que cada um prova: [qualidade.md](docs/qualidade.md)):
 - Backend (`backend/`, JDK 21 e Docker): `.\mvnw.cmd -B -ntp clean verify` (Linux: `./mvnw -B -ntp clean verify`). Antes, `.\mvnw.cmd spotless:apply`.
-- Frontend (`frontend/`): `npm ci`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+- Frontend (`frontend/`): `npm ci`, `npm run lint`, `npm run typecheck`, `npm run build`.
+- A CI (`.github/workflows/ci.yml`) roda os mesmos checks em todo PR.
 - Ambiente: `docker compose up -d --build --wait` na raiz.
 
 Sem `TODO` silencioso em fluxos críticos; limitações e bloqueios ficam documentados.

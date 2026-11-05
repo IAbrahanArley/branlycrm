@@ -1,5 +1,6 @@
 package br.com.branlycrm.identity.security;
 
+import br.com.branlycrm.common.controllers.ApiErrors;
 import br.com.branlycrm.identity.services.IdentityService;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.services.TenantAccessService;
@@ -37,7 +38,7 @@ public class SessionValidationFilter extends OncePerRequestFilter {
       if (!identities.isCurrent(principal)) {
         if (session != null) session.invalidate();
         SecurityContextHolder.clearContext();
-        response.setStatus(401);
+        ApiErrors.write(response, 401, ApiErrors.SESSION_REVOKED, "Sessão encerrada.");
         return;
       }
       if (session != null && session.getAttribute(SELECTED_TENANT) instanceof UUID tenantId) {
@@ -45,7 +46,8 @@ public class SessionValidationFilter extends OncePerRequestFilter {
           tenants.authorize(tenantId, principal.subjectId());
         } catch (TenantAccessException denied) {
           session.removeAttribute(SELECTED_TENANT);
-          response.setStatus(403);
+          ApiErrors.write(
+              response, 403, ApiErrors.CLINIC_ACCESS_DENIED, "Acesso à clínica negado.");
           return;
         }
       }

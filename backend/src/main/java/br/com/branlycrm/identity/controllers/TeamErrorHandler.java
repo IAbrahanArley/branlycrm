@@ -1,10 +1,12 @@
 package br.com.branlycrm.identity.controllers;
 
+import br.com.branlycrm.common.controllers.ApiErrors;
+import br.com.branlycrm.common.dto.response.ApiError;
+import br.com.branlycrm.common.exceptions.InvalidInputException;
 import br.com.branlycrm.identity.exceptions.ClinicNotSelectedException;
-import br.com.branlycrm.identity.exceptions.InvalidRequestException;
 import br.com.branlycrm.tenant.exceptions.TeamException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
-import java.util.Map;
+import java.util.List;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -15,45 +17,46 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 /** HTTP translation for team endpoints; no SQL detail or stack trace reaches the client. */
 @RestControllerAdvice(assignableTypes = TeamController.class)
 public final class TeamErrorHandler {
+  public static final String MEMBER_NOT_FOUND = "MEMBER_NOT_FOUND";
+  public static final String MEMBER_CHANGE_FORBIDDEN = "MEMBER_CHANGE_FORBIDDEN";
+  public static final String LAST_OWNER = "LAST_OWNER";
+
   @ExceptionHandler(TeamException.class)
-  ResponseEntity<Map<String, String>> team(TeamException exception) {
-    int status =
-        switch (exception.reason()) {
-          case NOT_FOUND -> 404;
-          case FORBIDDEN -> 403;
-          case LAST_OWNER -> 409;
-        };
-    return ResponseEntity.status(status).body(Map.of("message", exception.getMessage()));
+  ResponseEntity<ApiError> team(TeamException exception) {
+    return switch (exception.reason()) {
+      case NOT_FOUND -> ApiErrors.response(404, MEMBER_NOT_FOUND, exception.getMessage());
+      case FORBIDDEN -> ApiErrors.response(403, MEMBER_CHANGE_FORBIDDEN, exception.getMessage());
+      case LAST_OWNER -> ApiErrors.response(409, LAST_OWNER, exception.getMessage());
+    };
   }
 
   @ExceptionHandler(TenantAccessException.class)
-  ResponseEntity<Map<String, String>> denied(TenantAccessException exception) {
-    return ResponseEntity.status(403).body(Map.of("message", exception.getMessage()));
+  ResponseEntity<ApiError> denied(TenantAccessException exception) {
+    return ApiErrors.response(403, ApiErrors.CLINIC_ACCESS_DENIED, exception.getMessage());
   }
 
   @ExceptionHandler(ClinicNotSelectedException.class)
-  ResponseEntity<Map<String, String>> notSelected(ClinicNotSelectedException exception) {
-    return ResponseEntity.status(409).body(Map.of("message", exception.getMessage()));
+  ResponseEntity<ApiError> notSelected(ClinicNotSelectedException exception) {
+    return ApiErrors.response(409, ApiErrors.CLINIC_NOT_SELECTED, exception.getMessage());
   }
 
-  @ExceptionHandler({
-    InvalidRequestException.class,
-    HttpMessageNotReadableException.class,
-    MethodArgumentTypeMismatchException.class
-  })
-  ResponseEntity<Map<String, String>> invalid() {
-    return ResponseEntity.badRequest()
-        .body(
-            Map.of(
-                "message",
-                "Dados inválidos. Use um identificador válido e um papel entre OWNER, MANAGER,"
-                    + " RECEPTION, SALES e PROFESSIONAL."));
+  @ExceptionHandler(InvalidInputException.class)
+  ResponseEntity<ApiError> invalid(InvalidInputException exception) {
+    return ApiErrors.invalidInput(exception.fields());
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  ResponseEntity<ApiError> invalidParameter(MethodArgumentTypeMismatchException exception) {
+    return ApiErrors.invalidInput(List.of(exception.getName()));
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  ResponseEntity<ApiError> unreadable() {
+    return ApiErrors.invalidInput(List.of("body"));
   }
 
   @ExceptionHandler(DataAccessException.class)
-  ResponseEntity<Map<String, String>> unavailable() {
-    return ResponseEntity.status(503)
-        .header("Retry-After", "5")
-        .body(Map.of("message", "Serviço temporariamente indisponível."));
+  ResponseEntity<ApiError> unavailable() {
+    return ApiErrors.unavailable();
   }
 }

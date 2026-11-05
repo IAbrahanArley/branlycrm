@@ -10,6 +10,7 @@ Monólito modular, com camadas dentro de cada funcionalidade. Criar apenas os pa
 br.com.branlycrm/
   BranlyCrmApplication.java
   config/                  segurança, OpenAPI e migrador central
+  common/                  contrato HTTP comum: ApiError, ApiErrors, PageQuery, PageView, InvalidInputException
   identity/ | tenant/
     controllers/           rotas e tradução HTTP (*Controller, *ErrorHandler)
     services/              casos de uso, regras e transações
@@ -26,7 +27,8 @@ Não criar módulos futuros, classes base genéricas ou interfaces sem uso demon
 ## Responsabilidades
 
 - **Controllers:** classe `public final` com `@RestController`, rotas, parsing, identidade autenticada e respostas. Documentação OpenAPI (`@Tag`, `@Operation`, `@ApiResponse`, `@SecurityRequirement`) fica no próprio método. Sem SQL nem acesso direto a repositórios.
-- **ErrorHandler:** um `@RestControllerAdvice(assignableTypes = ...)` por controller traduz exceções do módulo em status e `{"message": ...}`. Falha de banco vira 503 com `Retry-After`, sem detalhes SQL ou stack trace.
+- **ErrorHandler:** um `@RestControllerAdvice(assignableTypes = ...)` por controller traduz as exceções do módulo em status e no corpo padrão `{"code", "message", "fields"}` (ver [api-convencoes.md](api-convencoes.md)). Falha de banco vira 503 `SERVICE_UNAVAILABLE` com `Retry-After`, sem detalhes SQL ou stack trace.
+- **Listas, filtros e validação:** paginação com `PageQuery`/`PageView`, filtros validados em records de consulta do domínio e `InvalidInputException` para entrada inválida, conforme [api-convencoes.md](api-convencoes.md).
 - **Services:** casos de uso e fronteiras transacionais (`@Transactional`). Dependências por construtor; sem `JdbcTemplate`, `java.sql` ou JPA. Devolvem DTOs de resposta, nunca linhas do banco.
 - **Repositories:** consultas parametrizadas, mapeamento e conexões. Não chamam services ou controllers e não conhecem HTTP nem DTOs.
 - **Domain:** records e valores com invariantes no construtor; nenhuma dependência de Spring ou de outras camadas. `toString` não expõe hashes, e-mails ou segredos.

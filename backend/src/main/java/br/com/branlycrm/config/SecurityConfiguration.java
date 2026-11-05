@@ -1,5 +1,6 @@
 package br.com.branlycrm.config;
 
+import br.com.branlycrm.common.controllers.ApiErrors;
 import br.com.branlycrm.identity.security.LoginRateLimitFilter;
 import br.com.branlycrm.identity.security.SessionValidationFilter;
 import br.com.branlycrm.identity.services.IdentityService;
@@ -15,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfException;
 
 /**
  * ADR-015: server session with HttpOnly cookie and CSRF. Login and logout are handled by the native
@@ -51,8 +53,27 @@ public class SecurityConfiguration {
         .exceptionHandling(
             errors ->
                 errors
-                    .authenticationEntryPoint((request, response, error) -> response.setStatus(401))
-                    .accessDeniedHandler((request, response, error) -> response.setStatus(403)))
+                    .authenticationEntryPoint(
+                        (request, response, error) ->
+                            ApiErrors.write(
+                                response,
+                                401,
+                                ApiErrors.AUTHENTICATION_REQUIRED,
+                                "Autenticação necessária."))
+                    .accessDeniedHandler(
+                        (request, response, error) -> {
+                          // A missing or stale CSRF token is recoverable: fetch a new one.
+                          if (error instanceof CsrfException) {
+                            ApiErrors.write(
+                                response,
+                                403,
+                                ApiErrors.CSRF_INVALID,
+                                "Token CSRF ausente ou expirado.");
+                          } else {
+                            ApiErrors.write(
+                                response, 403, ApiErrors.ACCESS_DENIED, "Acesso negado.");
+                          }
+                        }))
         .formLogin(
             login ->
                 login
@@ -66,7 +87,14 @@ public class SecurityConfiguration {
                               .removeAttribute(SessionValidationFilter.SELECTED_TENANT);
                           response.setStatus(204);
                         })
-                    .failureHandler((request, response, error) -> response.setStatus(401)))
+                    .failureHandler(
+                        // Same answer for unknown, wrong password, inactive or unverified account.
+                        (request, response, error) ->
+                            ApiErrors.write(
+                                response,
+                                401,
+                                ApiErrors.INVALID_CREDENTIALS,
+                                "E-mail ou senha inválidos.")))
         .logout(
             logout ->
                 logout
