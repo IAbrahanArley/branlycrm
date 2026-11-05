@@ -51,6 +51,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
       SPRING_DATASOURCE_USERNAME: crm_control_runtime
       SPRING_DATASOURCE_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
+      APP_TENANCY_SECRETS_DIRECTORY: /run/branly/tenant-secrets
+    volumes:
+      # Read-only: only the future provisioner writes clinic credentials (ADR-016).
+      - tenant_secrets:/run/branly/tenant-secrets:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,3 +94,4 @@ services:
     restart: unless-stopped
 volumes:
   postgres_data:
+  tenant_secrets:

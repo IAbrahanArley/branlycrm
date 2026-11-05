@@ -43,7 +43,7 @@ Também foi validada instalação completa em banco vazio temporário (V1–V4),
 ## Pendências
 
 - Prover papéis exclusivos de proprietário/migrador/runtime para cada clínica e conferir rejeição de conexão A → B.
-- Definir armazenamento de segredos de clínicas, rotação e pools.
+- Armazenamento local e rotação versionada de segredos de clínicas implementados ([segredos-clinicas.md](segredos-clinicas.md)); faltam armazenamento gerenciado da hospedagem e pools.
 - Separar JPA central e tenant antes dos dados de domínio.
 - Automatizar cadastro, e-mail e provisionamento.
 - Privilégios atuais são para o ambiente local; CREATEROLE/CREATEDB precisam permanecer restritos ao processo provisionador.

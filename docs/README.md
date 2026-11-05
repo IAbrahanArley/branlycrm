@@ -28,3 +28,5 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 - [Separação de credenciais PostgreSQL](credenciais-postgres.md)
 
 - [Próxima etapa: credenciais por clínica e isolamento](plano-isolamento-clinicas.md)
+
+- [Segredos das clínicas](segredos-clinicas.md)

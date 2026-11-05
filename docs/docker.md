@@ -40,6 +40,8 @@ O perfil docker desativa a integração automática Spring Docker Compose. O ant
 
 ## Limites
 
+O volume `tenant_secrets` é montado somente leitura no backend para credenciais de clínicas ([segredos-clinicas.md](segredos-clinicas.md)).
+
 Ambiente local HTTP. TLS, domínio, segredos de produção, backups agendados e monitoramento externo serão definidos para hospedagem. IA, WhatsApp, armazenamento e cobrança ainda não estão integrados.
 
 ## Resultado da verificação
