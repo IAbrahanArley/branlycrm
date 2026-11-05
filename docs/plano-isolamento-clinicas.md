@@ -64,7 +64,7 @@ Depois da prova de isolamento: separar EntityManager central e tenant, configura
 
 ## Ordem dos próximos itens
 
-1. Contrato/adaptador local de segredos com testes de leitura, referência inválida e ausência.
+1. Contrato/adaptador local de segredos com testes de leitura, referência inválida e ausência. **Concluído em 05/11/2026** — [segredos-clinicas.md](segredos-clinicas.md).
 2. Provisionamento interno de papéis e banco com tratamento de falha parcial.
 3. Migração e ativação com verificação de identidade.
 4. Prova A/B e limpeza segura.

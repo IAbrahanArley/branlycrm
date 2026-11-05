@@ -4,13 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.branlycrm.support.TestPostgres;
+import br.com.branlycrm.tenant.domain.TenantDatabase;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.repositories.TenantConnectionRepository;
+import br.com.branlycrm.tenant.secrets.FileTenantSecretWriter;
+import br.com.branlycrm.tenant.secrets.TenantSecretException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Locale;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +31,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * Connects to real per-clinic databases with their own login role and password over TCP.
- * Cross-credential isolation (A cannot reach B) belongs to the provisioner and is not proven here.
+ * Connects to real per-clinic databases with their own login role over TCP, reading the password
+ * from files published by the provisioner's writer. Cross-credential isolation (A cannot reach B)
+ * belongs to the provisioner and is not proven here.
  */
 @Testcontainers
 @SpringBootTest(properties = "spring.docker.compose.enabled=false")
@@ -35,7 +43,10 @@ class TenantConnectionIT {
 
   private static final UUID CLINIC = UUID.randomUUID();
   private static final UUID MISMATCHED = UUID.randomUUID();
+  private static final UUID WITHOUT_SECRET = UUID.randomUUID();
+  private static final UUID ROTATED = UUID.randomUUID();
   private static final String SECRET = "synthetic-" + UUID.randomUUID();
+  private static final Path SECRETS = temporaryDirectory();
 
   @Autowired JdbcTemplate jdbc;
   @Autowired TenantConnectionRepository connections;
@@ -44,8 +55,7 @@ class TenantConnectionIT {
   static void tenantDatabase(DynamicPropertyRegistry registry) {
     registry.add("app.tenancy.host", POSTGRES::getHost);
     registry.add("app.tenancy.port", () -> POSTGRES.getMappedPort(5432));
-    registry.add(secretReference(CLINIC), () -> SECRET);
-    registry.add(secretReference(MISMATCHED), () -> SECRET);
+    registry.add("app.tenancy.secrets.directory", SECRETS::toString);
   }
 
   @BeforeAll
@@ -53,6 +63,22 @@ class TenantConnectionIT {
     provision(CLINIC, CLINIC);
     // Registry says MISMATCHED, but its database declares another clinic's identity.
     provision(MISMATCHED, UUID.randomUUID());
+    provision(WITHOUT_SECRET, WITHOUT_SECRET);
+    provision(ROTATED, ROTATED);
+    var writer = new FileTenantSecretWriter(SECRETS.toString());
+    for (UUID tenant : new UUID[] {CLINIC, MISMATCHED, ROTATED}) {
+      writer.create(database(tenant), SECRET);
+    }
+    // The file now holds a password the clinic role does not have.
+    writer.rotate(database(ROTATED), 1, "synthetic-" + UUID.randomUUID());
+  }
+
+  @AfterAll
+  static void removeTheSecretDirectoryThisClassCreated() throws IOException {
+    try (var files = Files.list(SECRETS)) {
+      for (Path file : files.toList()) Files.delete(file);
+    }
+    Files.delete(SECRETS);
   }
 
   @Test
@@ -73,6 +99,22 @@ class TenantConnectionIT {
     assertThatThrownBy(() -> connections.open(MISMATCHED, subject))
         .isInstanceOf(SQLException.class)
         .hasMessage("Tenant database identity mismatch");
+  }
+
+  @Test
+  void missingSecretFailsClosedWithoutFallback() {
+    UUID subject = activeMember(WITHOUT_SECRET);
+    assertThatThrownBy(() -> connections.open(WITHOUT_SECRET, subject))
+        .isInstanceOf(TenantSecretException.class)
+        .hasMessage("Tenant credentials unavailable");
+  }
+
+  @Test
+  void passwordComesFromTheSecretStore() {
+    UUID subject = activeMember(ROTATED);
+    assertThatThrownBy(() -> connections.open(ROTATED, subject))
+        .isInstanceOf(SQLException.class)
+        .hasMessageNotContaining(SECRET);
   }
 
   @Test
@@ -129,6 +171,20 @@ class TenantConnectionIT {
       statement.execute(
           "INSERT INTO tenant_identity (tenant_id) VALUES ('" + declaredIdentity + "')");
       statement.execute("GRANT SELECT ON tenant_identity TO tenant_" + suffix);
+    }
+  }
+
+  private static TenantDatabase database(UUID tenant) {
+    String suffix = suffix(tenant);
+    return new TenantDatabase(
+        tenant, "clinic_" + suffix, "tenant_" + suffix, secretReference(tenant));
+  }
+
+  private static Path temporaryDirectory() {
+    try {
+      return Files.createTempDirectory("branly-tenant-secrets-");
+    } catch (IOException exception) {
+      throw new IllegalStateException(exception);
     }
   }
 

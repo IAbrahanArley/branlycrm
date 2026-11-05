@@ -2,13 +2,14 @@ package br.com.branlycrm.tenant.repositories;
 
 import br.com.branlycrm.tenant.domain.TenantDatabase;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
+import br.com.branlycrm.tenant.secrets.TenantSecretException;
+import br.com.branlycrm.tenant.secrets.TenantSecretReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -22,20 +23,20 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class TenantConnectionRepository {
   private final TenantRegistryRepository registry;
-  private final Environment environment;
+  private final TenantSecretReader secrets;
   private final String host;
   private final int port;
 
   public TenantConnectionRepository(
       TenantRegistryRepository registry,
-      Environment environment,
+      TenantSecretReader secrets,
       @Value("${app.tenancy.host:localhost}") String host,
       @Value("${app.tenancy.port:5432}") int port) {
     if (!host.matches("[a-zA-Z0-9.-]+") || port < 1 || port > 65535) {
       throw new IllegalArgumentException("Invalid tenant database endpoint");
     }
     this.registry = registry;
-    this.environment = environment;
+    this.secrets = secrets;
     this.host = host;
     this.port = port;
   }
@@ -50,10 +51,14 @@ public class TenantConnectionRepository {
         registry
             .findAuthorized(tenantId, authenticatedSubject)
             .orElseThrow(TenantAccessException::new);
-    String password = environment.getProperty(database.credentialReference());
-    if (password == null || password.isBlank()) {
-      throw new IllegalStateException("Tenant credentials unavailable");
-    }
+    String password =
+        secrets
+            .read(database)
+            .orElseThrow(
+                () ->
+                    new TenantSecretException(
+                        TenantSecretException.Reason.MISSING, "Tenant credentials unavailable"))
+            .password();
     Properties properties = new Properties();
     properties.setProperty("user", database.databaseUser());
     properties.setProperty("password", password);

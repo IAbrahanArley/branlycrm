@@ -4,7 +4,7 @@ Data: 05/11/2026. Decisão vigente: ADR-014, substituindo banco compartilhado da
 
 ## Separação
 
-Banco central: tenants e tenant_memberships. Cada clínica: banco clinic_<uuid sem hífens>, papel tenant_<uuid sem hífens> e referência de segredo TENANT_SECRET_<UUID sem hífens em maiúsculas>. O segredo fica no servidor/gerenciador de segredos; apenas sua referência vai ao registro.
+Banco central: tenants e tenant_memberships. Cada clínica: banco clinic_<uuid sem hífens>, papel tenant_<uuid sem hífens> e referência de segredo TENANT_SECRET_<UUID sem hífens em maiúsculas>. O segredo fica no servidor/gerenciador de segredos; apenas sua referência vai ao registro. A API só lê, por TenantSecretReader; ver [segredos-clinicas.md](segredos-clinicas.md).
 
 O tenant_id é permanente. No cadastro futuro, o servidor gera UUID e cria registro PROVISIONING; o provisionador cria banco/papel, aplica migrações, insere tenant_identity e verifica isolamento antes de ativar. Falhas deixam registro FAILED e permitem retomada controlada sem gerar outro UUID para a mesma tentativa de cadastro.
 

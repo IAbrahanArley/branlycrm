@@ -57,6 +57,18 @@ class ArchitectureTest {
         .check(CODE);
   }
 
+  /** ADR-016: the API holds read-only secret capability; writing belongs to the provisioner. */
+  @Test
+  void onlyTheSecretStoreKnowsTheSecretWriter() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackage("..tenant.secrets..")
+        .should()
+        .dependOnClassesThat()
+        .haveSimpleName("FileTenantSecretWriter")
+        .check(CODE);
+  }
+
   @Test
   void domainDependsOnNoOtherLayer() {
     noClasses()
