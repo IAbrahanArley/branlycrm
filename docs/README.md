@@ -11,6 +11,7 @@ Comece por aqui:
 - [Backlog executável e estado verificado](../TASKS.md)
 - [Papéis e orquestração dos agentes](agents/ORCHESTRATION.md)
 - [Papéis e permissões das clínicas](permissoes.md)
+- [Convenções da API: erros, paginação, filtros](api-convencoes.md)
 
 Referência:
 

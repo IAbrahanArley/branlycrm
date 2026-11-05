@@ -148,7 +148,12 @@ class TeamManagementIT {
           .doesNotContain("authVersion")
           .doesNotContain("sales-b@example.test")
           .doesNotContain("owner-b@example.test");
-      JsonNode team = Browser.JSON.readTree(response.body());
+      JsonNode page = Browser.JSON.readTree(response.body());
+      assertThat(fieldNames(page)).containsExactlyInAnyOrder("items", "page", "pageSize", "total");
+      assertThat(page.get("page").asInt()).isOne();
+      assertThat(page.get("pageSize").asInt()).isEqualTo(25);
+      assertThat(page.get("total").asLong()).isEqualTo(8);
+      JsonNode team = page.get("items");
       assertThat(team.isArray()).isTrue();
       assertThat(team.size()).as("active and inactive members of clinic A only").isEqualTo(8);
       List<String> subjects = new ArrayList<>();
@@ -174,6 +179,7 @@ class TeamManagementIT {
       var denied = browser.get("/v1/clinic/team");
       assertThat(denied.statusCode()).isEqualTo(403);
       assertThat(denied.body()).doesNotContain("@example.test");
+      assertThat(code(denied)).isEqualTo("CLINIC_ACCESS_DENIED");
     }
   }
 
@@ -234,6 +240,7 @@ class TeamManagementIT {
     assertThat(absent.statusCode()).isEqualTo(404);
     assertThat(inactive.statusCode()).isEqualTo(404);
     assertThat(foreign.body()).isEqualTo(absent.body()).isEqualTo(inactive.body());
+    assertThat(code(foreign)).isEqualTo("MEMBER_NOT_FOUND");
     var foreignDelete = manager.delete("/v1/clinic/team/" + outsiderB, true);
     var absentDelete = manager.delete("/v1/clinic/team/" + UUID.randomUUID(), true);
     assertThat(foreignDelete.statusCode()).isEqualTo(404);
@@ -446,6 +453,10 @@ class TeamManagementIT {
     assertThat(browser.login(email, PASSWORD).statusCode()).isEqualTo(204);
     browser.csrf();
     return browser;
+  }
+
+  private static String code(HttpResponse<String> response) {
+    return Browser.JSON.readTree(response.body()).get("code").asText();
   }
 
   private static List<String> fieldNames(JsonNode node) {

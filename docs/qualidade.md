@@ -8,9 +8,11 @@
 | --- | --- | --- | --- |
 | Backend | `.\mvnw.cmd -B -ntp clean verify` em `backend/` com JDK 21 e Docker | Formatação, compilação, unitários, ArchUnit e integração com PostgreSQL descartável (Testcontainers) | Comportamento no Compose, Nginx ou outro PostgreSQL |
 | Backend | `.\mvnw.cmd spotless:apply` | Aplica a formatação exigida pelo `verify` | — |
-| Frontend | `npm run lint`, `npx tsc --noEmit`, `npm run build` em `frontend/` | Lint, tipos e build de produção | Comportamento em execução |
+| Frontend | `npm run lint`, `npm run typecheck`, `npm run build` em `frontend/` | Lint sem avisos, tipos de rota e TypeScript, build de produção | Comportamento em execução |
 | Ambiente | `docker compose build` e `docker compose up` na raiz | Imagens e ordem de inicialização | Isolamento entre clínicas |
 | Papéis do banco | Procedimento em [credenciais-postgres.md](credenciais-postgres.md) | Privilégios dos papéis centrais | Credenciais por clínica |
+
+**CI:** `.github/workflows/ci.yml` roda os mesmos checks em todo PR e em push na `main`, sem deploy nem segredos. O job do backend executa `./mvnw -B -ntp verify` (Testcontainers usa o Docker do runner). O job do frontend executa `npm ci`, `npm run lint` (zero avisos), `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run build`. As actions são fixadas por SHA.
 
 Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` geram dois candidatos a classe principal.
 

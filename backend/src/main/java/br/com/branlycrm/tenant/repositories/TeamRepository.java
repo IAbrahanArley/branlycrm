@@ -1,9 +1,12 @@
 package br.com.branlycrm.tenant.repositories;
 
+import br.com.branlycrm.common.domain.PageResult;
 import br.com.branlycrm.tenant.domain.ClinicRole;
 import br.com.branlycrm.tenant.domain.TeamMember;
+import br.com.branlycrm.tenant.domain.TeamQuery;
 import br.com.branlycrm.tenant.exceptions.TeamException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -93,11 +96,36 @@ public class TeamRepository {
         .findFirst();
   }
 
-  public List<TeamMember> list(UUID tenantId) {
-    return jdbc.query(
-        COLUMNS + " WHERE m.tenant_id = ? ORDER BY m.active DESC, u.display_name, m.subject_id",
-        MEMBER,
-        tenantId);
+  /** Fixed SQL fragments and bound parameters only; filter values never become SQL text. */
+  public PageResult<TeamMember> list(UUID tenantId, TeamQuery query) {
+    StringBuilder where = new StringBuilder(" WHERE m.tenant_id = ?");
+    List<Object> parameters = new ArrayList<>(List.of(tenantId));
+    if (query.role() != null) {
+      where.append(" AND m.role = ?");
+      parameters.add(query.role().name());
+    }
+    if (query.active() != null) {
+      where.append(" AND m.active = ?");
+      parameters.add(query.active());
+    }
+    Long total =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM tenant_memberships m"
+                + " JOIN user_accounts u ON u.subject_id = m.subject_id"
+                + where,
+            Long.class,
+            parameters.toArray());
+    List<Object> paged = new ArrayList<>(parameters);
+    paged.add(query.page().pageSize());
+    paged.add(query.page().offset());
+    List<TeamMember> items =
+        jdbc.query(
+            COLUMNS
+                + where
+                + " ORDER BY m.active DESC, u.display_name, m.subject_id LIMIT ? OFFSET ?",
+            MEMBER,
+            paged.toArray());
+    return new PageResult<>(items, total == null ? 0 : total);
   }
 
   /** Whether another active owner (with an active, verified account) remains. */

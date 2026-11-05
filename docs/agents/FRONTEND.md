@@ -23,7 +23,7 @@ Use `web-design-guidelines` para revisar as telas alteradas. `design-taste-front
 
 ## Checks
 
-`npm run lint`, `npx tsc --noEmit` e `npm run build` em `frontend/`. Quando a tela depender da API, validar também no Compose (`localhost:8088`).
+`npm run lint`, `npm run typecheck` e `npm run build` em `frontend/` (os mesmos da CI). Quando a tela depender da API, validar também no Compose (`localhost:8088`).
 
 ## Entrega
 

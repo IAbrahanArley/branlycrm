@@ -1,15 +1,17 @@
 package br.com.branlycrm.tenant.services;
 
+import br.com.branlycrm.common.domain.PageResult;
+import br.com.branlycrm.common.dto.response.PageView;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicPermission;
 import br.com.branlycrm.tenant.domain.ClinicRole;
 import br.com.branlycrm.tenant.domain.TeamMember;
 import br.com.branlycrm.tenant.domain.TeamPolicy;
+import br.com.branlycrm.tenant.domain.TeamQuery;
 import br.com.branlycrm.tenant.dto.response.TeamMemberView;
 import br.com.branlycrm.tenant.exceptions.TeamException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.repositories.TeamRepository;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,9 +33,14 @@ public class TeamService {
   }
 
   @Transactional(readOnly = true)
-  public List<TeamMemberView> list(UUID tenantId, UUID actor) {
+  public PageView<TeamMemberView> list(UUID tenantId, UUID actor, TeamQuery query) {
     access.require(tenantId, actor, ClinicPermission.TEAM_VIEW);
-    return team.list(tenantId).stream().map(TeamService::view).toList();
+    PageResult<TeamMember> result = team.list(tenantId, query);
+    return new PageView<>(
+        result.items().stream().map(TeamService::view).toList(),
+        query.page().page(),
+        query.page().pageSize(),
+        result.total());
   }
 
   @Transactional
