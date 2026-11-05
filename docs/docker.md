@@ -50,3 +50,7 @@ Em 05/11/2026: imagens de backend e frontend compiladas; Compose iniciado; pági
 ## Atualização de autenticação
 
 HTTP Basic foi substituído por login por sessão em /api/v1/auth/login. Apenas saúde, obtenção de CSRF e processamento de login são públicos; o login exige token CSRF. Não existem credenciais padrão. Ver autenticacao.md.
+
+## Evolução das credenciais
+
+A API não utiliza mais POSTGRES_USER. Compose agora executa db-bootstrap e migrate antes do backend. O Flyway está desabilitado no processo HTTP; suas migrações são executadas por serviço separado. Ver credenciais-postgres.md para variáveis obrigatórias e validação. Esta atualização substitui as instruções anteriores de migração no início da API.

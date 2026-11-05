@@ -203,3 +203,13 @@ Data de todos os registros: 04/11/2026.
 **Alternativas:** JWT em localStorage; confiar em tenant informado por header; atribuir papel de clínica globalmente ao usuário.
 
 **Consequências:** Sessões atualmente em memória atendem uma instância e se perdem no reinício; armazenamento compartilhado é necessário para escalar. HTTPS e Secure cookie necessários na hospedagem. Limitação de login é local inicialmente. Login/logout executados por filtros constituem operações de infraestrutura e não recebem implementação fictícia de controller; controllers reais preservam interface documentada e Override. Cadastro, MFA e recuperação ainda pendentes. Detalhes em ../autenticacao.md.
+
+## ADR-016 — Separação de credenciais e migração fora da API
+
+**Data:** 05/11/2026. **Status:** Implementada no Docker local.
+
+**Decisão:** API usa crm_control_runtime; processo independente executa migrações com crm_control_migrator; bootstrap administrativo prepara permissões; crm_tenant_provisioner fica reservado ao futuro provisionamento, sem acesso ao banco central. API não recebe segredos desses outros papéis. Bootstrap também atende volumes existentes, transferindo apenas objetos conhecidos da aplicação.
+
+**Alternativas:** Usuário administrativo compartilhado; senha de migração carregada pelo processo HTTP.
+
+**Consequências:** Subida exige bootstrap e migração concluídos. Novas tabelas precisam de grants explícitos. O provisionador ainda não foi implementado e as credenciais por clínica continuam pendentes. Consultas de autorização também verificam conta ativa/verificada fora do filtro HTTP. Procedimentos e testes em ../credenciais-postgres.md.

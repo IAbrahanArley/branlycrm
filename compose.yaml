@@ -14,17 +14,48 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
+  db-bootstrap:
+    image: pgvector/pgvector:pg17
+    entrypoint: ["sh", "/bootstrap/bootstrap-roles.sh"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-branlycrm}
+      POSTGRES_USER: ${POSTGRES_USER:-branlycrm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      CONTROL_RUNTIME_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
+      CONTROL_MIGRATION_PASSWORD: ${CONTROL_MIGRATION_PASSWORD:?Defina CONTROL_MIGRATION_PASSWORD}
+      TENANT_PROVISIONER_PASSWORD: ${TENANT_PROVISIONER_PASSWORD:?Defina TENANT_PROVISIONER_PASSWORD}
+    volumes:
+      - ./infra/postgres/bootstrap-roles.sh:/bootstrap/bootstrap-roles.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+  migrate:
+    image: branlycrm-backend
+    build: ./backend
+    environment:
+      APP_MODE: migrate
+      MIGRATION_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
+      MIGRATION_DB_USER: crm_control_migrator
+      MIGRATION_DB_PASSWORD: ${CONTROL_MIGRATION_PASSWORD:?Defina CONTROL_MIGRATION_PASSWORD}
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
   backend:
     build: ./backend
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SPRING_FLYWAY_ENABLED: 'false'
       APP_TENANCY_HOST: postgres
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-branlycrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      SPRING_DATASOURCE_USERNAME: crm_control_runtime
+      SPRING_DATASOURCE_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /api/actuator/health HTTP/1.0\r\nHost: localhost\r\n\r\n\" >&3; cat <&3 | grep -q UP'"]
       interval: 10s

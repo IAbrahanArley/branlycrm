@@ -5,7 +5,7 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 ## Leitura
 
 - [Escopo funcional](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-015](adr/decisoes.md)
+- [Decisões arquiteturais — ADR-001 a ADR-016](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
 - [Entregas e pendências](entregas-e-pendencias.md)
@@ -22,3 +22,5 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 - [Identidade e Spring Security](autenticacao.md)
 
 - [Plano da próxima entrega: onboarding e provisionamento](plano-onboarding.md)
+
+- [Separação de credenciais PostgreSQL](credenciais-postgres.md)

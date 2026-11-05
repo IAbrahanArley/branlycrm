@@ -76,3 +76,7 @@ Rotas propostas, ainda não existentes: pedido de cadastro, confirmação de e-m
 ## Depois desta entrega
 
 Convites e permissões granulares; recuperação de senha; segundo fator de administradores; cadastro de profissionais e serviços; agenda; WhatsApp; IA. Recuperação e segundo fator continuam necessários para completar o módulo de acesso antes de produção.
+
+## Progresso — 05/11/2026
+
+Etapa 1 parcialmente concluída: credenciais centrais separadas, migração fora da API, permissões verificadas no volume atual e instalação vazia testada. Autorização passou a verificar identidade ativa/verificada também no repository. Ainda faltam papéis por clínica, teste de credenciais cruzadas, armazenamento de segredos e integração JPA tenant. Etapas 2 a 7 continuam planejadas.
