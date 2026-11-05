@@ -53,8 +53,13 @@ Fluxo completo validado: captar → atender → agendar → transferir quando ne
 
 - Frontend inicial criado e movido para o repositório correto; ver projeto.md.
 - Documentação consolidada em docs/.
-- Pendente corrigir/validar compilação de produção antes de considerar a base pronta para publicação.
-- Pendente conferir o projeto Spring existente e sua organização entre api/ e backend/.
+- Build de produção do frontend validado no Docker; publicação e configuração de produção continuam pendentes.
+- Backend Spring Boot 4.1.2 identificado em backend/ e integrado ao Compose; a pasta api/ adicional não foi reorganizada.
 - Modelagem de dados, matriz de permissões, contratos detalhados e protótipos ainda não foram realizados.
 - GitHub Project e Lovable não foram utilizados.
 - Compatibilidade de Swagger refinada: Boot 4.0.x com springdoc 3.0.x; Boot 4.1.x com springdoc 3.1.x–3.2.x, conforme consulta oficial registrada na conversa. Para Boot 4.1.x foi exemplificado springdoc 3.2.0. Não foi confirmada a versão exata instalada do backend.
+
+
+## Próxima entrega definida
+
+Plano em plano-onboarding.md: separar credenciais, detalhar cadastro, verificar e-mail, provisionar banco por clínica, ativar após validação e integrar telas. Itens do plano ainda não foram implementados. Acesso atual documentado em autenticacao.md.

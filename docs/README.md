@@ -20,3 +20,5 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 - [Multitenancy: banco por clínica](multitenancy.md)
 
 - [Identidade e Spring Security](autenticacao.md)
+
+- [Plano da próxima entrega: onboarding e provisionamento](plano-onboarding.md)
