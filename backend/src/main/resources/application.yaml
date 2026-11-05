@@ -1,6 +1,19 @@
 spring:
   application:
-    name: api
+    name: branly-crm
+  datasource:
+    hikari:
+      connection-timeout: 3000
+      validation-timeout: 1000
+  flyway:
+    clean-disabled: true
+    validate-on-migrate: true
+    baseline-on-migrate: false
+  jpa:
+    open-in-view: false
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
 server:
   servlet:
     session:
@@ -11,3 +24,15 @@ server:
         http-only: true
         same-site: lax
         secure: ${SESSION_COOKIE_SECURE:false}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

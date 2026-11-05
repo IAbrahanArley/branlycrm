@@ -8,7 +8,7 @@ Provisionar duas clínicas de teste, com bancos e credenciais distintos, e demon
 
 ## 1. Contratos de segredo
 
-Extrair a leitura direta de Environment do TenantConnectionService para uma interface TenantSecretReader. O provisionador usa uma interface de escrita distinta. A API recebe somente capacidade de leitura; não recebe credenciais de provisionamento.
+Extrair a leitura direta de Environment do TenantConnectionRepository para uma interface TenantSecretReader. O provisionador usa uma interface de escrita distinta. A API recebe somente capacidade de leitura; não recebe credenciais de provisionamento.
 
 Proposta local: adaptador de arquivos em volume privado, leitura somente na API e escrita no worker. Referências e nomes derivados do UUID, sem aceitar caminhos do navegador. Não permitir symlinks ou travessia de diretórios; escrita atômica e verificação de identidade/versão. Arquivos fora do Git e das imagens. Definir armazenamento gerenciado da hospedagem antes de produção; o adaptador local não substitui criptografia e controles de acesso da infraestrutura.
 

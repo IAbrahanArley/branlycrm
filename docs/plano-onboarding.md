@@ -71,7 +71,7 @@ Rotas propostas, ainda não existentes: pedido de cadastro, confirmação de e-m
 - A identidade gravada no banco corresponde ao registro central.
 - Senhas e tokens brutos não aparecem em logs nem respostas.
 - Usuário sem participação não acompanha operação alheia.
-- Rodar a suíte completa com Testcontainers; a validação anterior cobriu apenas os sete testes focados e o teste HTTP.
+- Manter `mvnw clean verify` passando; desde a ADR-017 a suíte com Testcontainers cobre o fluxo de sessão, mas ainda não o provisionamento.
 
 ## Depois desta entrega
 

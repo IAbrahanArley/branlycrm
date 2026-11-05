@@ -2,6 +2,8 @@
 
 ## ADR-010 — MVC REST com contrato documentado na interface
 
+> Substituída pela ADR-017 em 05/11/2026 quanto à interface no arquivo do controller. O texto abaixo permanece como histórico.
+
 **Data:** 05/11/2026. **Status:** Aceita por instrução do usuário.
 
 **Contexto:** Padronizar controllers e manter contrato HTTP e documentação junto à implementação.
@@ -213,3 +215,17 @@ Data de todos os registros: 04/11/2026.
 **Alternativas:** Usuário administrativo compartilhado; senha de migração carregada pelo processo HTTP.
 
 **Consequências:** Subida exige bootstrap e migração concluídos. Novas tabelas precisam de grants explícitos. O provisionador ainda não foi implementado e as credenciais por clínica continuam pendentes. Consultas de autorização também verificam conta ativa/verificada fora do filtro HTTP. Procedimentos e testes em ../credenciais-postgres.md.
+
+## ADR-017 — Padrão de código do Smart Commerce
+
+**Data:** 05/11/2026. **Status:** Aceita por instrução do usuário. **Substitui:** ADR-010 quanto à interface de contrato no arquivo do controller.
+
+**Contexto:** O usuário pediu que o backend siga a arquitetura, a organização de pastas, os testes e a qualidade de código do projeto Smart Commerce, aproveitando o início do projeto.
+
+**Decisão:** Pacote raiz br.com.branlycrm, com módulos identity, tenant e config. Camadas dentro de cada módulo: controllers, services, repositories, domain, dto/request, dto/response, exceptions e, na identidade, security. Controllers são classes finais com anotações OpenAPI nos próprios métodos e um RestControllerAdvice por controller; não há mais interface ControllerDoc. Exceções de negócio não conhecem HTTP. Spotless com google-java-format, ArchUnit para dependências entre camadas, testes unitários *Test e de integração *IT com Testcontainers via Failsafe. Detalhes em ../padroes-backend.md e ../qualidade.md.
+
+**Preservado:** rotas e campos JSON da sessão, login/logout pelos filtros do Spring Security, CSRF, cookie, revalidação por auth_version, limitação de tentativas, migrações V1–V4 e tenant V1, configuração Docker e credenciais (ADR-013 a ADR-016).
+
+**Diferenças em relação ao Smart Commerce:** login continua em filtro nativo, não em controller com JSON; sessões continuam em memória, sem Spring Session JDBC; Swagger não foi restrito a um perfil dev porque o projeto ainda não tem esse perfil. Essas convergências exigem decisões próprias.
+
+**Consequências:** A conexão com o banco da clínica passou de service para TenantConnectionRepository, que verifica a participação antes de ler o segredo, porque services não podem depender de java.sql. Respostas 403 da seleção de clínica passaram a ter corpo {"message"}; UUID malformado responde 400. Dependências sem uso (mail, devtools) foram removidas e voltam quando o fluxo de e-mail for implementado.

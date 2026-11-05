@@ -5,9 +5,11 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 ## Leitura
 
 - [Escopo funcional](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-016](adr/decisoes.md)
+- [Decisões arquiteturais — ADR-001 a ADR-017](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
+- [Convenções de código do backend](padroes-backend.md)
+- [Qualidade e comandos de verificação](qualidade.md)
 - [Entregas e pendências](entregas-e-pendencias.md)
 - [Estrutura e situação do projeto](projeto.md)
 

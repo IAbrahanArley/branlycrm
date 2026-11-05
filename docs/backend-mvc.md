@@ -8,16 +8,12 @@ Monólito modular por funcionalidade. Dentro de cada módulo: controller, servic
 
 Controller trata HTTP e delega ao service; service contém regras e limites transacionais; repository trata persistência; DTOs definem contratos sem expor entidades JPA. Autorização não depende apenas da controller: services devem preservar permissões e isolamento também para workers e IA. Exceções HTTP padronizadas por RestControllerAdvice.
 
-## Contrato e implementação no mesmo arquivo
+## Controllers
 
-Arquivo ExemploController.java: interface ExemploControllerDoc com visibilidade de pacote e classe pública ExemploController que a implementa. Java não permite dois tipos públicos de topo nesse mesmo arquivo.
+A ADR-017 substituiu a interface ControllerDoc no mesmo arquivo (ADR-010). Controllers são classes finais com mapeamentos e anotações OpenAPI nos próprios métodos, delegam a services e têm um ErrorHandler próprio. Convenções completas em [padroes-backend.md](padroes-backend.md).
 
-- Interface: assinaturas, mapeamentos HTTP, anotações de parâmetros, validação e documentação OpenAPI/Swagger.
-- Implementação: RestController, injeção por construtor e métodos públicos com Override. Não duplicar mapeamentos e documentação.
-- DTOs e services ficam em arquivos próprios.
 - Documentar respostas de sucesso e erros reais, incluindo autenticação, autorização, validação, recurso ausente e conflito quando aplicáveis.
-- Restrições dos parâmetros de método ficam no contrato, evitando redefini-las no override.
-- Validar descoberta de rotas e geração de /v3/api-docs em teste de integração quando o primeiro endpoint for implementado.
+- DTOs e services ficam em arquivos próprios.
 
 ## Spring Initializr
 
@@ -34,7 +30,7 @@ Selecionar:
 | Spring Security | Autenticação e autorização; exige configuração própria |
 | Flyway Migration | Migrações versionadas |
 | Spring Boot Actuator | Saúde e métricas |
-| Java Mail Sender | Convites e recuperação por e-mail |
+| Java Mail Sender | Convites e recuperação por e-mail (removido até o fluxo de e-mail existir; ADR-017) |
 
 Opcionais: Docker Compose Support para ambiente local; Testcontainers para testes com PostgreSQL; DevTools apenas no desenvolvimento. Lombok não é obrigatório.
 

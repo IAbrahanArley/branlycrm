@@ -4,7 +4,7 @@ Implementação inicial em 05/11/2026. ADR-015.
 
 ## Camadas
 
-UserAccountRepository, TenantRegistryRepository e TenantIdentityRepository concentram SQL. IdentityService valida estado da identidade; TenantAccessService valida participação; SessionService coordena seleção. Controllers têm interface documentada no mesmo arquivo e implementação com Override. DTOs de resposta ficam em arquivos próprios.
+Organização conforme ADR-017 e [padroes-backend.md](padroes-backend.md). identity/repositories/UserAccountRepository e tenant/repositories/TenantRegistryRepository concentram SQL. identity/services/IdentityService valida estado da identidade; tenant/services/TenantAccessService valida participação; identity/services/SessionService coordena seleção e devolve DTOs (IdentityView, ClinicView, ClinicSelectionView, CsrfView). SessionController é final, com OpenAPI nos métodos; SessionErrorHandler traduz TenantAccessException em 403. Filtros e principal ficam em identity/security; a cadeia de segurança em config/SecurityConfiguration.
 
 Banco central: user_accounts com UUID permanente, e-mail normalizado único, hash bcrypt, estado ativo, verificação de e-mail e versão de autenticação. tenant_memberships referencia a identidade global com chave estrangeira. Papéis continuam por clínica: ADMIN, RECEPTION, PROFESSIONAL; não são autoridades globais na sessão.
 
@@ -21,7 +21,7 @@ Prefixo externo no Docker: /api/v1/auth.
 
 Cookies: BRANLY_SESSION, HttpOnly, SameSite=Lax, somente cookie (sem URL rewriting), expiração por inatividade de 30 minutos. SESSION_COOKIE_SECURE=true é obrigatório em implantação HTTPS; false no ambiente HTTP local. Sem token de acesso em localStorage. ID da sessão é renovado no login.
 
-Login/logout são processados pelos filtros nativos do Spring Security, não por controllers fictícios. Os demais endpoints têm contratos OpenAPI no SessionControllerDoc. As rotas de filtros estão descritas aqui; documentação OpenAPI dessas duas operações ainda precisa ser adicionada.
+Login/logout são processados pelos filtros nativos do Spring Security, não por controllers fictícios. Os demais endpoints têm contratos OpenAPI no SessionController. As duas operações de filtro estão documentadas em config/OpenApiConfiguration. Seleção negada responde 403 com {"message"}; UUID malformado responde 400.
 
 ## Revogação e limitação
 
@@ -42,6 +42,6 @@ Não há usuários padrão nem endpoint público para inserir credenciais. Esta 
 
 ## Verificações
 
-Sete testes Java focados passaram: tenant ausente/desconhecido, vínculo de banco, normalização de e-mail, revogação, usuário não verificado e limitação de tentativas.
+Desde a ADR-017, `mvnw clean verify` executa 19 testes unitários/ArchUnit e 10 de integração com PostgreSQL (Testcontainers), que automatizam o fluxo HTTP descrito abaixo; ver [qualidade.md](qualidade.md). Antes eram sete testes focados.
 
 Teste HTTP via Nginx com dados temporários: anônimo 401; login sem CSRF 403; senha incorreta 401; login válido 204; identidade 200; clínica alheia 403; clínica autorizada 200; participação revogada 403; usuário desativado 401; novo login 204; logout 204; acesso posterior 401. Os dados de teste foram removidos. A suíte completa com Testcontainers não foi executada nesta etapa.

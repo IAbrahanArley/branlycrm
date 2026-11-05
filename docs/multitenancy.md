@@ -10,7 +10,7 @@ O tenant_id é permanente. No cadastro futuro, o servidor gera UUID e cria regis
 
 ## Acesso
 
-TenantAccessService verifica clínica ACTIVE e participação ativa do sujeito autenticado. TenantConnectionService usa esse resultado, busca segredo e confere tenant_identity antes de devolver a conexão. O chamador fecha a conexão com try-with-resources. Não existe fallback. Não usar ID de usuário fornecido pelo cliente como authenticatedSubject.
+TenantAccessService verifica clínica ACTIVE e participação ativa do sujeito autenticado. TenantConnectionRepository (ADR-017) repete essa verificação no registro, busca segredo e confere tenant_identity antes de devolver a conexão. O chamador fecha a conexão com try-with-resources. Não existe fallback. Não usar ID de usuário fornecido pelo cliente como authenticatedSubject.
 
 Esta etapa não adiciona endpoints públicos, seleção por header ou login. A integração dos serviços com o sujeito autenticado será feita no módulo de identidade. Conexão por operação é provisória; pools com limite global, expiração e fechamento precisam ser implementados antes de escalar.
 
