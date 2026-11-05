@@ -24,6 +24,7 @@ services:
       CONTROL_RUNTIME_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
       CONTROL_MIGRATION_PASSWORD: ${CONTROL_MIGRATION_PASSWORD:?Defina CONTROL_MIGRATION_PASSWORD}
       TENANT_PROVISIONER_PASSWORD: ${TENANT_PROVISIONER_PASSWORD:?Defina TENANT_PROVISIONER_PASSWORD}
+      PROVISIONING_WORKER_PASSWORD: ${PROVISIONING_WORKER_PASSWORD:?Defina PROVISIONING_WORKER_PASSWORD}
     volumes:
       - ./infra/postgres/bootstrap-roles.sh:/bootstrap/bootstrap-roles.sh:ro
     depends_on:
@@ -66,6 +67,28 @@ services:
       timeout: 5s
       retries: 20
       start_period: 40s
+    restart: unless-stopped
+  provisioner:
+    image: branlycrm-backend
+    build: ./backend
+    environment:
+      APP_MODE: provision
+      SPRING_FLYWAY_ENABLED: 'false'
+      SPRING_DOCKER_COMPOSE_ENABLED: 'false'
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
+      SPRING_DATASOURCE_USERNAME: crm_provisioning_worker
+      SPRING_DATASOURCE_PASSWORD: ${PROVISIONING_WORKER_PASSWORD:?Defina PROVISIONING_WORKER_PASSWORD}
+      APP_TENANCY_HOST: postgres
+      APP_TENANCY_SECRETS_DIRECTORY: /run/branly/tenant-secrets
+      APP_PROVISIONING_ADMIN_USERNAME: crm_tenant_provisioner
+      APP_PROVISIONING_ADMIN_PASSWORD: ${TENANT_PROVISIONER_PASSWORD:?Defina TENANT_PROVISIONER_PASSWORD}
+      APP_PROVISIONING_CONTROL_DATABASE: ${POSTGRES_DB:-branlycrm}
+    volumes:
+      # Only writer of clinic credentials; the API mounts the same volume read-only.
+      - tenant_secrets:/run/branly/tenant-secrets
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
   frontend:
     build: ./frontend

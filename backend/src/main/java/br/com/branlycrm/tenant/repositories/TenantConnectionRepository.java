@@ -1,15 +1,13 @@
 package br.com.branlycrm.tenant.repositories;
 
 import br.com.branlycrm.tenant.domain.TenantDatabase;
+import br.com.branlycrm.tenant.domain.TenantSecret;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.secrets.TenantSecretException;
 import br.com.branlycrm.tenant.secrets.TenantSecretReader;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Properties;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -17,28 +15,20 @@ import org.springframework.stereotype.Repository;
  * caller can reach a clinic database without an active membership. There is no fallback to the
  * control database: missing secret, inactive clinic or identity mismatch all fail closed.
  *
- * <p>Connection per operation is provisional; bounded pools come with tenant JPA
- * (plano-isolamento-clinicas.md).
+ * <p>Connections come from {@link TenantConnectionPools}: bounded per clinic and globally, and
+ * keyed by secret version so a rotated password retires the previous pool.
  */
 @Repository
 public class TenantConnectionRepository {
   private final TenantRegistryRepository registry;
   private final TenantSecretReader secrets;
-  private final String host;
-  private final int port;
+  private final TenantConnectionPools pools;
 
   public TenantConnectionRepository(
-      TenantRegistryRepository registry,
-      TenantSecretReader secrets,
-      @Value("${app.tenancy.host:localhost}") String host,
-      @Value("${app.tenancy.port:5432}") int port) {
-    if (!host.matches("[a-zA-Z0-9.-]+") || port < 1 || port > 65535) {
-      throw new IllegalArgumentException("Invalid tenant database endpoint");
-    }
+      TenantRegistryRepository registry, TenantSecretReader secrets, TenantConnectionPools pools) {
     this.registry = registry;
     this.secrets = secrets;
-    this.host = host;
-    this.port = port;
+    this.pools = pools;
   }
 
   /**
@@ -51,21 +41,14 @@ public class TenantConnectionRepository {
         registry
             .findAuthorized(tenantId, authenticatedSubject)
             .orElseThrow(TenantAccessException::new);
-    String password =
+    TenantSecret secret =
         secrets
             .read(database)
             .orElseThrow(
                 () ->
                     new TenantSecretException(
-                        TenantSecretException.Reason.MISSING, "Tenant credentials unavailable"))
-            .password();
-    Properties properties = new Properties();
-    properties.setProperty("user", database.databaseUser());
-    properties.setProperty("password", password);
-    properties.setProperty("connectTimeout", "5");
-    Connection connection =
-        DriverManager.getConnection(
-            "jdbc:postgresql://" + host + ":" + port + "/" + database.databaseName(), properties);
+                        TenantSecretException.Reason.MISSING, "Tenant credentials unavailable"));
+    Connection connection = pools.borrow(database, secret);
     try {
       verifyIdentity(connection, tenantId);
       return connection;

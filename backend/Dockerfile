@@ -7,7 +7,10 @@ RUN mvn -B package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
-RUN groupadd --system app && useradd --system --gid app app
+# The secrets directory is copied into the empty tenant_secrets volume with this ownership.
+RUN groupadd --system app && useradd --system --gid app app \
+    && mkdir -p /run/branly/tenant-secrets \
+    && chown app:app /run/branly/tenant-secrets && chmod 700 /run/branly/tenant-secrets
 COPY --from=build --chown=app:app /app/target/*.jar app.jar
 USER app
 EXPOSE 8080

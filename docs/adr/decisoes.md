@@ -229,3 +229,13 @@ Data de todos os registros: 04/11/2026.
 **Diferenças em relação ao Smart Commerce:** login continua em filtro nativo, não em controller com JSON; sessões continuam em memória, sem Spring Session JDBC; Swagger não foi restrito a um perfil dev porque o projeto ainda não tem esse perfil. Essas convergências exigem decisões próprias.
 
 **Consequências:** A conexão com o banco da clínica passou de service para TenantConnectionRepository, que verifica a participação antes de ler o segredo, porque services não podem depender de java.sql. Respostas 403 da seleção de clínica passaram a ter corpo {"message"}; UUID malformado responde 400. Dependências sem uso (mail, devtools) foram removidas e voltam quando o fluxo de e-mail for implementado.
+
+## ADR-018 — Provisionador de clínicas e pools por tenant
+
+**Data:** 05/11/2026. **Status:** Implementada no Docker local. **Complementa:** ADR-014 e ADR-016.
+
+**Decisão:** Processo separado (`APP_MODE=provision`, sem HTTP) com fila persistente `tenant_provisioning_tasks` no banco central, posse por `FOR UPDATE SKIP LOCKED` e lease, etapas idempotentes e retomáveis. Recebe apenas `crm_provisioning_worker` (banco central, sem acesso a hashes) e `crm_tenant_provisioner` (CREATEDB/CREATEROLE, sem superusuário e sem acesso ao banco central). Por clínica: `owner_<id>` NOLOGIN dono de tudo e `tenant_<id>` runtime; o provisionador tem SET sem INHERIT sobre o dono e aplica as migrações como dono. A extensão vector é preparada em `template1` pelo bootstrap, porque não é trusted. A clínica só fica ACTIVE após verificação por login real do runtime. A API usa pools Hikari limitados por clínica e globalmente, chaveados pela versão do segredo.
+
+**Alternativas:** Papel `migrator_<id>` com login (segunda senha por clínica sem ganho de isolamento); superusuário no provisionador; executar o provisionamento no processo HTTP; um pool sem limite por clínica.
+
+**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Até lá, o ArchUnit proíbe `@Entity`. O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.

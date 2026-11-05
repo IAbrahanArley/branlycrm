@@ -14,6 +14,7 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
  * they are described here instead of through a placeholder controller (ADR-015).
  */
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication
 public class OpenApiConfiguration {
   @Bean
   OpenAPI branlyCrmApi() {

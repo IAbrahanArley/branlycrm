@@ -24,7 +24,9 @@ JPA permanece associado ao banco central e ainda não tem entidades de negócio.
 - V1 tenant cria vector e tenant_identity com no máximo uma linha. Provisionamento insere a identidade antes de ativar e concede somente SELECT dessa tabela ao papel runtime.
 - Sem tabelas de domínio modeladas ainda: unicidade de telefone normalizado, valores válidos, relacionamentos e conflitos de agenda serão definidos nas migrações correspondentes.
 
-## Requisitos do provisionador ainda pendente
+## Requisitos do provisionador
+
+Implementados em 05/11/2026; ver [provisionamento-clinicas.md](provisionamento-clinicas.md). Lista original:
 
 1. Validar identidade, idempotência e dados da clínica.
 2. Reservar UUID e nomes imutáveis em PROVISIONING.
@@ -41,7 +43,7 @@ A senha de cada clínica não está provisionada pelo Compose. O perfil local ai
 - SC-017: provisionamento. AC-01 UUID é gerado no servidor; AC-02 clínica não pode operar enquanto PROVISIONING/FAILED; AC-03 só ativar após migração e isolamento; AC-04 repetição reutiliza identidade da tentativa; AC-05 falha não produz acesso parcial.
 - SC-018: acesso ao banco. AC-01 sujeito sem participação é recusado; AC-02 suspensão e revogação bloqueiam novas conexões; AC-03 referência de outro banco é rejeitada; AC-04 segredo ausente não provoca fallback; AC-05 identidade incompatível fecha conexão; AC-06 credencial A não conecta ao banco B.
 
-SC-017 e o teste de credenciais cruzadas são requisitos da próxima entrega, não funcionalidades concluídas.
+SC-017 e SC-018 são verificados por TenantIsolationIT desde 05/11/2026. O disparo de SC-017 pelo cadastro público ainda depende do onboarding.
 
 ## Verificações executadas
 

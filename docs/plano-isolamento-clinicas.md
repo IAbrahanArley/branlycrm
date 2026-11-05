@@ -74,3 +74,9 @@ Depois da prova de isolamento: separar EntityManager central e tenant, configura
 ## Condição de conclusão
 
 Só considerar a etapa de credenciais concluída quando a prova A/B passar e os segredos não estiverem na API como credenciais administrativas. A separação central já concluída, isoladamente, não comprova isolamento de clínicas.
+
+## Progresso — 05/11/2026
+
+Itens 1 a 4 concluídos e item 5 concluído quanto aos pools. A prova A/B passou com papéis sem superusuário, e a API não tem credenciais administrativas: a condição de conclusão desta etapa foi atendida. Detalhes em [provisionamento-clinicas.md](provisionamento-clinicas.md) e [segredos-clinicas.md](segredos-clinicas.md).
+
+Diferenças em relação a este plano: não há `migrator_<id>` com login, porque as migrações são aplicadas pelo provisionador como dono. A persistência JPA de clínica fica para a primeira entidade de negócio (ADR-018). Próximo passo: item 6, retomar o cadastro conforme plano-onboarding.md.
