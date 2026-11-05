@@ -4,6 +4,7 @@ import br.com.branlycrm.identity.security.LoginRateLimitFilter;
 import br.com.branlycrm.identity.security.SessionValidationFilter;
 import br.com.branlycrm.identity.services.IdentityService;
 import br.com.branlycrm.tenant.services.TenantAccessService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -20,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * Spring Security filters and answer with plain status codes, never redirects.
  */
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication
 public class SecurityConfiguration {
   public static final String SESSION_COOKIE = "BRANLY_SESSION";
   public static final String LOGIN_PATH = "/v1/auth/login";

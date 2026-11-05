@@ -59,14 +59,35 @@ class ArchitectureTest {
 
   /** ADR-016: the API holds read-only secret capability; writing belongs to the provisioner. */
   @Test
-  void onlyTheSecretStoreKnowsTheSecretWriter() {
+  void onlyTheProvisionerKnowsTheSecretWriter() {
     noClasses()
         .that()
-        .resideOutsideOfPackage("..tenant.secrets..")
+        .resideOutsideOfPackages("..tenant.secrets..", "..provisioning..")
         .should()
         .dependOnClassesThat()
         .haveSimpleName("FileTenantSecretWriter")
         .check(CODE);
+  }
+
+  /** The API modules never reach provisioning code, which holds administrative credentials. */
+  @Test
+  void apiModulesDoNotDependOnProvisioning() {
+    noClasses()
+        .that()
+        .resideInAnyPackage("br.com.branlycrm.identity..", "br.com.branlycrm.tenant..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("br.com.branlycrm.provisioning..")
+        .check(CODE);
+  }
+
+  /**
+   * ADR-018: the only EntityManager today is the central one, so any entity would land in the
+   * control database. Clinic entities wait for the tenant persistence unit.
+   */
+  @Test
+  void noJpaEntitiesUntilTenantPersistenceExists() {
+    noClasses().should().beAnnotatedWith("jakarta.persistence.Entity").check(CODE);
   }
 
   @Test

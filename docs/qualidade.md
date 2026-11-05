@@ -18,11 +18,12 @@ Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` ge
 
 - `BootstrapIT`: migrações V1–V4 em banco vazio, extensão vector; somente saúde e CSRF são públicos.
 - `SessionAuthenticationIT`: cookie `BRANLY_SESSION` HttpOnly/SameSite, login sem CSRF (403), senha errada (401), normalização de e-mail, rotação do token CSRF, identidade sem credenciais, listagem só de clínicas ativas com participação ativa, seleção de clínica alheia/inexistente/suspensa/revogada com a mesma resposta 403, UUID inválido (400), revogação de participação, suspensão de clínica e desativação da conta valendo na requisição seguinte, conta não verificada igual a conta inexistente, logout e documentação OpenAPI com as rotas de filtro e o cookie de sessão.
-- `TenantConnectionIT`: bancos de clínica reais criados pela migração `db/tenant-migration`, senha lida de arquivos publicados por `FileTenantSecretWriter`, conexão por TCP com o papel runtime da clínica, recusa quando `tenant_identity` diverge, quando o segredo falta ou não corresponde ao papel, e recusa antes de conectar sem participação.
+- `TenantIsolationIT` (substitui `TenantConnectionIT`): provisionamento real sem superusuário, prova A/B, falha e retomada, concorrência e pools de conexão; ver [provisionamento-clinicas.md](provisionamento-clinicas.md).
+- Antes, `TenantConnectionIT`: bancos de clínica reais criados pela migração `db/tenant-migration`, senha lida de arquivos publicados por `FileTenantSecretWriter`, conexão por TCP com o papel runtime da clínica, recusa quando `tenant_identity` diverge, quando o segredo falta ou não corresponde ao papel, e recusa antes de conectar sem participação.
 
 Testes de symlink e permissões POSIX de `FileTenantSecretStoreTest` são ignorados no Windows; rode a classe em Linux ao alterar o armazenamento de segredos (comando em [segredos-clinicas.md](segredos-clinicas.md)).
 
-Ainda não cobertos: prova A/B de credenciais cruzadas (depende do provisionador), limitação de login em ambiente com várias réplicas e o caminho via Nginx com contexto `/api`.
+Ainda não cobertos: limitação de login em ambiente com várias réplicas e o caminho via Nginx com contexto `/api`.
 
 ## Revisão
 

@@ -9,7 +9,8 @@ Implementado em 05/11/2026. ADR-016. Esta é a primeira parte da etapa 1 do onbo
 | POSTGRES_USER | Bootstrap administrativo local | Somente contêiner PostgreSQL e db-bootstrap; nunca API |
 | crm_control_runtime | Requisições da API | CONNECT, USAGE e SELECT/INSERT/UPDATE/DELETE nas tabelas centrais autorizadas; somente leitura do histórico Flyway |
 | crm_control_migrator | Migrações centrais | Proprietário das tabelas e funções da aplicação, CREATE no schema; sem SUPERUSER/CREATEDB/CREATEROLE |
-| crm_tenant_provisioner | Provisionamento futuro | CREATEDB/CREATEROLE sem superusuário e sem CONNECT no controle; credencial não entregue à API |
+| crm_tenant_provisioner | Provisionador (ADR-018) | CREATEDB/CREATEROLE sem superusuário; CONNECT só em `postgres` e nos bancos de clínica que cria, nunca no controle; credencial não entregue à API |
+| crm_provisioning_worker | Fila do provisionador no controle | Tarefas, status de tenants, inclusão do ADMIN e leitura do estado das contas, sem `password_hash`; credencial não entregue à API |
 
 API não recebe senhas de administrador, migrador ou provisionador. O provisionador ainda não possui worker nem fluxo de criação de clínica. Antes de conectá-lo, revisar concessões e validar credenciais cruzadas entre bancos de clínicas.
 
@@ -42,7 +43,7 @@ Também foi validada instalação completa em banco vazio temporário (V1–V4),
 
 ## Pendências
 
-- Prover papéis exclusivos de proprietário/migrador/runtime para cada clínica e conferir rejeição de conexão A → B.
+- Papéis por clínica e rejeição A → B implementados e testados ([provisionamento-clinicas.md](provisionamento-clinicas.md)). O bootstrap também revoga CONNECT de PUBLIC em `postgres`/`template1` e prepara vector em `template1`.
 - Armazenamento local e rotação versionada de segredos de clínicas implementados ([segredos-clinicas.md](segredos-clinicas.md)); faltam armazenamento gerenciado da hospedagem e pools.
 - Separar JPA central e tenant antes dos dados de domínio.
 - Automatizar cadastro, e-mail e provisionamento.

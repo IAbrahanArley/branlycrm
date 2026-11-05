@@ -21,6 +21,11 @@ BEGIN
  IF NOT rejected THEN RAISE EXCEPTION 'Runtime unexpectedly created role'; END IF;
  IF has_table_privilege(current_user,'flyway_schema_history','UPDATE') THEN RAISE EXCEPTION 'Runtime can alter migration history'; END IF;
  IF has_database_privilege('crm_tenant_provisioner',current_database(),'CONNECT') THEN RAISE EXCEPTION 'Provisioner can access control database'; END IF;
+ IF has_column_privilege('crm_provisioning_worker','user_accounts','password_hash','SELECT') THEN RAISE EXCEPTION 'Worker can read password hashes'; END IF;
+ IF has_database_privilege('public','postgres','CONNECT') OR has_database_privilege('public','template1','CONNECT') THEN
+   RAISE EXCEPTION 'PUBLIC can connect to maintenance databases';
+ END IF;
+ IF NOT has_database_privilege('crm_tenant_provisioner','postgres','CONNECT') THEN RAISE EXCEPTION 'Provisioner cannot reach maintenance database'; END IF;
 END $$;
 SELECT count(*) >= 0 AS application_tables_accessible FROM tenants;
 ROLLBACK;

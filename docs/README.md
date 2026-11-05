@@ -5,7 +5,7 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 ## Leitura
 
 - [Escopo funcional](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-017](adr/decisoes.md)
+- [Decisões arquiteturais — ADR-001 a ADR-018](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
 - [Convenções de código do backend](padroes-backend.md)
@@ -30,3 +30,5 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 - [Próxima etapa: credenciais por clínica e isolamento](plano-isolamento-clinicas.md)
 
 - [Segredos das clínicas](segredos-clinicas.md)
+
+- [Provisionamento de clínicas e pools](provisionamento-clinicas.md)
