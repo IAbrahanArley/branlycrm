@@ -24,3 +24,5 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 - [Plano da próxima entrega: onboarding e provisionamento](plano-onboarding.md)
 
 - [Separação de credenciais PostgreSQL](credenciais-postgres.md)
+
+- [Próxima etapa: credenciais por clínica e isolamento](plano-isolamento-clinicas.md)

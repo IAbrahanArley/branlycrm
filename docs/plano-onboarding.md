@@ -80,3 +80,7 @@ Convites e permissões granulares; recuperação de senha; segundo fator de admi
 ## Progresso — 05/11/2026
 
 Etapa 1 parcialmente concluída: credenciais centrais separadas, migração fora da API, permissões verificadas no volume atual e instalação vazia testada. Autorização passou a verificar identidade ativa/verificada também no repository. Ainda faltam papéis por clínica, teste de credenciais cruzadas, armazenamento de segredos e integração JPA tenant. Etapas 2 a 7 continuam planejadas.
+
+## Detalhamento da próxima etapa
+
+A sequência imediata está em plano-isolamento-clinicas.md: contratos de segredo, papéis por tenant, provisionamento interno, prova A/B e persistência tenant. Essas tarefas são planejadas; ainda não há cadastro público ou banco de clínica provisionado pela aplicação.
