@@ -1,0 +1,27 @@
+# Qualidade
+
+Índice das verificações do Branly CRM. Convenções de backend: [padroes-backend.md](padroes-backend.md).
+
+## Comandos e o que provam
+
+| Escopo | Comando | Prova | Não prova |
+| --- | --- | --- | --- |
+| Backend | `.\mvnw.cmd -B -ntp clean verify` em `backend/` com JDK 21 e Docker | Formatação, compilação, unitários, ArchUnit e integração com PostgreSQL descartável (Testcontainers) | Comportamento no Compose, Nginx ou outro PostgreSQL |
+| Backend | `.\mvnw.cmd spotless:apply` | Aplica a formatação exigida pelo `verify` | — |
+| Frontend | `npm run lint`, `npx tsc --noEmit`, `npm run build` em `frontend/` | Lint, tipos e build de produção | Comportamento em execução |
+| Ambiente | `docker compose build` e `docker compose up` na raiz | Imagens e ordem de inicialização | Isolamento entre clínicas |
+| Papéis do banco | Procedimento em [credenciais-postgres.md](credenciais-postgres.md) | Privilégios dos papéis centrais | Credenciais por clínica |
+
+Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` geram dois candidatos a classe principal.
+
+## Cobertura atual dos testes de integração
+
+- `BootstrapIT`: migrações V1–V4 em banco vazio, extensão vector; somente saúde e CSRF são públicos.
+- `SessionAuthenticationIT`: cookie `BRANLY_SESSION` HttpOnly/SameSite, login sem CSRF (403), senha errada (401), normalização de e-mail, rotação do token CSRF, identidade sem credenciais, listagem só de clínicas ativas com participação ativa, seleção de clínica alheia/inexistente/suspensa/revogada com a mesma resposta 403, UUID inválido (400), revogação de participação, suspensão de clínica e desativação da conta valendo na requisição seguinte, conta não verificada igual a conta inexistente, logout e documentação OpenAPI com as rotas de filtro e o cookie de sessão.
+- `TenantConnectionIT`: bancos de clínica reais criados pela migração `db/tenant-migration`, conexão por TCP com o papel runtime da clínica, recusa quando `tenant_identity` diverge e recusa antes de conectar sem participação.
+
+Ainda não cobertos: prova A/B de credenciais cruzadas (depende do provisionador), limitação de login em ambiente com várias réplicas e o caminho via Nginx com contexto `/api`.
+
+## Revisão
+
+Mudanças em autenticação, sessão, CSRF, tenant ou credenciais exigem revisão de segurança proporcional ao diff e testes de integração do fluxo alterado. Registrar comandos e resultados reais; não afirmar execução sem rodar.

@@ -1,9 +1,3 @@
-services:
-  postgres:
-    image: 'postgres:latest'
-    environment:
-      - 'POSTGRES_DB=mydatabase'
-      - 'POSTGRES_PASSWORD=secret'
-      - 'POSTGRES_USER=myuser'
-    ports:
-      - '5432'
+# Para desenvolvimento somente do backend: use o banco do Compose da raiz.
+# Arquivo mantido sem serviços para impedir a criação de um segundo banco pelo Spring.
+services: {}

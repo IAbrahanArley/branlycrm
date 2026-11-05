@@ -1,0 +1,92 @@
+name: branlycrm
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-branlycrm}
+      POSTGRES_USER: ${POSTGRES_USER:-branlycrm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  db-bootstrap:
+    image: pgvector/pgvector:pg17
+    entrypoint: ["sh", "/bootstrap/bootstrap-roles.sh"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-branlycrm}
+      POSTGRES_USER: ${POSTGRES_USER:-branlycrm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      CONTROL_RUNTIME_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
+      CONTROL_MIGRATION_PASSWORD: ${CONTROL_MIGRATION_PASSWORD:?Defina CONTROL_MIGRATION_PASSWORD}
+      TENANT_PROVISIONER_PASSWORD: ${TENANT_PROVISIONER_PASSWORD:?Defina TENANT_PROVISIONER_PASSWORD}
+    volumes:
+      - ./infra/postgres/bootstrap-roles.sh:/bootstrap/bootstrap-roles.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+  migrate:
+    image: branlycrm-backend
+    build: ./backend
+    environment:
+      APP_MODE: migrate
+      MIGRATION_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
+      MIGRATION_DB_USER: crm_control_migrator
+      MIGRATION_DB_PASSWORD: ${CONTROL_MIGRATION_PASSWORD:?Defina CONTROL_MIGRATION_PASSWORD}
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+  backend:
+    build: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_FLYWAY_ENABLED: 'false'
+      APP_TENANCY_HOST: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
+      SPRING_DATASOURCE_USERNAME: crm_control_runtime
+      SPRING_DATASOURCE_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /api/actuator/health HTTP/1.0\r\nHost: localhost\r\n\r\n\" >&3; cat <&3 | grep -q UP'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    restart: unless-stopped
+  frontend:
+    build: ./frontend
+    environment:
+      API_INTERNAL_URL: http://backend:8080/api
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:${APP_PORT:-8088}:80"
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  postgres_data:
