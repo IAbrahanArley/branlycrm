@@ -239,3 +239,13 @@ Data de todos os registros: 04/11/2026.
 **Alternativas:** Papel `migrator_<id>` com login (segunda senha por clínica sem ganho de isolamento); superusuário no provisionador; executar o provisionamento no processo HTTP; um pool sem limite por clínica.
 
 **Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Até lá, o ArchUnit proíbe `@Entity`. O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.
+
+## ADR-019 — Planejamento do produto e escopo do MVP
+
+**Data:** 05/11/2026. **Status:** Aceita por instrução do usuário. **Substitui:** o escopo de ../escopo.md e a sequência de entregas de ../entregas-e-pendencias.md onde houver conflito.
+
+**Contexto:** O usuário forneceu um planejamento de produto, um backlog executável e instruções para agentes, pedindo que o planejamento passe a ser seguido e adaptado ao que já existe.
+
+**Decisão:** ../planejamento-crm-clinicas-estetica.md é a fonte de escopo do MVP, e ../../TASKS.md é o backlog com o estado verificado. O MVP é CRM comercial: contatos, funil e oportunidades, tarefas, agenda comercial, dashboard, relatórios e administração mínima. WhatsApp, automações e campanhas passam para a Fase 2 e a IA para a Fase 3; as ADR-005, ADR-006 e ADR-007 ficam como desenho prévio dessas fases. Prevalecem as decisões técnicas já aceitas: Java/Spring em vez de NestJS, sessão de servidor em vez de Supabase Auth, banco por clínica em vez de `clinic_id` em banco compartilhado. A execução passa a seguir ../../AGENTS.md, com papéis multiagente em ../agents/ e `.claude/agents/`.
+
+**Consequências:** O modelo comercial da ADR-008 (franquia de IA) fica sem objeto no MVP; a precificação por clínica continua pendente. Os papéis do planejamento (Proprietário, Gerente, Recepcionista, Vendedor, Profissional) diferem do catálogo atual (`ADMIN`, `RECEPTION`, `PROFESSIONAL`) e exigem decisão e migração em CRM-012. Os documentos antigos ganham aviso de substituição e permanecem como histórico.
