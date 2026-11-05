@@ -44,19 +44,26 @@ class SessionAuthenticationIT {
   @BeforeEach
   void resetDisposableFixtures() {
     // Each class owns a disposable container; never clean the developer database.
+    // Suspend first: the V6 trigger forbids removing the last owner of an ACTIVE clinic.
+    jdbc.update("UPDATE tenants SET status = 'SUSPENDED'");
+    jdbc.update("DELETE FROM tenant_provisioning_tasks");
     jdbc.update("DELETE FROM tenant_memberships");
     jdbc.update("DELETE FROM tenants");
     jdbc.update("DELETE FROM user_accounts");
     ownerA = account("owner-a@example.test", true);
     ownerB = account("owner-b@example.test", true);
+    // A second owner lets the tests revoke owner A without hitting the last-owner invariant.
+    UUID coOwnerA = account("co-owner-a@example.test", true);
     account("unverified@example.test", false);
+    // Inserted directly as ACTIVE: the activation trigger fires only on UPDATE of status.
     clinicA = clinic("Clínica A", "ACTIVE");
     clinicB = clinic("Clínica B", "ACTIVE");
     suspendedClinic = clinic("Clínica Suspensa", "SUSPENDED");
     revokedClinic = clinic("Clínica Revogada", "ACTIVE");
-    member(clinicA, ownerA, "ADMIN", true);
-    member(clinicB, ownerB, "ADMIN", true);
-    member(suspendedClinic, ownerA, "ADMIN", true);
+    member(clinicA, ownerA, "OWNER", true);
+    member(clinicA, coOwnerA, "OWNER", true);
+    member(clinicB, ownerB, "OWNER", true);
+    member(suspendedClinic, ownerA, "OWNER", true);
     member(revokedClinic, ownerA, "RECEPTION", false);
   }
 
@@ -90,7 +97,7 @@ class SessionAuthenticationIT {
     assertThat(clinics.size()).isOne();
     assertThat(clinics.get(0).get("tenantId").asText()).isEqualTo(clinicA.toString());
     assertThat(clinics.get(0).get("clinicName").asText()).isEqualTo("Clínica A");
-    assertThat(clinics.get(0).get("role").asText()).isEqualTo("ADMIN");
+    assertThat(clinics.get(0).get("role").asText()).isEqualTo("OWNER");
 
     // The token rotates on login: the pre-login token must no longer authorize mutations.
     assertThat(browser.put("/v1/auth/clinic/" + clinicA, true).statusCode()).isEqualTo(403);

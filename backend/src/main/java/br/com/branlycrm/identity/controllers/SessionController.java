@@ -3,8 +3,10 @@ package br.com.branlycrm.identity.controllers;
 import br.com.branlycrm.identity.dto.response.ClinicSelectionView;
 import br.com.branlycrm.identity.dto.response.ClinicView;
 import br.com.branlycrm.identity.dto.response.CsrfView;
+import br.com.branlycrm.identity.dto.response.CurrentClinicView;
 import br.com.branlycrm.identity.dto.response.IdentityView;
 import br.com.branlycrm.identity.security.CrmPrincipal;
+import br.com.branlycrm.identity.security.SelectedClinic;
 import br.com.branlycrm.identity.security.SessionValidationFilter;
 import br.com.branlycrm.identity.services.SessionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +55,16 @@ public final class SessionController {
   @GetMapping("/clinics")
   public List<ClinicView> clinics(@AuthenticationPrincipal CrmPrincipal principal) {
     return sessions.clinics(principal);
+  }
+
+  @Operation(summary = "Selected clinic with role and permission scopes (UI hint only)")
+  @ApiResponse(responseCode = "403", description = "Membership no longer valid")
+  @ApiResponse(responseCode = "409", description = "No clinic selected")
+  @SecurityRequirement(name = "session")
+  @GetMapping("/clinic")
+  public CurrentClinicView current(
+      @AuthenticationPrincipal CrmPrincipal principal, HttpSession session) {
+    return sessions.current(principal, SelectedClinic.require(session));
   }
 
   @Operation(summary = "Select a clinic after validating the membership")

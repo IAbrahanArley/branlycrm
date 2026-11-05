@@ -6,6 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.branlycrm.tenant.domain.ClinicAccess;
+import br.com.branlycrm.tenant.domain.ClinicRole;
 import br.com.branlycrm.tenant.domain.TenantDatabase;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.repositories.TenantConnectionPools;
@@ -62,11 +64,14 @@ class TenantAccessServiceTest {
     when(registry.findAuthorized(any(), any()))
         .thenReturn(
             Optional.of(
-                new TenantDatabase(
-                    tenant,
-                    "clinic_" + suffix,
-                    "tenant_" + suffix,
-                    "TENANT_SECRET_" + suffix.toUpperCase(Locale.ROOT))));
+                new ClinicAccess(
+                    new TenantDatabase(
+                        tenant,
+                        "clinic_" + suffix,
+                        "tenant_" + suffix,
+                        "TENANT_SECRET_" + suffix.toUpperCase(Locale.ROOT)),
+                    UUID.randomUUID(),
+                    ClinicRole.OWNER)));
     when(secrets.read(any())).thenReturn(Optional.empty());
     var connections = new TenantConnectionRepository(registry, secrets, pools);
     assertThatThrownBy(() -> connections.open(tenant, UUID.randomUUID()))

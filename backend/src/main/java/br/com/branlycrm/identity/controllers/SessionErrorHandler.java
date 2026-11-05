@@ -1,5 +1,6 @@
 package br.com.branlycrm.identity.controllers;
 
+import br.com.branlycrm.identity.exceptions.ClinicNotSelectedException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import java.util.Map;
 import org.springframework.dao.DataAccessException;
@@ -14,6 +15,11 @@ public final class SessionErrorHandler {
   @ExceptionHandler(TenantAccessException.class)
   ResponseEntity<Map<String, String>> denied(TenantAccessException exception) {
     return ResponseEntity.status(403).body(Map.of("message", exception.getMessage()));
+  }
+
+  @ExceptionHandler(ClinicNotSelectedException.class)
+  ResponseEntity<Map<String, String>> notSelected(ClinicNotSelectedException exception) {
+    return ResponseEntity.status(409).body(Map.of("message", exception.getMessage()));
   }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)

@@ -467,7 +467,7 @@ class TenantIsolationIT {
                 String.class,
                 clinic.tenantId(),
                 admin))
-        .isEqualTo("ADMIN");
+        .isEqualTo("OWNER");
   }
 
   private String status(TenantDatabase clinic) {

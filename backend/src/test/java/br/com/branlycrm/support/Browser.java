@@ -68,6 +68,17 @@ public final class Browser {
     return send(csrf(request(path), withCsrf).POST(HttpRequest.BodyPublishers.noBody()));
   }
 
+  public HttpResponse<String> putJson(String path, String json, boolean withCsrf) throws Exception {
+    return send(
+        csrf(request(path), withCsrf)
+            .header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString(json)));
+  }
+
+  public HttpResponse<String> delete(String path, boolean withCsrf) throws Exception {
+    return send(csrf(request(path), withCsrf).DELETE());
+  }
+
   private HttpResponse<String> form(String path, String body, boolean withCsrf) throws Exception {
     return send(
         csrf(request(path), withCsrf)

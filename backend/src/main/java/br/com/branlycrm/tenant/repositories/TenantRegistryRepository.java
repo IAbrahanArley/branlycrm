@@ -1,6 +1,8 @@
 package br.com.branlycrm.tenant.repositories;
 
+import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicMembership;
+import br.com.branlycrm.tenant.domain.ClinicRole;
 import br.com.branlycrm.tenant.domain.TenantDatabase;
 import java.util.List;
 import java.util.Optional;
@@ -20,11 +22,12 @@ public class TenantRegistryRepository {
     this.jdbc = jdbc;
   }
 
-  public Optional<TenantDatabase> findAuthorized(UUID tenantId, UUID subjectId) {
+  /** Access with the role, read in the same query that checks clinic, membership and account. */
+  public Optional<ClinicAccess> findAuthorized(UUID tenantId, UUID subjectId) {
     return jdbc
         .query(
             """
-            SELECT t.tenant_id, t.database_name, t.database_user, t.credential_reference
+            SELECT t.tenant_id, t.database_name, t.database_user, t.credential_reference, m.role
             FROM tenants t
             JOIN tenant_memberships m ON m.tenant_id = t.tenant_id
             JOIN user_accounts u ON u.subject_id = m.subject_id
@@ -32,11 +35,14 @@ public class TenantRegistryRepository {
               AND m.active AND t.status = 'ACTIVE' AND u.active AND u.email_verified
             """,
             (row, index) ->
-                new TenantDatabase(
-                    row.getObject("tenant_id", UUID.class),
-                    row.getString("database_name"),
-                    row.getString("database_user"),
-                    row.getString("credential_reference")),
+                new ClinicAccess(
+                    new TenantDatabase(
+                        row.getObject("tenant_id", UUID.class),
+                        row.getString("database_name"),
+                        row.getString("database_user"),
+                        row.getString("credential_reference")),
+                    subjectId,
+                    ClinicRole.valueOf(row.getString("role"))),
             tenantId,
             subjectId)
         .stream()
@@ -58,7 +64,7 @@ public class TenantRegistryRepository {
             new ClinicMembership(
                 row.getObject("tenant_id", UUID.class),
                 row.getString("clinic_name"),
-                row.getString("role")),
+                ClinicRole.valueOf(row.getString("role"))),
         subjectId);
   }
 }

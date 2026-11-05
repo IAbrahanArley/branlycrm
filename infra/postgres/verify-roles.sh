@@ -26,6 +26,11 @@ BEGIN
    RAISE EXCEPTION 'PUBLIC can connect to maintenance databases';
  END IF;
  IF NOT has_database_privilege('crm_tenant_provisioner','postgres','CONNECT') THEN RAISE EXCEPTION 'Provisioner cannot reach maintenance database'; END IF;
+ IF has_table_privilege(current_user,'tenant_memberships','DELETE') THEN RAISE EXCEPTION 'Runtime can delete memberships'; END IF;
+ IF has_column_privilege(current_user,'tenant_memberships','tenant_id','UPDATE') OR has_column_privilege(current_user,'tenant_memberships','subject_id','UPDATE') THEN
+   RAISE EXCEPTION 'Runtime can move memberships between clinics or subjects';
+ END IF;
+ IF NOT has_column_privilege(current_user,'tenant_memberships','role','UPDATE') THEN RAISE EXCEPTION 'Runtime cannot change roles'; END IF;
 END $$;
 SELECT count(*) >= 0 AS application_tables_accessible FROM tenants;
 ROLLBACK;
