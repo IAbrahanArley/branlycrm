@@ -6,7 +6,7 @@ Implementação inicial em 05/11/2026. ADR-015.
 
 Organização conforme ADR-017 e [padroes-backend.md](padroes-backend.md). identity/repositories/UserAccountRepository e tenant/repositories/TenantRegistryRepository concentram SQL. identity/services/IdentityService valida estado da identidade; tenant/services/TenantAccessService valida participação; identity/services/SessionService coordena seleção e devolve DTOs (IdentityView, ClinicView, ClinicSelectionView, CsrfView). SessionController é final, com OpenAPI nos métodos; SessionErrorHandler traduz TenantAccessException em 403. Filtros e principal ficam em identity/security; a cadeia de segurança em config/SecurityConfiguration.
 
-Banco central: user_accounts com UUID permanente, e-mail normalizado único, hash bcrypt, estado ativo, verificação de e-mail e versão de autenticação. tenant_memberships referencia a identidade global com chave estrangeira. Papéis continuam por clínica: ADMIN, RECEPTION, PROFESSIONAL; não são autoridades globais na sessão.
+Banco central: user_accounts com UUID permanente, e-mail normalizado único, hash bcrypt, estado ativo, verificação de e-mail e versão de autenticação. tenant_memberships referencia a identidade global com chave estrangeira. Papéis são por clínica: OWNER, MANAGER, RECEPTION, SALES, PROFESSIONAL (ADR-020, V6). Não são autoridades globais na sessão; o papel é relido a cada autorização, então uma mudança vale na requisição seguinte.
 
 ## Protocolo HTTP
 
@@ -18,6 +18,9 @@ Prefixo externo no Docker: /api/v1/auth.
 4. GET /me: subjectId e email, sem credenciais. GET /clinics: participações ativas em clínicas ativas.
 5. PUT /clinic/{tenantId}: exige CSRF e participação ativa; armazena UUID na sessão e retorna tenantId. O UUID do sujeito vem do principal autenticado, não do navegador.
 6. POST /logout: exige CSRF, invalida sessão e remove cookie; retorna 204. Obter novo token antes de novo login.
+7. GET /clinic: clínica selecionada, papel e escopo de cada permissão (ALL, OWN, NONE), só como dica para a interface; 409 sem seleção.
+
+Gestão de equipe da clínica selecionada em `/api/v1/clinic/team` (CRM-012, [permissoes.md](permissoes.md)): listar, mudar papel e desativar membro. A clínica vem sempre da sessão.
 
 Cookies: BRANLY_SESSION, HttpOnly, SameSite=Lax, somente cookie (sem URL rewriting), expiração por inatividade de 30 minutos. SESSION_COOKIE_SECURE=true é obrigatório em implantação HTTPS; false no ambiente HTTP local. Sem token de acesso em localStorage. ID da sessão é renovado no login.
 

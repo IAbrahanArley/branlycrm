@@ -2,10 +2,14 @@ package br.com.branlycrm.identity.services;
 
 import br.com.branlycrm.identity.dto.response.ClinicSelectionView;
 import br.com.branlycrm.identity.dto.response.ClinicView;
+import br.com.branlycrm.identity.dto.response.CurrentClinicView;
 import br.com.branlycrm.identity.dto.response.IdentityView;
 import br.com.branlycrm.identity.security.CrmPrincipal;
+import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.services.TenantAccessService;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +30,19 @@ public class SessionService {
     return tenants.memberships(principal.subjectId()).stream()
         .map(
             membership ->
-                new ClinicView(membership.tenantId(), membership.clinicName(), membership.role()))
+                new ClinicView(
+                    membership.tenantId(), membership.clinicName(), membership.role().name()))
         .toList();
+  }
+
+  public CurrentClinicView current(CrmPrincipal principal, UUID tenantId) {
+    ClinicAccess access = tenants.authorize(tenantId, principal.subjectId());
+    Map<String, String> permissions = new TreeMap<>();
+    access
+        .role()
+        .permissions()
+        .forEach((permission, scope) -> permissions.put(permission.name(), scope.name()));
+    return new CurrentClinicView(access.tenantId(), access.role().name(), permissions);
   }
 
   /** Grants no global authority: the selection is revalidated on every request. */

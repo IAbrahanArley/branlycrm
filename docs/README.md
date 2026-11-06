@@ -4,13 +4,24 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 
 ## Leitura
 
-- [Escopo funcional](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-018](adr/decisoes.md)
+Comece por aqui:
+
+- [Instruções para agentes (inclui multiagentes)](../AGENTS.md)
+- [Planejamento do produto — fonte do escopo do MVP](planejamento-crm-clinicas-estetica.md)
+- [Backlog executável e estado verificado](../TASKS.md)
+- [Papéis e orquestração dos agentes](agents/ORCHESTRATION.md)
+- [Papéis e permissões das clínicas](permissoes.md)
+- [Convenções da API: erros, paginação, filtros](api-convencoes.md)
+
+Referência:
+
+- [Escopo funcional — histórico, substituído em parte pela ADR-019](escopo.md)
+- [Decisões arquiteturais — ADR-001 a ADR-022](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
 - [Convenções de código do backend](padroes-backend.md)
 - [Qualidade e comandos de verificação](qualidade.md)
-- [Entregas e pendências](entregas-e-pendencias.md)
+- [Entregas e pendências — histórico, substituído por TASKS.md](entregas-e-pendencias.md)
 - [Estrutura e situação do projeto](projeto.md)
 
 SC significa cenário; AC significa critério de aceitação. Propostas e detalhes ainda não confirmados estão identificados como pendências. Regras propostas nos ACs não constituem aprovação comercial automática.

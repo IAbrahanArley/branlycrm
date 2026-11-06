@@ -1,5 +1,7 @@
 # Plano da próxima entrega — cadastro e ativação de clínica
 
+> Estado e próximos passos acompanhados em [TASKS.md](../TASKS.md): CRM-011, CRM-013 e CRM-014.
+
 Data: 05/11/2026. Status: planejamento; itens abaixo ainda não implementados. Não substitui ADRs aceitas. Parâmetros propostos precisam ser confirmados na implementação.
 
 ## Base concluída

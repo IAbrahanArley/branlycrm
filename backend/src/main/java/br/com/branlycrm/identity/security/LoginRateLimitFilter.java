@@ -1,5 +1,6 @@
 package br.com.branlycrm.identity.security;
 
+import br.com.branlycrm.common.controllers.ApiErrors;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,8 +45,9 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     if ("POST".equals(request.getMethod())
         && loginPath.equals(request.getServletPath())
         && !allow(request.getRemoteAddr(), System.currentTimeMillis())) {
-      response.setStatus(429);
       response.setHeader("Retry-After", "60");
+      ApiErrors.write(
+          response, 429, ApiErrors.RATE_LIMITED, "Muitas tentativas. Aguarde um minuto.");
       return;
     }
     chain.doFilter(request, response);

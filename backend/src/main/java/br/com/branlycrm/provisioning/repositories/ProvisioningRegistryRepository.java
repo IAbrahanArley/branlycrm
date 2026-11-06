@@ -24,11 +24,22 @@ public class ProvisioningRegistryRepository {
     jdbc.update(
         """
         INSERT INTO tenant_memberships (tenant_id, subject_id, role)
-        VALUES (?, ?, 'ADMIN')
+        VALUES (?, ?, 'OWNER')
         ON CONFLICT (tenant_id, subject_id) DO NOTHING
         """,
         tenantId,
         subjectId);
+  }
+
+  /** True when the admin's membership exists, is active and is OWNER (ADR-020). */
+  public boolean isActiveOwner(UUID tenantId, UUID subjectId) {
+    return !jdbc.query(
+            "SELECT subject_id FROM tenant_memberships"
+                + " WHERE tenant_id = ? AND subject_id = ? AND active AND role = 'OWNER'",
+            (row, index) -> row.getObject("subject_id", UUID.class),
+            tenantId,
+            subjectId)
+        .isEmpty();
   }
 
   public boolean changeStatus(UUID tenantId, String from, String to) {

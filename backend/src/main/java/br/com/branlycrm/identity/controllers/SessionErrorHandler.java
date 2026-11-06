@@ -1,7 +1,10 @@
 package br.com.branlycrm.identity.controllers;
 
+import br.com.branlycrm.common.controllers.ApiErrors;
+import br.com.branlycrm.common.dto.response.ApiError;
+import br.com.branlycrm.identity.exceptions.ClinicNotSelectedException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
-import java.util.Map;
+import java.util.List;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,19 +15,22 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice(assignableTypes = SessionController.class)
 public final class SessionErrorHandler {
   @ExceptionHandler(TenantAccessException.class)
-  ResponseEntity<Map<String, String>> denied(TenantAccessException exception) {
-    return ResponseEntity.status(403).body(Map.of("message", exception.getMessage()));
+  ResponseEntity<ApiError> denied(TenantAccessException exception) {
+    return ApiErrors.response(403, ApiErrors.CLINIC_ACCESS_DENIED, exception.getMessage());
+  }
+
+  @ExceptionHandler(ClinicNotSelectedException.class)
+  ResponseEntity<ApiError> notSelected(ClinicNotSelectedException exception) {
+    return ApiErrors.response(409, ApiErrors.CLINIC_NOT_SELECTED, exception.getMessage());
   }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  ResponseEntity<Map<String, String>> invalid() {
-    return ResponseEntity.badRequest().body(Map.of("message", "Identificador inválido."));
+  ResponseEntity<ApiError> invalid(MethodArgumentTypeMismatchException exception) {
+    return ApiErrors.invalidInput(List.of(exception.getName()));
   }
 
   @ExceptionHandler(DataAccessException.class)
-  ResponseEntity<Map<String, String>> unavailable() {
-    return ResponseEntity.status(503)
-        .header("Retry-After", "5")
-        .body(Map.of("message", "Serviço temporariamente indisponível."));
+  ResponseEntity<ApiError> unavailable() {
+    return ApiErrors.unavailable();
   }
 }

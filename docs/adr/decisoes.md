@@ -239,3 +239,57 @@ Data de todos os registros: 04/11/2026.
 **Alternativas:** Papel `migrator_<id>` com login (segunda senha por clínica sem ganho de isolamento); superusuário no provisionador; executar o provisionamento no processo HTTP; um pool sem limite por clínica.
 
 **Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Até lá, o ArchUnit proíbe `@Entity`. O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.
+
+## ADR-019 — Planejamento do produto e escopo do MVP
+
+**Data:** 05/11/2026. **Status:** Aceita por instrução do usuário. **Substitui:** o escopo de ../escopo.md e a sequência de entregas de ../entregas-e-pendencias.md onde houver conflito.
+
+**Contexto:** O usuário forneceu um planejamento de produto, um backlog executável e instruções para agentes, pedindo que o planejamento passe a ser seguido e adaptado ao que já existe.
+
+**Decisão:** ../planejamento-crm-clinicas-estetica.md é a fonte de escopo do MVP, e ../../TASKS.md é o backlog com o estado verificado. O MVP é CRM comercial: contatos, funil e oportunidades, tarefas, agenda comercial, dashboard, relatórios e administração mínima. WhatsApp, automações e campanhas passam para a Fase 2 e a IA para a Fase 3; as ADR-005, ADR-006 e ADR-007 ficam como desenho prévio dessas fases. Prevalecem as decisões técnicas já aceitas: Java/Spring em vez de NestJS, sessão de servidor em vez de Supabase Auth, banco por clínica em vez de `clinic_id` em banco compartilhado. A execução passa a seguir ../../AGENTS.md, com papéis multiagente em ../agents/ e `.claude/agents/`.
+
+**Consequências:** O modelo comercial da ADR-008 (franquia de IA) fica sem objeto no MVP; a precificação por clínica continua pendente. Os papéis do planejamento (Proprietário, Gerente, Recepcionista, Vendedor, Profissional) diferem do catálogo atual (`ADMIN`, `RECEPTION`, `PROFESSIONAL`) e exigem decisão e migração em CRM-012. Os documentos antigos ganham aviso de substituição e permanecem como histórico.
+
+## ADR-020 — Catálogo de papéis da clínica
+
+**Data:** 05/11/2026. **Status:** Aceita pelo usuário; implementação em CRM-012. **Substitui:** os papéis iniciais da ADR-003 (administrador, recepção/comercial, profissional).
+
+**Decisão:** Cinco papéis por clínica, um por participação: `OWNER` (Proprietário), `MANAGER` (Gerente), `RECEPTION` (Recepcionista), `SALES` (Vendedor) e `PROFESSIONAL` (Profissional). O `ADMIN` atual é convertido em `OWNER`, e o provisionador passa a criar `OWNER`. Responsabilidades, matriz de permissões e invariantes, entre elas a de que toda clínica ativa tem ao menos um OWNER, estão em ../permissoes.md. Super Admin continua fora das participações de clínica.
+
+**Alternativas:** Manter três papéis (não separa venda de recepção, como exige o planejamento); permissões configuráveis por clínica (complexidade sem demanda no MVP).
+
+**Consequências:** Migração do banco central e alteração do provisionador; cada módulo de negócio implementa as políticas da matriz com testes de permissão e de negação. A separação recepção/venda faz parte dos critérios de lançamento do planejamento.
+
+## ADR-021 — Envio de e-mail com Resend
+
+**Data:** 05/11/2026. **Status:** Aceita pelo usuário; implementação em CRM-014 e CRM-011.
+
+**Decisão:** E-mails transacionais (verificação de e-mail, convite e recuperação de senha) são enviados pela API HTTP do Resend, com o domínio do usuário já verificado no Resend. Usar um adaptador HTTP no módulo de identidade, atrás de uma interface de envio, sem SDK novo, no mesmo padrão do Smart Commerce. Em desenvolvimento e testes, um adaptador local grava as mensagens em diretório e nunca envia a pessoas reais.
+
+**Configuração** (somente no processo da API; nunca no frontend nem no provisionador):
+
+| Variável | Uso |
+|---|---|
+| `MAIL_PROVIDER` | `local` (padrão) ou `resend` |
+| `RESEND_API_KEY` | Chave de envio do Resend; segredo, só no `.env` e no gerenciador de segredos da hospedagem |
+| `MAIL_FROM_ADDRESS` | Remetente no domínio verificado, por exemplo `no-reply@<domínio>` |
+| `MAIL_FROM_NAME` | Nome exibido, por exemplo `Branly CRM` |
+| `APP_PUBLIC_ORIGIN` | Origem pública HTTPS usada nos links dos e-mails |
+
+**Consequências:** A chave nunca aparece em logs nem em respostas; falha de envio vira um código estável. Links usam apenas `APP_PUBLIC_ORIGIN` e tokens de uso único armazenados como hash. Uma origem HTTPS exige `SESSION_COOKIE_SECURE=true`. O `.env.example` recebe essas variáveis junto com a implementação.
+
+## ADR-022 — Hospedagem: AWS Lightsail para a API e Vercel para o frontend
+
+**Data:** 05/11/2026. **Status:** Aceita pelo usuário; preparação operacional em CRM-072. **Complementa:** ADR-013.
+
+**Decisão:** Uma VM AWS Lightsail roda o Compose do backend: PostgreSQL com controle total dos papéis, `db-bootstrap`, `migrate`, API, provisionador e o volume de segredos compartilhado, com Nginx e TLS como entrada. O Next.js fica na Vercel enquanto o plano atender. Os dois usam subdomínios do mesmo domínio, por exemplo `app.<domínio>` na Vercel e `api.<domínio>` no Lightsail.
+
+**Por quê:** O banco por clínica exige CREATEDB/CREATEROLE, a extensão vector preparada em `template1` e um volume compartilhado entre provisionador e API (ADR-014, ADR-016, ADR-018). Uma VM própria atende isso sem mudar a arquitetura e com o menor custo. O Postgres gerenciado e os discos por serviço do Render não garantem esses requisitos.
+
+**Consequências e itens obrigatórios antes de expor dados reais:**
+- **Mesma origem para o navegador:** a Vercel reescreve `/api/*` para a API (rewrite de proxy). Assim o cookie `BRANLY_SESSION` e o CSRF continuam de primeira parte, sem CORS com credenciais. Chamar `api.<domínio>` direto do navegador exigiria CORS restrito à origem do app.
+- **IP real do cliente:** atrás da Vercel, `getRemoteAddr()` passa a ser o IP da Vercel, e o limite de tentativas de login trataria todos os usuários como um só. É preciso confiar no encaminhamento apenas da origem conhecida (cabeçalho do proxy com segredo compartilhado ou IPs da Vercel) e nunca aceitar `X-Forwarded-For` de qualquer um. Hoje o perfil docker usa `forward-headers-strategy: framework`, que confia em qualquer cliente que alcance a API; a porta da API não pode ficar pública.
+- **HTTPS:** `SESSION_COOKIE_SECURE=true`, `APP_PUBLIC_ORIGIN=https://app.<domínio>`, certificado no Nginx da VM e portas do PostgreSQL e da API fechadas no firewall do Lightsail.
+- **Operação sob nossa responsabilidade:** backup diário do banco central e de cada banco de clínica fora da VM, com restauração testada (CRM-072), atualizações do sistema, monitoramento e snapshots.
+- **Plano da Vercel:** o plano Hobby é para uso pessoal e não comercial. Usar com clínicas pagantes exige o plano Pro, mesmo sem necessidade técnica de upgrade.
+- **Tamanho da VM:** 4 GB de RAM para três JVMs, PostgreSQL e Nginx. Sem o Next.js na VM, 2 GB pode bastar no início, desde que se meça o consumo antes de reduzir.

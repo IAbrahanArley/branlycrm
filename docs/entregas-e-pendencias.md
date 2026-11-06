@@ -1,5 +1,7 @@
 # Entregas e decisões pendentes
 
+> **Substituído (ADR-019, 05/11/2026):** a sequência e o estado das entregas estão em [TASKS.md](../TASKS.md). Este documento permanece como histórico.
+
 Data: 04/11/2026.
 
 ## Sequência proposta
