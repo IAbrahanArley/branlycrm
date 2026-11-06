@@ -1,6 +1,6 @@
 # Escopo funcional do MVP
 
-> **Substituído em parte (ADR-019, 05/11/2026):** o escopo do MVP passou a ser [planejamento-crm-clinicas-estetica.md](planejamento-crm-clinicas-estetica.md). WhatsApp, automações e campanhas foram para a Fase 2 e IA para a Fase 3. Este texto permanece como histórico e como referência de requisitos dessas fases.
+> **Substituído (ADR-019 e ADR-024):** o escopo do MVP é o de [planejamento-produto.md](planejamento-produto.md), baseado no documento do cliente de 06/11/2026. Este texto permanece como histórico. Partes dele voltaram ao escopo, como WhatsApp e origem do lead na Fase 1 e IA na Fase 2. A agenda própria saiu do MVP.
 
 Consolidado em 05/11/2026 a partir das decisões da conversa.
 

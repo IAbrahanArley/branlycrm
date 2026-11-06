@@ -1,17 +1,25 @@
 # AGENTS.md — Instruções para agentes de desenvolvimento
 
-> Projeto: **Branly CRM**, SaaS de CRM comercial e relacionamento para clínicas de estética.
-> Produto: [`docs/planejamento-crm-clinicas-estetica.md`](docs/planejamento-crm-clinicas-estetica.md). Backlog e estado: [`TASKS.md`](TASKS.md). Decisões: [`docs/adr/decisoes.md`](docs/adr/decisoes.md).
+> Projeto: **Branly CRM**, SaaS de CRM, atendimento por WhatsApp e relacionamento para clínicas (estética, odontologia e saúde), vendido direto às clínicas ou por agências de marketing parceiras.
+> Produto: [`docs/planejamento-produto.md`](docs/planejamento-produto.md), baseado no [documento de requisitos do cliente](docs/requisitos/requisitos-plataforma-clinicas-v1.1.pdf). Backlog e estado: [`TASKS.md`](TASKS.md). Decisões: [`docs/adr/decisoes.md`](docs/adr/decisoes.md).
 > Codex lê este arquivo diretamente; Claude Code o importa por `CLAUDE.md`. Ele define como trabalhar; o estado real está no código e em `TASKS.md`.
 
 ## 1. Missão e limites
 
-Construir um MVP B2B multi-tenant para clínicas captarem e organizarem contatos, gerenciarem oportunidades, tarefas, avaliações comerciais e relatórios. **Não** implementar prontuário, diagnóstico, prescrição, financeiro clínico, WhatsApp integrado, campanhas automatizadas ou IA sem autorização explícita (ADR-019). Evitar guardar dados de saúde não necessários ao CRM.
+Construir um MVP B2B multi-clínica em que o lead que chega pelo WhatsApp oficial é registrado automaticamente com a sua origem e acompanhado pelo funil até a venda. O MVP inclui caixa de entrada, notificações, lista exportável e relatório mensal, e agências parceiras gerenciam a sua carteira de clínicas (ADR-024, ADR-026).
+
+**Não** implementar sem autorização explícita:
+- prontuário, diagnóstico, prescrição, orientação clínica e financeiro clínico;
+- métricas de anúncios (gasto, CPL, CAC, ROAS, ROI);
+- WhatsApp não oficial;
+- itens da Fase 2 (IA, automações e disparos) ou sugestões do cliente.
+
+Evitar guardar dados de saúde não necessários ao CRM.
 
 ## 2. Ordem de leitura obrigatória
 
 1. Este `AGENTS.md`.
-2. `docs/planejamento-crm-clinicas-estetica.md` (visão e requisitos).
+2. `docs/planejamento-produto.md` (visão, requisitos e como cada requisito do cliente é atendido).
 3. `TASKS.md` (ordem, dependências, aceite e estado verificado).
 4. As ADRs relevantes, [`docs/padroes-backend.md`](docs/padroes-backend.md) e [`docs/qualidade.md`](docs/qualidade.md). Para clínicas e credenciais, também [`docs/provisionamento-clinicas.md`](docs/provisionamento-clinicas.md) e [`docs/segredos-clinicas.md`](docs/segredos-clinicas.md).
 5. Inspecionar arquivos reais, testes, configurações e histórico antes de presumir uma implementação.
@@ -162,4 +170,4 @@ Próxima tarefa sugerida: CRM-YYY
 
 ## 13. Prompt inicial recomendado
 
-> Leia `AGENTS.md`, `docs/planejamento-crm-clinicas-estetica.md` e `TASKS.md`. Inspecione o repositório e confirme o estado das tarefas em andamento. Proponha a próxima tarefa desbloqueada com plano, arquivos, riscos, testes e papéis de agente. Não altere a arquitetura nem amplie o escopo sem aprovação. Implemente somente a tarefa aprovada e registre evidências no backlog.
+> Leia `AGENTS.md`, `docs/planejamento-produto.md` e `TASKS.md`. Inspecione o repositório e confirme o estado das tarefas em andamento. Proponha a próxima tarefa desbloqueada com plano, arquivos, riscos, testes e papéis de agente. Não altere a arquitetura nem amplie o escopo sem aprovação. Implemente somente a tarefa aprovada e registre evidências no backlog.

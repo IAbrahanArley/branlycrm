@@ -64,6 +64,8 @@ Data de todos os registros: 04/11/2026.
 
 ## ADR-004 — Agenda própria e integridade de reservas
 
+> Suspensa pela ADR-024 em 06/11/2026: o MVP não tem agenda própria. O funil registra Agendado e Compareceu, e a agenda integrada é sugestão. O desenho abaixo vale se a agenda voltar ao escopo.
+
 **Status:** Aceita.
 
 **Contexto:** Agendamentos conectam o atendimento ao comparecimento e à venda.
@@ -77,6 +79,8 @@ Data de todos os registros: 04/11/2026.
 **Rastreabilidade:** SC-005 a SC-007, SC-011.
 
 ## ADR-005 — WhatsApp e processamento confiável
+
+> Volta a valer para a Fase 1 pela ADR-024 em 06/11/2026, detalhada pela ADR-027.
 
 **Status:** Aceita.
 
@@ -242,6 +246,8 @@ Data de todos os registros: 04/11/2026.
 
 ## ADR-019 — Planejamento do produto e escopo do MVP
 
+> Substituída pela ADR-024 em 06/11/2026. O texto abaixo permanece como histórico; o arquivo citado foi renomeado para ../planejamento-produto.md e reescrito.
+
 **Data:** 05/11/2026. **Status:** Aceita por instrução do usuário. **Substitui:** o escopo de ../escopo.md e a sequência de entregas de ../entregas-e-pendencias.md onde houver conflito.
 
 **Contexto:** O usuário forneceu um planejamento de produto, um backlog executável e instruções para agentes, pedindo que o planejamento passe a ser seguido e adaptado ao que já existe.
@@ -251,6 +257,8 @@ Data de todos os registros: 04/11/2026.
 **Consequências:** O modelo comercial da ADR-008 (franquia de IA) fica sem objeto no MVP; a precificação por clínica continua pendente. Os papéis do planejamento (Proprietário, Gerente, Recepcionista, Vendedor, Profissional) diferem do catálogo atual (`ADMIN`, `RECEPTION`, `PROFESSIONAL`) e exigem decisão e migração em CRM-012. Os documentos antigos ganham aviso de substituição e permanecem como histórico.
 
 ## ADR-020 — Catálogo de papéis da clínica
+
+> Substituída pela ADR-025 em 06/11/2026 quanto ao catálogo. Continuam valendo: um papel por participação, o invariante de último `OWNER`, os triggers da V6 e o Super Admin fora das participações. O código segue com os cinco papéis até a migração de CRM-017.
 
 **Data:** 05/11/2026. **Status:** Aceita pelo usuário; implementação em CRM-012. **Substitui:** os papéis iniciais da ADR-003 (administrador, recepção/comercial, profissional).
 
@@ -280,6 +288,11 @@ Data de todos os registros: 04/11/2026.
 
 ## ADR-022 — Hospedagem: AWS Lightsail para a API e Vercel para o frontend
 
+> **Revisão de 06/11/2026 (ADR-024, ADR-027):**
+> - **Região:** a VM e o armazenamento de objetos ficam em São Paulo (`sa-east-1`), disponível no Lightsail desde junho de 2026, porque o cliente pede servidores no Brasil.
+> - **Webhook:** a rota do WhatsApp é chamada pela Meta direto em `api.<domínio>`, sem passar pela Vercel. O Nginx expõe só essa rota sem sessão; o restante da API continua acessível apenas pelo rewrite.
+> - **VM:** o worker de mensagens é mais uma JVM. Começar com 4 GB e medir.
+
 **Data:** 05/11/2026. **Status:** Aceita pelo usuário; preparação operacional em CRM-072. **Complementa:** ADR-013.
 
 **Decisão:** Uma VM AWS Lightsail roda o Compose do backend: PostgreSQL com controle total dos papéis, `db-bootstrap`, `migrate`, API, provisionador e o volume de segredos compartilhado, com Nginx e TLS como entrada. O Next.js fica na Vercel enquanto o plano atender. Os dois usam subdomínios do mesmo domínio, por exemplo `app.<domínio>` na Vercel e `api.<domínio>` no Lightsail.
@@ -303,3 +316,124 @@ Data de todos os registros: 04/11/2026.
 **Alternativas:** Manter só `{message}` (frontend dependeria de texto); paginação por cursor em toda lista (complexidade sem necessidade nas listas atuais; continua opção por módulo); Bean Validation nos DTOs.
 
 **Consequências:** O frontend trata erros por `code`. Novos códigos são acréscimos ao contrato; mudar o significado de um código exige nova versão. A dependência `spring-boot-starter-validation` fica sem uso até haver necessidade concreta.
+
+## ADR-024 — Escopo pelo documento de requisitos do cliente
+
+**Data:** 06/11/2026. **Status:** Aceita pelo usuário. **Substitui:** ADR-019. **Suspende:** ADR-004.
+
+**Contexto:** O primeiro cliente, uma assessoria de marketing para clínicas, entregou o documento de requisitos v1.1 (../requisitos/requisitos-plataforma-clinicas-v1.1.pdf). O documento põe o WhatsApp oficial e a captura de origem do tráfego no centro do MVP.
+
+**Decisão:** O documento v1.1 é a fonte de requisitos, e ../planejamento-produto.md registra como cada requisito é atendido. As fases são as do cliente:
+- **F1 (MVP):**
+  - contatos, funil com temperatura e vendas, origem do lead;
+  - WhatsApp oficial com caixa de entrada;
+  - notificações, lista exportável, dashboard da recepção, relatório mensal;
+  - multi-clínica com permissões e 2FA para administradores.
+- **F2:** IA de atendimento, automações e disparos, e os demais itens marcados como F2.
+- **Sugestões:** só com pedido explícito.
+
+Também ficam decididos:
+- **Agenda própria:** sai do MVP.
+- **Funil padrão:** passa a ser o do cliente.
+- **Métricas de anúncios:** ficam fora do produto.
+- **Arquitetura:** prevalecem as decisões técnicas aceitas: banco por clínica em vez de `clinic_id`, Java/Spring e sessão de servidor.
+
+**Alternativas:**
+- Manter o planejamento de 05/11: não atende o primeiro cliente.
+- Adotar o documento inteiro, inclusive as sugestões de arquitetura: a coluna `clinic_id` enfraqueceria o isolamento já provado.
+
+**Consequências:**
+- **Backlog:** o `TASKS.md` é reorganizado; a agenda (CRM-041) sai do MVP.
+- **Desenhos prévios:** as ADR-005 e ADR-007 voltam a ser trabalho próximo (a ADR-007 na F2).
+- **Estimativa:** o MVP fica maior e a estimativa é refeita depois da prova do WhatsApp.
+- **Dados de saúde:** odontologia e saúde ampliam esses dados, e a revisão de LGPD vem antes do piloto.
+
+## ADR-025 — Catálogo de papéis do cliente
+
+**Data:** 06/11/2026. **Status:** Aceita pelo usuário; implementação em CRM-017. **Substitui:** o catálogo da ADR-020.
+
+**Decisão:** Os papéis de clínica passam a ser os do cliente (ADM-02):
+
+| Papel do cliente | Papel no banco | O que é |
+|---|---|---|
+| Gestor | `OWNER` | Dono: plano, exportação, auditoria; toda clínica ativa tem ao menos um |
+| Gestor | `MANAGER` | Operação comercial e equipe, sem mexer em `OWNER` |
+| Atendente | `ATTENDANT` | Junta recepção e vendas: atende, move leads e registra vendas e perdas |
+| Somente leitura | `VIEWER` | Consulta sem alterar |
+
+**Migração:** uma nova versão do banco central converte os papéis antigos:
+- `RECEPTION` e `SALES` → `ATTENDANT`;
+- `PROFESSIONAL` → `VIEWER`;
+- `OWNER` e `MANAGER` continuam.
+
+O "profissional" da venda é cadastro da clínica, sem login. Admin da agência e Super Admin não são papéis de clínica. A matriz está em ../permissoes.md.
+
+**Alternativas:**
+- Manter os cinco papéis: o atendente do cliente também registra vendas, e "Somente leitura" não existe no catálogo atual.
+- Permissões configuráveis por clínica: complexidade sem demanda.
+
+**Consequências:**
+- O escopo "próprios" deixa de existir no MVP: a caixa de entrada é compartilhada, e o atendente vê todos os leads da clínica.
+- As matrizes e os testes de `ClinicRole` mudam junto com a migração.
+- A V6 e os triggers de último proprietário continuam válidos.
+
+## ADR-026 — Agências parceiras sobre clínicas isoladas
+
+**Data:** 06/11/2026. **Status:** Aceita pelo usuário; desenho detalhado e implementação em CRM-018, com revisão de `architect` e `security`.
+
+**Contexto:** O produto é vendido de dois modos: direto a clínicas e por agências de marketing que revendem a uma carteira de clínicas.
+
+**Decisão:** Três níveis de autorização, nunca misturados:
+- **Plataforma (Super Admin):** autorização própria, fora das participações.
+- **Agência:**
+  - `agencies` e `agency_memberships` no banco central; `tenants.agency_id` é opcional, então uma clínica tem no máximo uma agência;
+  - o Admin da agência cria clínicas na carteira (pelo provisionador), convida o primeiro gestor, conecta o WhatsApp e vê o estado das clínicas;
+  - não há leitura de dados da clínica pelo papel de agência.
+- **Clínica:** participações e papéis da ADR-025. Usuários da agência só leem dados de pacientes com participação explícita na clínica, que é visível ao gestor, auditada e revogável.
+
+**Regras de segurança:**
+- **Origem da agência:** vem da participação do usuário autenticado na agência. A clínica-alvo é conferida contra `tenants.agency_id` no servidor, com a mesma resposta para "não existe" e "outra agência".
+- **2FA:** obrigatório para Admin da agência.
+- **Painel consolidado (F2):** só agregados sem dados pessoais, calculados por clínica pelo caminho de conexão autorizado.
+
+**Alternativas:**
+- Agência como `OWNER` em todas as clínicas: dá à agência acesso total a dados de saúde, sem controle da clínica.
+- Agência como tenant que contém as clínicas: quebraria o isolamento por banco.
+
+**Consequências:**
+- Novas tabelas centrais e um módulo `agency`.
+- O provisionador recebe a agência de origem.
+- Ficam pendentes: suspensão de agência e saída de clínica de uma agência. Também fica pendente se a agência recebe participação ao criar a clínica (proposta: `MANAGER`, revogável).
+
+## ADR-027 — WhatsApp oficial, fila de entrada e captura de origem
+
+**Data:** 06/11/2026. **Status:** Aceita como direção; detalhes em CRM-080, depois da prova CRM-005. **Detalha:** ADR-005.
+
+**Decisão:**
+- **Canal:** só API oficial da WhatsApp Business Platform. O fornecedor (Cloud API direta ou provedor parceiro) é escolhido depois da prova CRM-005, que precisa mostrar o `referral` de um anúncio de teste chegando ao webhook.
+- **Entrada:**
+  - `POST /v1/webhooks/whatsapp` público, fora da sessão e do CSRF, com assinatura `X-Hub-Signature-256` conferida sobre o corpo bruto;
+  - a clínica é resolvida pelo `phone_number_id` numa tabela central de canais;
+  - o evento é gravado no banco da clínica com unicidade pelo `wamid` antes de responder 200.
+- **Processamento:**
+  - um worker separado da API consome a fila persistente no PostgreSQL;
+  - o aviso para acordar o worker não carrega dados pessoais (por exemplo, `NOTIFY` com o identificador da clínica);
+  - há tentativas e registro de falha.
+- **Origem:**
+  - `referral` → Tráfego pago, com anúncio e `ctwa_clid`;
+  - código `[CODIGO]` → origem do código;
+  - senão → Não identificada;
+  - a primeira origem do lead não é sobrescrita automaticamente; contatos seguintes viram eventos.
+- **Tokens do canal:** são segredos; nunca ficam em código, logs ou respostas. A API pode lê-los para enviar. A escrita segue um fluxo dedicado a definir em CRM-080, sem dar ao processo HTTP o gravador genérico de segredos das clínicas (regra do ArchUnit).
+- **Mídias e exportações:** armazenamento de objetos compatível com S3 na mesma região, com prefixo por clínica e links temporários.
+
+**Alternativas:**
+- API não oficial: risco de banimento e sem dados de origem.
+- Processar dentro da requisição do webhook: perde mensagens em falhas e excede o tempo de resposta.
+- Redis ou broker agora: sem necessidade medida.
+
+**Consequências:**
+- Novo processo na VM e nova superfície pública, que exige revisão de `security`.
+- Custo por template, inclusive nas notificações ao gestor.
+- A atribuição de origem é parcial e não pode ser prometida como completa.
+

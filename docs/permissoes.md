@@ -1,8 +1,83 @@
 # Papéis e permissões por clínica
 
-Decidido em 05/11/2026 (ADR-020). Implementação: CRM-012. Este documento é a referência para o RBAC do servidor e para os testes de permissão de cada módulo.
+Referência para o RBAC do servidor e para os testes de permissão de cada módulo.
 
-## Papéis
+- **Catálogo alvo** (ADR-025, 06/11/2026): Gestor (`OWNER`, `MANAGER`), Atendente (`ATTENDANT`) e Somente leitura (`VIEWER`), mais os níveis de agência e plataforma (ADR-026). Entra no código em CRM-017.
+- **Catálogo vigente no código** (ADR-020, CRM-012): cinco papéis, descritos a partir de [Catálogo vigente](#catálogo-vigente-adr-020). Vale até a migração de CRM-017; as regras invariantes e as garantias continuam valendo depois dela.
+
+## Catálogo alvo (ADR-025)
+
+| Papel no banco | Nome na interface | Responsabilidade |
+|---|---|---|
+| `OWNER` | Gestor (proprietário) | Responde pela clínica: dados cadastrais, plano, equipe completa, exportação e auditoria |
+| `MANAGER` | Gestor | Opera o comercial: funil, etapas, motivos de perda, procedimentos, respostas rápidas, equipe operacional, relatórios e exportação |
+| `ATTENDANT` | Atendente | Atende pela caixa de entrada, cadastra contatos, move leads, define temperatura, cria tarefas e registra vendas e perdas |
+| `VIEWER` | Somente leitura | Consulta contatos, leads, conversas, dashboard e relatório, sem alterar nada |
+
+Legenda:
+- **✓**: permitido em todos os registros da clínica selecionada.
+- **Si**: só para si mesmo.
+- **—**: sem acesso.
+
+O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é compartilhada.
+
+| Recurso / ação | OWNER | MANAGER | ATTENDANT | VIEWER |
+|---|---|---|---|---|
+| Dados da clínica e fuso: editar | ✓ | — | — | — |
+| Dados da clínica e fuso: ver | ✓ | ✓ | ✓ | ✓ |
+| Plano e assinatura | ✓ | — | — | — |
+| Equipe: ver | ✓ | ✓ | — | — |
+| Equipe: convidar, mudar papel, desativar | ✓ | Só `ATTENDANT` e `VIEWER` | — | — |
+| Configuração comercial (funil, etapas, motivos de perda, procedimentos, profissionais, respostas rápidas) | ✓ | ✓ | — | — |
+| Canal WhatsApp: ver estado | ✓ | ✓ | — | — |
+| Contatos: ver e buscar | ✓ | ✓ | ✓ | ✓ |
+| Contatos: criar, editar, tags, consentimento | ✓ | ✓ | ✓ | — |
+| Contatos: arquivar | ✓ | ✓ | — | — |
+| Contatos: importar planilha | ✓ | ✓ | — | — |
+| Leads: ver, Kanban e linha do tempo | ✓ | ✓ | ✓ | ✓ |
+| Leads: criar, mover etapa, temperatura, notas | ✓ | ✓ | ✓ | — |
+| Leads: assumir como responsável | ✓ | ✓ | Si | — |
+| Leads: atribuir ou reatribuir a outro | ✓ | ✓ | — | — |
+| Leads: corrigir origem manualmente | ✓ | ✓ | ✓ | — |
+| Vendas e perdas: registrar | ✓ | ✓ | ✓ | — |
+| Vendas: corrigir ou cancelar registro | ✓ | ✓ | — | — |
+| Caixa de entrada: ler conversas | ✓ | ✓ | ✓ | ✓ |
+| Caixa de entrada: responder, assumir, enviar mídia e template | ✓ | ✓ | ✓ | — |
+| Tarefas: criar e atribuir | ✓ | ✓ | ✓ | — |
+| Tarefas: ver | ✓ | ✓ | ✓ | ✓ |
+| Notificações próprias | ✓ | ✓ | ✓ | ✓ |
+| Lista de leads com filtros | ✓ | ✓ | ✓ | ✓ |
+| Lista de leads: exportar (Excel, CSV, PDF) | ✓ | ✓ | — | — |
+| Dashboard da recepção | ✓ | ✓ | ✓ | ✓ |
+| Relatório mensal | ✓ | ✓ | — | ✓ |
+| Auditoria da clínica | ✓ | — | — | — |
+
+**Conversão na migração de CRM-017:**
+- `RECEPTION` e `SALES` → `ATTENDANT`;
+- `PROFESSIONAL` → `VIEWER`;
+- `OWNER` e `MANAGER` continuam.
+
+### Agência e plataforma (ADR-026)
+
+Não são papéis de clínica e nunca aparecem em `tenant_memberships`.
+
+| Ação | Admin da agência | Super Admin |
+|---|---|---|
+| Ver clínicas (nome, situação, plano, estado do canal) | Só da própria carteira | Todas |
+| Criar clínica | Na própria carteira | Direta ou em qualquer agência |
+| Convidar o primeiro gestor da clínica | Na própria carteira | ✓ |
+| Conectar ou trocar o número do WhatsApp | Na própria carteira | ✓ |
+| Criar e suspender agências | — | ✓ |
+| Ler contatos, leads, conversas e vendas | Só com participação na clínica | Não, por padrão (suporte auditado é fluxo próprio, futuro) |
+| Painel consolidado com agregados, sem dados pessoais (F2) | Da própria carteira | ✓ |
+
+**Regras:**
+- **2FA:** obrigatório para Admin da agência, Super Admin e `OWNER`.
+- **Recusa:** clínica de outra agência e clínica inexistente recebem a mesma resposta.
+
+## Catálogo vigente (ADR-020)
+
+### Papéis
 
 Cada usuário tem **um** papel por clínica (`tenant_memberships`), e pode ter papéis diferentes em clínicas diferentes. Papéis nunca são autoridade global na sessão.
 
@@ -16,7 +91,7 @@ Cada usuário tem **um** papel por clínica (`tenant_memberships`), e pode ter p
 
 **Super Admin** é autorização da plataforma, fora de `tenant_memberships`. Não acessa dados comerciais das clínicas por padrão (planejamento, seção 2.1).
 
-## Matriz por módulo
+### Matriz por módulo
 
 Legenda:
 - **T**: todos os registros da clínica.
