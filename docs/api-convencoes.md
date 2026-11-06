@@ -24,8 +24,10 @@ Toda lista que cresce com o uso é paginada no servidor.
 
 | Parâmetro | Regra |
 |---|---|
-| `page` | Começa em 1; padrão 1; máximo 10000 |
+| `page` | Começa em 1; padrão 1 |
 | `pageSize` | Padrão 25; de 1 a 100 |
+
+A posição mais funda alcançável é a linha 10.000 (`(page - 1) × pageSize ≤ 10000`), porque o OFFSET faz o PostgreSQL percorrer todas as linhas puladas. Listas maiores são estreitadas por filtros ou, no módulo que precisar, por paginação por chave.
 
 Resposta:
 
@@ -49,7 +51,7 @@ Resposta:
 
 ## Validação de entrada
 
-Segue o padrão do Smart Commerce: a validação fica nos records de domínio (construtor ou `of(...)`), não em anotações de Bean Validation. Isso cobre regras de Unicode, normalização e limites que `@Size` não expressa.
+A validação fica nos records de domínio (construtor ou `of(...)`), não em anotações de Bean Validation (ADR-023). Isso cobre regras de Unicode, normalização e limites que `@Size` não expressa.
 
 - Entrada inválida lança `common/exceptions/InvalidInputException` com os nomes dos campos.
 - JSON malformado vira `INVALID_INPUT` com o campo `body`; parâmetro de caminho com tipo errado vira o nome do parâmetro.
@@ -57,7 +59,7 @@ Segue o padrão do Smart Commerce: a validação fica nos records de domínio (c
 
 ## Erros
 
-Todo erro, inclusive os gerados pelos filtros de segurança antes do Spring MVC, tem este corpo:
+Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes do Spring MVC, os de rota inexistente e os erros internos:
 
 ```json
 { "code": "INVALID_INPUT", "message": "Dados inválidos.", "fields": ["pageSize"] }
@@ -83,12 +85,17 @@ Todo erro, inclusive os gerados pelos filtros de segurança antes do Spring MVC,
 | `INVALID_INPUT` | 400 | Entrada inválida (`fields` diz quais) | Handlers |
 | `RATE_LIMITED` | 429 | Excesso de tentativas de login; respeitar `Retry-After` | `LoginRateLimitFilter` |
 | `SERVICE_UNAVAILABLE` | 503 | Banco indisponível ou espera de lock esgotada; respeitar `Retry-After` | Handlers |
+| `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
+| `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | Corpo com tipo diferente de JSON | `GlobalErrorHandler` |
+| `INTERNAL_ERROR` | 500 | Bug; registrado no log do servidor com stack trace, nunca na resposta | `GlobalErrorHandler` |
 
 **Na implementação:**
-- Códigos gerais ficam em `common/controllers/ApiErrors`; códigos de um módulo ficam no `*ErrorHandler` dele.
-- Cada controller mantém o seu `*ErrorHandler` (ADR-017), usando `ApiErrors` para montar o corpo.
+- Códigos gerais ficam em `common/web/ApiErrors`; códigos de um módulo ficam no `*ErrorHandler` dele.
+- Cada controller mantém o seu `*ErrorHandler` (ADR-017), com `@Order(GlobalErrorHandler.MODULE_ORDER)` e usando `ApiErrors` para montar o corpo.
+- `common/web/GlobalErrorHandler` é o fallback de menor prioridade para o que nenhum módulo trata. Exceções do Spring Security são relançadas para virar 401/403 no filtro.
 - Recursos identificados por ID que o usuário não pode ver respondem 404, igual a inexistentes.
 
 ## Documentação OpenAPI
 
-Cada operação declara `@Operation` e, para cada erro possível, um `@ApiResponse` com o código, por exemplo `"INVALID_INPUT: page, pageSize, role or active"`. Parâmetros de paginação e filtros têm `@Parameter` com a regra. As rotas de login e logout, que são filtros, ficam em `OpenApiConfiguration`.
+Cada operação declara `@Operation` e, para cada erro próprio, um `@ApiResponse` com o código, por exemplo `"INVALID_INPUT: page, pageSize, role or active"`. Os erros comuns (401 `AUTHENTICATION_REQUIRED`/`SESSION_REVOKED`, 403 `CSRF_INVALID` em mutações, 500 e 503) e o esquema `ApiError` em toda resposta de erro são adicionados por `OpenApiConfiguration.standardErrorResponses`. Parâmetros de paginação e filtros têm `@Parameter` com a regra. As rotas de login e logout, que são filtros, ficam em `OpenApiConfiguration`.

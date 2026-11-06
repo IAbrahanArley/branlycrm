@@ -1,6 +1,7 @@
 package br.com.branlycrm.config;
 
-import br.com.branlycrm.common.controllers.ApiErrors;
+import br.com.branlycrm.common.web.ApiErrors;
+import br.com.branlycrm.identity.security.CrmPrincipal;
 import br.com.branlycrm.identity.security.LoginRateLimitFilter;
 import br.com.branlycrm.identity.security.SessionValidationFilter;
 import br.com.branlycrm.identity.services.IdentityService;
@@ -8,6 +9,8 @@ import br.com.branlycrm.tenant.services.TenantAccessService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -32,6 +35,25 @@ public class SecurityConfiguration {
   @Bean
   PasswordEncoder passwordEncoder() {
     return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+  }
+
+  /**
+   * Inactive or unverified accounts are refused after the password comparison, never before, so
+   * they take as long as a wrong password and as an unknown e-mail (Spring hashes a dummy password
+   * for unknown users). All three answer INVALID_CREDENTIALS.
+   */
+  @Bean
+  DaoAuthenticationProvider authenticationProvider(
+      IdentityService identities, PasswordEncoder passwordEncoder) {
+    DaoAuthenticationProvider provider = new DaoAuthenticationProvider(identities);
+    provider.setPasswordEncoder(passwordEncoder);
+    provider.setPostAuthenticationChecks(
+        user -> {
+          if (!(user instanceof CrmPrincipal principal) || !principal.usable()) {
+            throw new DisabledException("Account unavailable");
+          }
+        });
+    return provider;
   }
 
   @Bean

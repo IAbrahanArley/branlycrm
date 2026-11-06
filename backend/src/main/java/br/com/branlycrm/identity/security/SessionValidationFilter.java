@@ -1,6 +1,6 @@
 package br.com.branlycrm.identity.security;
 
-import br.com.branlycrm.common.controllers.ApiErrors;
+import br.com.branlycrm.common.web.ApiErrors;
 import br.com.branlycrm.identity.services.IdentityService;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.services.TenantAccessService;

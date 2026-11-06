@@ -13,18 +13,23 @@ public class CrmPrincipal extends User {
   private static final long serialVersionUID = 1L;
   private final UUID subjectId;
   private final long authVersion;
+  private final boolean usable;
 
+  /**
+   * Always "enabled" for Spring Security: an inactive or unverified account is refused only after
+   * the password check (SecurityConfiguration), so every refusal costs one hash comparison and
+   * response time does not reveal which e-mails exist.
+   */
   public CrmPrincipal(UserAccount account) {
-    super(
-        account.email(),
-        account.passwordHash(),
-        account.canAuthenticate(),
-        true,
-        true,
-        true,
-        List.of());
+    super(account.email(), account.passwordHash(), true, true, true, true, List.of());
     this.subjectId = account.subjectId();
     this.authVersion = account.authVersion();
+    this.usable = account.canAuthenticate();
+  }
+
+  /** Active and verified at load time; checked after the password, then on every request. */
+  public boolean usable() {
+    return usable;
   }
 
   public UUID subjectId() {

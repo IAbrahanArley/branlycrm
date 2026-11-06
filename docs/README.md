@@ -16,7 +16,7 @@ Comece por aqui:
 Referência:
 
 - [Escopo funcional — histórico, substituído em parte pela ADR-019](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-022](adr/decisoes.md)
+- [Decisões arquiteturais — ADR-001 a ADR-023](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
 - [Convenções de código do backend](padroes-backend.md)

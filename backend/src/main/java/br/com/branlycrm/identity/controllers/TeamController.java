@@ -65,12 +65,15 @@ public final class TeamController {
   }
 
   @Operation(summary = "Change a member's role")
-  @ApiResponse(responseCode = "400", description = "Unknown role")
+  @ApiResponse(responseCode = "400", description = "INVALID_INPUT: role, subjectId or body")
   @ApiResponse(
       responseCode = "403",
-      description = "CSRF, role without permission or own membership")
-  @ApiResponse(responseCode = "404", description = "Not an active member of the selected clinic")
-  @ApiResponse(responseCode = "409", description = "Last owner or no clinic selected")
+      description =
+          "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed)")
+  @ApiResponse(
+      responseCode = "404",
+      description = "MEMBER_NOT_FOUND: not an active member of the selected clinic")
+  @ApiResponse(responseCode = "409", description = "LAST_OWNER or CLINIC_NOT_SELECTED")
   @SecurityRequirement(name = "csrf")
   @PutMapping("/{subjectId}/role")
   public TeamMemberView changeRole(
@@ -95,9 +98,12 @@ public final class TeamController {
   @ApiResponse(responseCode = "204", description = "Member deactivated")
   @ApiResponse(
       responseCode = "403",
-      description = "CSRF, role without permission or own membership")
-  @ApiResponse(responseCode = "404", description = "Not an active member of the selected clinic")
-  @ApiResponse(responseCode = "409", description = "Last owner or no clinic selected")
+      description =
+          "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed)")
+  @ApiResponse(
+      responseCode = "404",
+      description = "MEMBER_NOT_FOUND: not an active member of the selected clinic")
+  @ApiResponse(responseCode = "409", description = "LAST_OWNER or CLINIC_NOT_SELECTED")
   @SecurityRequirement(name = "csrf")
   @DeleteMapping("/{subjectId}")
   public ResponseEntity<Void> deactivate(

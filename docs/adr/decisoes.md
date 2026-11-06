@@ -293,3 +293,13 @@ Data de todos os registros: 04/11/2026.
 - **Operação sob nossa responsabilidade:** backup diário do banco central e de cada banco de clínica fora da VM, com restauração testada (CRM-072), atualizações do sistema, monitoramento e snapshots.
 - **Plano da Vercel:** o plano Hobby é para uso pessoal e não comercial. Usar com clínicas pagantes exige o plano Pro, mesmo sem necessidade técnica de upgrade.
 - **Tamanho da VM:** 4 GB de RAM para três JVMs, PostgreSQL e Nginx. Sem o Next.js na VM, 2 GB pode bastar no início, desde que se meça o consumo antes de reduzir.
+
+## ADR-023 — Contrato de erros, paginação e validação da API
+
+**Data:** 05/11/2026. **Status:** Adotada em CRM-004. **Detalhes:** ../api-convencoes.md.
+
+**Decisão:** Todo erro usa o corpo `{code, message, fields}`, com `code` estável para o frontend, inclusive nas respostas dos filtros de segurança e no fallback global. Listas são paginadas com `page` (a partir de 1) e `pageSize` (25 por padrão, no máximo 100), até a linha 10.000, e respondem `{items, page, pageSize, total}`. Filtros são parâmetros de query validados em records de consulta do domínio. A validação de entrada fica nos records de domínio, e não em Bean Validation como previa a entrega original de CRM-004, porque regras de Unicode, normalização e limites não cabem em anotações e o padrão do projeto de referência (ADR-017) já faz assim.
+
+**Alternativas:** Manter só `{message}` (frontend dependeria de texto); paginação por cursor em toda lista (complexidade sem necessidade nas listas atuais; continua opção por módulo); Bean Validation nos DTOs.
+
+**Consequências:** O frontend trata erros por `code`. Novos códigos são acréscimos ao contrato; mudar o significado de um código exige nova versão. A dependência `spring-boot-starter-validation` fica sem uso até haver necessidade concreta.
