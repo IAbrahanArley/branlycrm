@@ -7,7 +7,8 @@ Consolidado em 05/11/2026. Esta documentação registra decisões e requisitos; 
 Comece por aqui:
 
 - [Instruções para agentes (inclui multiagentes)](../AGENTS.md)
-- [Planejamento do produto — fonte do escopo do MVP](planejamento-crm-clinicas-estetica.md)
+- [Planejamento do produto — fonte do escopo do MVP](planejamento-produto.md)
+- [Documento de requisitos do cliente v1.1 (PDF)](requisitos/requisitos-plataforma-clinicas-v1.1.pdf)
 - [Backlog executável e estado verificado](../TASKS.md)
 - [Papéis e orquestração dos agentes](agents/ORCHESTRATION.md)
 - [Papéis e permissões das clínicas](permissoes.md)
@@ -15,8 +16,8 @@ Comece por aqui:
 
 Referência:
 
-- [Escopo funcional — histórico, substituído em parte pela ADR-019](escopo.md)
-- [Decisões arquiteturais — ADR-001 a ADR-023](adr/decisoes.md)
+- [Escopo funcional — histórico, substituído pelas ADR-019 e ADR-024](escopo.md)
+- [Decisões arquiteturais — ADR-001 a ADR-027](adr/decisoes.md)
 - [Cenários e critérios de aceitação](cenarios-e-aceitacao.md)
 - [Backend MVC e dependências](backend-mvc.md)
 - [Convenções de código do backend](padroes-backend.md)
