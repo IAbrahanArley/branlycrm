@@ -26,6 +26,10 @@ Cookies: BRANLY_SESSION, HttpOnly, SameSite=Lax, somente cookie (sem URL rewriti
 
 Login/logout são processados pelos filtros nativos do Spring Security, não por controllers fictícios. Os demais endpoints têm contratos OpenAPI no SessionController. As duas operações de filtro estão documentadas em config/OpenApiConfiguration. Seleção negada responde 403 com {"message"}; UUID malformado responde 400.
 
+## Respostas de login
+
+Senha errada, conta inexistente, conta inativa e conta não verificada respondem igual: 401 `INVALID_CREDENTIALS`, com o mesmo corpo. O estado da conta só é verificado depois da comparação da senha (`SecurityConfiguration.authenticationProvider`), então as quatro respostas têm custo de hash equivalente e o tempo de resposta não revela quais e-mails existem. Erros seguem [api-convencoes.md](api-convencoes.md).
+
 ## Revogação e limitação
 
 A cada requisição autenticada, o servidor consulta estado e auth_version. Desativar usuário, alterar senha/e-mail/verificação incrementa versão no banco e invalida a sessão no próximo acesso. Participação/estado da clínica também são revalidados quando houver seleção; revogação elimina a seleção e retorna 403. A identidade global pode continuar ativa para outras clínicas.

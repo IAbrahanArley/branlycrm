@@ -90,6 +90,22 @@ class ArchitectureTest {
     noClasses().should().beAnnotatedWith("jakarta.persistence.Entity").check(CODE);
   }
 
+  /** Shared HTTP contract and helpers never reach into a business or infrastructure module. */
+  @Test
+  void commonDependsOnNoModule() {
+    noClasses()
+        .that()
+        .resideInAPackage("br.com.branlycrm.common..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "br.com.branlycrm.identity..",
+            "br.com.branlycrm.tenant..",
+            "br.com.branlycrm.provisioning..",
+            "br.com.branlycrm.config..")
+        .check(CODE);
+  }
+
   @Test
   void domainDependsOnNoOtherLayer() {
     noClasses()

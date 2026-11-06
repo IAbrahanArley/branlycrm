@@ -20,11 +20,15 @@
 **Aceite:** decisões aprovadas e registradas; dúvidas explicitadas; nenhuma tecnologia suposta como existente.
 **Estado:** decididos stack (ADR-001, ADR-012, ADR-017), monorepo (ADR-011), persistência JDBC em identidade/registro e JPA de clínica adiada (ADR-017, ADR-018), autenticação por sessão (ADR-015), banco por clínica (ADR-014), UTC no banco e fuso da clínica (ADR-004) e escopo do MVP (ADR-019). Papéis (ADR-020), e-mail com Resend (ADR-021) e hospedagem (ADR-022: Lightsail para o backend e Vercel para o Next.js) decididos. **Falta:** armazenamento de segredos na VM (permissões, backup e rotação) e a configuração de proxy confiável descrita na ADR-022, ambos em CRM-072.
 
-### [-] CRM-002 — Criar estrutura do repositório e CI (P0)
+### [x] CRM-002 — Criar estrutura do repositório e CI (P0)
 **Depende de:** CRM-001.
 **Entregas:** apps frontend/backend, configuração TypeScript estrita, lint, format, testes, scripts e `.env.example`.
 **Aceite:** instalação, lint, typecheck, testes iniciais e build executam em ambiente limpo; CI replica as verificações.
-**Estado:** `backend/` com Spotless, ArchUnit, Surefire/Failsafe e Testcontainers; `frontend/` com TypeScript `strict`, ESLint e build; `.env.example`; Compose. **Falta:** CI (não existe `.github/workflows`), script `typecheck` e testes no frontend.
+**Estado (05/11/2026):** concluída em `feat/crm-004-api-conventions`.
+- **Backend:** Spotless, ArchUnit, Surefire/Failsafe e Testcontainers.
+- **Frontend:** TypeScript `strict`; `npm run lint` com zero avisos, `npm run typecheck` (`next typegen` + `tsc`) e build, todos executados localmente (o build nativo no Windows agora também passa).
+- **CI:** `.github/workflows/ci.yml` roda `verify` e os checks do frontend em PR e push na `main`, com actions fixadas por SHA, token só de leitura e sem segredos; o wrapper do Maven confere o SHA-256 da distribuição.
+- **Fora do escopo:** testes automatizados de frontend (ainda não há telas) e build das imagens Docker na CI.
 
 ### [-] CRM-003 — Configurar banco, migrations e ambientes (P0)
 **Depende de:** CRM-001, CRM-002.
@@ -32,11 +36,18 @@
 **Aceite:** banco pode ser criado do zero por migrations; restauração é testável; nenhum segredo versionado.
 **Estado:** PostgreSQL 17 + pgvector no Compose; Flyway central V1–V5 e de clínica V1–V2, aplicadas do zero em `BootstrapIT` e `TenantIsolationIT`; papéis separados ([credenciais-postgres.md](docs/credenciais-postgres.md)). **Falta:** política e teste de backup/restauração (banco central e por clínica) e seeds sintéticos locais.
 
-### [-] CRM-004 — Definir contratos e convenções de API (P0)
+### [x] CRM-004 — Definir contratos e convenções de API (P0)
 **Depende de:** CRM-002.
 **Entregas:** padrão REST, paginação, filtros, validação, erros, documentação OpenAPI e versionamento.
 **Aceite:** endpoint de exemplo documentado e testado com respostas de sucesso/erro.
-**Estado:** prefixo `/v1` sob o contexto `/api`, OpenAPI nos controllers e nas rotas de filtro, erros `{"message"}` por `ErrorHandler` de módulo, endpoints de sessão testados em `SessionAuthenticationIT`. **Falta:** convenção de paginação/filtros e de validação de entrada (Bean Validation) e o código estável de erro consumível pelo frontend.
+**Estado (05/11/2026):** concluída; contrato em [api-convencoes.md](docs/api-convencoes.md) (ADR-023).
+- **Erros:** corpo `{code, message, fields}` em todas as respostas, inclusive filtros de segurança, rotas inexistentes e erros internos (`GlobalErrorHandler`).
+- **Listas e validação:** paginação até a linha 10.000; filtros e validação em records de domínio, em vez de Bean Validation.
+- **OpenAPI e versionamento:** erros comuns e esquema `ApiError` em toda operação; versionamento `/v1`.
+- **Endpoint de exemplo:** `GET /v1/clinic/team`, paginado e com filtros `role` e `active`.
+- **Testes:** `./mvnw -B -ntp clean verify` → 99 unitários (2 ignorados no Windows) e 31 de integração passaram, entre eles `ApiConventionsIT`, `PageQueryTest` e `TeamQueryTest`.
+- **Revisões:** `security` e `reviewer`. Correção aplicada: o login não revela mais por tempo de resposta se um e-mail existe e está inativo.
+- **Pendência:** a dependência de validação continua no `pom.xml` sem uso (ADR-023).
 
 ## Fase 1 — Identidade, clínicas e isolamento
 

@@ -42,7 +42,6 @@ public final class SessionController {
   }
 
   @Operation(summary = "Authenticated identity, without credentials")
-  @ApiResponse(responseCode = "401", description = "Authentication required")
   @SecurityRequirement(name = "session")
   @GetMapping("/me")
   public IdentityView me(@AuthenticationPrincipal CrmPrincipal principal) {
@@ -50,7 +49,6 @@ public final class SessionController {
   }
 
   @Operation(summary = "Active memberships in active clinics")
-  @ApiResponse(responseCode = "401", description = "Authentication required")
   @SecurityRequirement(name = "session")
   @GetMapping("/clinics")
   public List<ClinicView> clinics(@AuthenticationPrincipal CrmPrincipal principal) {
@@ -58,8 +56,8 @@ public final class SessionController {
   }
 
   @Operation(summary = "Selected clinic with role and permission scopes (UI hint only)")
-  @ApiResponse(responseCode = "403", description = "Membership no longer valid")
-  @ApiResponse(responseCode = "409", description = "No clinic selected")
+  @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED")
+  @ApiResponse(responseCode = "409", description = "CLINIC_NOT_SELECTED")
   @SecurityRequirement(name = "session")
   @GetMapping("/clinic")
   public CurrentClinicView current(
@@ -68,8 +66,8 @@ public final class SessionController {
   }
 
   @Operation(summary = "Select a clinic after validating the membership")
-  @ApiResponse(responseCode = "401", description = "Authentication required")
-  @ApiResponse(responseCode = "403", description = "CSRF or clinic access denied")
+  @ApiResponse(responseCode = "400", description = "INVALID_INPUT: tenantId")
+  @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED")
   @SecurityRequirement(name = "session")
   @SecurityRequirement(name = "csrf")
   @PutMapping("/clinic/{tenantId}")

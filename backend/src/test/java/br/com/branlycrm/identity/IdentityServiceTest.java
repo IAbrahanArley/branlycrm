@@ -24,7 +24,8 @@ class IdentityServiceTest {
   void normalizesEmailBeforeLookup() {
     when(accounts.findByEmail("user@example.test"))
         .thenReturn(Optional.of(account(UUID.randomUUID(), true, true, 0)));
-    assertThat(service.loadUserByUsername(" USER@Example.TEST ").isEnabled()).isTrue();
+    assertThat(((CrmPrincipal) service.loadUserByUsername(" USER@Example.TEST ")).usable())
+        .isTrue();
     verify(accounts).findByEmail("user@example.test");
   }
 
@@ -42,8 +43,10 @@ class IdentityServiceTest {
   @Test
   void inactiveOrUnverifiedAccountsCannotAuthenticate() {
     UUID id = UUID.randomUUID();
-    assertThat(new CrmPrincipal(account(id, true, false, 0)).isEnabled()).isFalse();
-    assertThat(new CrmPrincipal(account(id, false, true, 0)).isEnabled()).isFalse();
+    // Refused after the password check, not by Spring's pre-check: see SecurityConfiguration.
+    assertThat(new CrmPrincipal(account(id, true, false, 0)).usable()).isFalse();
+    assertThat(new CrmPrincipal(account(id, false, true, 0)).usable()).isFalse();
+    assertThat(new CrmPrincipal(account(id, false, false, 0)).isEnabled()).isTrue();
     verifyNoInteractions(accounts);
   }
 

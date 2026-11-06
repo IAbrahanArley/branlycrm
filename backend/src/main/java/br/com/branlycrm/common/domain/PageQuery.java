@@ -10,12 +10,18 @@ public record PageQuery(int page, int pageSize) {
   public static final int DEFAULT_SIZE = 25;
   public static final int MAX_SIZE = 100;
 
-  /** Upper bound keeps the offset inside an int and away from pathological scans. */
   public static final int MAX_PAGE = 10_000;
+
+  /**
+   * Deepest position reachable by paging: OFFSET makes PostgreSQL walk every skipped row, so large
+   * lists must be narrowed with filters (or keyset paging) instead of deep pages.
+   */
+  public static final int MAX_OFFSET = 10_000;
 
   public PageQuery {
     if (page < 1 || page > MAX_PAGE) throw new InvalidInputException("page");
     if (pageSize < 1 || pageSize > MAX_SIZE) throw new InvalidInputException("pageSize");
+    if ((long) (page - 1) * pageSize > MAX_OFFSET) throw new InvalidInputException("page");
   }
 
   /** Parses raw query parameters; absent values use the defaults. */

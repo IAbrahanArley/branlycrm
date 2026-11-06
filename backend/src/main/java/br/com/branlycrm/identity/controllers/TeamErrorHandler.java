@@ -1,12 +1,14 @@
 package br.com.branlycrm.identity.controllers;
 
-import br.com.branlycrm.common.controllers.ApiErrors;
 import br.com.branlycrm.common.dto.response.ApiError;
 import br.com.branlycrm.common.exceptions.InvalidInputException;
+import br.com.branlycrm.common.web.ApiErrors;
+import br.com.branlycrm.common.web.GlobalErrorHandler;
 import br.com.branlycrm.identity.exceptions.ClinicNotSelectedException;
 import br.com.branlycrm.tenant.exceptions.TeamException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import java.util.List;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -16,6 +18,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 /** HTTP translation for team endpoints; no SQL detail or stack trace reaches the client. */
 @RestControllerAdvice(assignableTypes = TeamController.class)
+@Order(GlobalErrorHandler.MODULE_ORDER)
 public final class TeamErrorHandler {
   public static final String MEMBER_NOT_FOUND = "MEMBER_NOT_FOUND";
   public static final String MEMBER_CHANGE_FORBIDDEN = "MEMBER_CHANGE_FORBIDDEN";

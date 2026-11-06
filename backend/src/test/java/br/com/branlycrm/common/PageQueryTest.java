@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.branlycrm.common.domain.PageQuery;
 import br.com.branlycrm.common.exceptions.InvalidInputException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -29,8 +30,11 @@ class PageQueryTest {
   @Test
   void acceptsTheBoundaries() {
     assertThat(PageQuery.of("1", "1")).isEqualTo(new PageQuery(1, 1));
-    assertThat(PageQuery.of("10000", "100")).isEqualTo(new PageQuery(10_000, 100));
+    // Deepest reachable position is MAX_OFFSET rows: page 101 of 100 starts at row 10000.
+    assertThat(PageQuery.of("101", "100")).isEqualTo(new PageQuery(101, 100));
+    assertThat(PageQuery.of("10000", "1")).isEqualTo(new PageQuery(10_000, 1));
     assertThat(PageQuery.MAX_PAGE).isEqualTo(10_000);
+    assertThat(PageQuery.MAX_OFFSET).isEqualTo(10_000);
     assertThat(PageQuery.MAX_SIZE).isEqualTo(100);
     // Leading zeros are digits; the value is what counts.
     assertThat(PageQuery.of("000002", "025")).isEqualTo(new PageQuery(2, 25));
@@ -89,8 +93,18 @@ class PageQueryTest {
     assertThat(new PageQuery(1, 25).offset()).isZero();
     assertThat(new PageQuery(2, 25).offset()).isEqualTo(25);
     assertThat(new PageQuery(3, 10).offset()).isEqualTo(20);
-    // Largest allowed offset stays far inside an int.
-    assertThat(new PageQuery(10_000, 100).offset()).isEqualTo(999_900);
+    assertThat(new PageQuery(101, 100).offset()).isEqualTo(PageQuery.MAX_OFFSET);
+  }
+
+  @Test
+  void refusesPagesDeeperThanTheOffsetCap() {
+    for (int[] tooDeep : new int[][] {{102, 100}, {10_000, 100}, {402, 25}, {10_000, 2}}) {
+      assertThatThrownBy(() -> new PageQuery(tooDeep[0], tooDeep[1]))
+          .as("page %s size %s", tooDeep[0], tooDeep[1])
+          .isInstanceOf(InvalidInputException.class)
+          .extracting(error -> ((InvalidInputException) error).fields())
+          .isEqualTo(List.of("page"));
+    }
   }
 
   @Test

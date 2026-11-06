@@ -1,4 +1,4 @@
-package br.com.branlycrm.common.controllers;
+package br.com.branlycrm.common.web;
 
 import br.com.branlycrm.common.dto.response.ApiError;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +23,10 @@ public final class ApiErrors {
   public static final String CLINIC_NOT_SELECTED = "CLINIC_NOT_SELECTED";
   public static final String INVALID_INPUT = "INVALID_INPUT";
   public static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
+  public static final String NOT_FOUND = "NOT_FOUND";
+  public static final String METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
+  public static final String UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE";
+  public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
   private static final JsonMapper JSON = JsonMapper.builder().build();
 

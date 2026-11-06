@@ -12,7 +12,7 @@
 | Ambiente | `docker compose build` e `docker compose up` na raiz | Imagens e ordem de inicialização | Isolamento entre clínicas |
 | Papéis do banco | Procedimento em [credenciais-postgres.md](credenciais-postgres.md) | Privilégios dos papéis centrais | Credenciais por clínica |
 
-**CI:** `.github/workflows/ci.yml` roda os mesmos checks em todo PR e em push na `main`, sem deploy nem segredos. O job do backend executa `./mvnw -B -ntp verify` (Testcontainers usa o Docker do runner). O job do frontend executa `npm ci`, `npm run lint` (zero avisos), `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run build`. As actions são fixadas por SHA.
+**CI:** `.github/workflows/ci.yml` roda os mesmos checks em todo PR e em push na `main`, sem deploy nem segredos. O job do backend executa `./mvnw -B -ntp verify` (Testcontainers usa o Docker do runner). O job do frontend executa `npm ci`, `npm run lint` (zero avisos), `npm run typecheck` (`next typegen` + `tsc --noEmit`) e `npm run build`. As actions são fixadas por SHA, e o Maven baixado pelo wrapper é conferido por `distributionSha256Sum`.
 
 Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` geram dois candidatos a classe principal.
 
@@ -32,6 +32,8 @@ Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` ge
   - triggers de último proprietário e de ativação;
   - dois proprietários se rebaixando ao mesmo tempo;
   - revogação na requisição seguinte.
+- `ApiConventionsIT`: corpo de erro padrão e códigos (401, credenciais inválidas com corpo único, CSRF, clínica, entrada inválida com `fields`, rota inexistente, método não permitido), ausência de SQL e de dados pessoais nos erros, paginação estável com total e filtros, limite de OFFSET e 429 do login.
+- `PageQueryTest` e `TeamQueryTest`: limites e validação de paginação e filtros.
 - `TeamRuntimeGrantsIT`: as mesmas operações com o papel `crm_control_runtime` real, depois da redução de permissões da V6.
 - `ClinicRoleTest` e `TeamPolicyTest`: matriz de [permissoes.md](permissoes.md) linha a linha e regras de gestão de equipe.
 

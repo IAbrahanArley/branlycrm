@@ -185,7 +185,8 @@ class ApiConventionsIT {
   @Order(5)
   void invalidInputNamesOnlyTheOffendingFields() throws Exception {
     Browser owner = selected("owner-a@example.test");
-    for (String page : List.of("0", "-1", "abc", "1.5", "1e3", "10001", "99999999999", "1%2C2")) {
+    for (String page :
+        List.of("0", "-1", "abc", "1.5", "1e3", "10001", "10000", "99999999999", "1%2C2")) {
       assertInvalid(owner.get("/v1/clinic/team?page=" + page), "page");
     }
     // Repeated parameters are joined by Spring and rejected rather than picking one.
@@ -271,7 +272,7 @@ class ApiConventionsIT {
         .containsExactly(expected.get(29).subjectId().toString());
 
     // Beyond the end: empty items, same total.
-    for (String query : List.of("?page=3", "?page=10000", "?pageSize=100&page=2")) {
+    for (String query : List.of("?page=3", "?page=401", "?pageSize=100&page=2")) {
       JsonNode beyond = page(owner, query);
       assertThat(beyond.get("items").size()).as(query).isZero();
       assertThat(beyond.get("total").asLong()).as(query).isEqualTo(30);
@@ -280,6 +281,24 @@ class ApiConventionsIT {
 
   @Test
   @Order(7)
+  void unhandledRoutesMethodsAndMediaTypesUseTheStandardBody() throws Exception {
+    Browser owner = selected("owner-a@example.test");
+    var unknown = owner.get("/v1/does-not-exist");
+    assertThat(unknown.statusCode()).isEqualTo(404);
+    assertThat(Browser.JSON.readTree(unknown.body()).get("code").asText()).isEqualTo("NOT_FOUND");
+    var method = owner.post("/v1/clinic/team", true);
+    assertThat(method.statusCode()).isEqualTo(405);
+    assertThat(Browser.JSON.readTree(method.body()).get("code").asText())
+        .isEqualTo("METHOD_NOT_ALLOWED");
+    for (var response : List.of(unknown, method)) {
+      assertThat(response.headers().firstValue("Content-Type").orElse(""))
+          .startsWith("application/json");
+      assertThat(response.body()).doesNotContain("timestamp", "Exception", "trace");
+    }
+  }
+
+  @Test
+  @Order(8)
   void filtersNarrowBothItemsAndTotal() throws Exception {
     Browser owner = selected("owner-a@example.test");
     for (String role : ROLES) {

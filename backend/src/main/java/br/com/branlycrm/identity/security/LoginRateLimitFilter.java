@@ -1,6 +1,6 @@
 package br.com.branlycrm.identity.security;
 
-import br.com.branlycrm.common.controllers.ApiErrors;
+import br.com.branlycrm.common.web.ApiErrors;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

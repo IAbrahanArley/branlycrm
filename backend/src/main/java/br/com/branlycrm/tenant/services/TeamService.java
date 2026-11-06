@@ -14,6 +14,7 @@ import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.repositories.TeamRepository;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -32,7 +33,8 @@ public class TeamService {
     this.team = team;
   }
 
-  @Transactional(readOnly = true)
+  /** One snapshot for count and items, so total matches the page under concurrent changes. */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public PageView<TeamMemberView> list(UUID tenantId, UUID actor, TeamQuery query) {
     access.require(tenantId, actor, ClinicPermission.TEAM_VIEW);
     PageResult<TeamMember> result = team.list(tenantId, query);
