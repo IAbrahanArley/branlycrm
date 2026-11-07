@@ -39,4 +39,41 @@ public class UserAccountRepository {
   public Optional<UserAccount> findById(UUID subjectId) {
     return jdbc.query(COLUMNS + " WHERE subject_id = ?", ACCOUNT, subjectId).stream().findFirst();
   }
+
+  /**
+   * Creates a verified account (an invitation token proved the address). Empty when the e-mail
+   * already exists: a concurrent acceptance won, and the caller must not reuse that account.
+   */
+  public Optional<UUID> insertVerified(String email, String displayName, String passwordHash) {
+    return jdbc
+        .query(
+            """
+            INSERT INTO user_accounts (email, display_name, password_hash, email_verified)
+            VALUES (?, ?, ?, true)
+            ON CONFLICT (email) DO NOTHING
+            RETURNING subject_id
+            """,
+            (row, index) -> row.getObject("subject_id", UUID.class),
+            email,
+            displayName,
+            passwordHash)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * Takes over an active but unverified account with the invitation token, which proves the
+   * address. The new password replaces whatever was set before verification, and the auth_version
+   * bump (V3 trigger) revokes any session opened with the old one.
+   */
+  public boolean claimUnverified(UUID subjectId, String displayName, String passwordHash) {
+    // V10: the rule lives in the function; the API has no UPDATE on user_accounts.
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "SELECT claim_unverified_account(?, ?, ?)",
+            Boolean.class,
+            subjectId,
+            displayName,
+            passwordHash));
+  }
 }

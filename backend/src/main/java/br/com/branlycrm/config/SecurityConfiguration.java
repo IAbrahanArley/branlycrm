@@ -6,6 +6,7 @@ import br.com.branlycrm.identity.security.LoginRateLimitFilter;
 import br.com.branlycrm.identity.security.SessionValidationFilter;
 import br.com.branlycrm.identity.services.IdentityService;
 import br.com.branlycrm.tenant.services.TenantAccessService;
+import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +32,8 @@ public class SecurityConfiguration {
   public static final String SESSION_COOKIE = "BRANLY_SESSION";
   public static final String LOGIN_PATH = "/v1/auth/login";
   public static final String LOGOUT_PATH = "/v1/auth/logout";
+  public static final String INVITATION_PREVIEW_PATH = "/v1/invitations/preview";
+  public static final String INVITATION_ACCEPT_PATH = "/v1/invitations/accept";
 
   @Bean
   PasswordEncoder passwordEncoder() {
@@ -68,7 +71,12 @@ public class SecurityConfiguration {
                     .sessionFixation(fixation -> fixation.changeSessionId()))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health", "/v1/auth/csrf", LOGIN_PATH)
+                auth.requestMatchers(
+                        "/actuator/health",
+                        "/v1/auth/csrf",
+                        LOGIN_PATH,
+                        INVITATION_PREVIEW_PATH,
+                        INVITATION_ACCEPT_PATH)
                     .permitAll()
                     .anyRequest()
                     .authenticated())
@@ -127,7 +135,10 @@ public class SecurityConfiguration {
                     .logoutSuccessHandler(
                         (request, response, authentication) -> response.setStatus(204)))
         .addFilterBefore(
-            new LoginRateLimitFilter(LOGIN_PATH), UsernamePasswordAuthenticationFilter.class)
+            // Login and the anonymous invitation endpoints, which hash passwords too.
+            new LoginRateLimitFilter(
+                Set.of(LOGIN_PATH, INVITATION_PREVIEW_PATH, INVITATION_ACCEPT_PATH)),
+            UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(
             new SessionValidationFilter(identities, tenants), AuthorizationFilter.class)
         .build();

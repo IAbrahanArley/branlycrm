@@ -65,6 +65,86 @@ public class TeamRepository {
   }
 
   /**
+   * Locks a clinic in any status for an invitation acceptance and returns that status. Same lock as
+   * {@link #lockActiveClinic} and as the provisioner's activation (ADR-028): the acceptance must
+   * hold it before adding an owner, because the membership foreign key alone takes KEY SHARE and
+   * would not make the provisioner wait.
+   */
+  public Optional<String> lockClinicForInvitation(UUID tenantId) {
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new IllegalStateException("Invitation acceptance must run inside a transaction");
+    }
+    jdbc.execute("SET LOCAL lock_timeout = '5s'");
+    return jdbc
+        .query(
+            "SELECT status FROM tenants WHERE tenant_id = ? FOR NO KEY UPDATE",
+            (row, index) -> row.getString("status"),
+            tenantId)
+        .stream()
+        .findFirst();
+  }
+
+  /** Membership of a subject in the clinic, active or not, locked for the acceptance. */
+  public Optional<Boolean> lockMembershipActive(UUID tenantId, UUID subjectId) {
+    return jdbc
+        .query(
+            "SELECT active FROM tenant_memberships WHERE tenant_id = ? AND subject_id = ?"
+                + " FOR UPDATE",
+            (row, index) -> row.getBoolean("active"),
+            tenantId,
+            subjectId)
+        .stream()
+        .findFirst();
+  }
+
+  /** Whether the address belongs to an active member; the team list already shows it. */
+  public boolean isActiveMemberEmail(UUID tenantId, String email) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            """
+            SELECT EXISTS (SELECT 1 FROM tenant_memberships m
+                           JOIN user_accounts u ON u.subject_id = m.subject_id
+                           WHERE m.tenant_id = ? AND u.email = ? AND m.active)
+            """,
+            Boolean.class,
+            tenantId,
+            email));
+  }
+
+  /** Any OWNER membership, active or not, with any account state (ADR-028 agency rule). */
+  public boolean hasAnyOwnerMembership(UUID tenantId) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM tenant_memberships WHERE tenant_id = ? AND role = 'OWNER')",
+            Boolean.class,
+            tenantId));
+  }
+
+  public void insertMembership(UUID tenantId, UUID subjectId, ClinicRole role) {
+    jdbc.update(
+        "INSERT INTO tenant_memberships (tenant_id, subject_id, role) VALUES (?, ?, ?)",
+        tenantId,
+        subjectId,
+        role.name());
+  }
+
+  /** Reactivation with the invited role; the V6 trigger ignores rows that were inactive. */
+  public void reactivate(UUID tenantId, UUID subjectId, ClinicRole role) {
+    jdbc.update(
+        "UPDATE tenant_memberships SET role = ?, active = true WHERE tenant_id = ?"
+            + " AND subject_id = ? AND NOT active",
+        role.name(),
+        tenantId,
+        subjectId);
+  }
+
+  /** AWAITING_OWNER to ACTIVE through the V8 function; the V6 trigger still requires an owner. */
+  public boolean activateAwaitingClinic(UUID tenantId) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject("SELECT activate_awaiting_clinic(?)", Boolean.class, tenantId));
+  }
+
+  /**
    * The acting member's current role, locked so a concurrent demotion of the actor waits for this
    * change. Requires the same conditions as authorization.
    */

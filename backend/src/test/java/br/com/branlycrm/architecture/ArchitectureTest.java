@@ -1,6 +1,7 @@
 package br.com.branlycrm.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -74,7 +75,10 @@ class ArchitectureTest {
   void apiModulesDoNotDependOnProvisioning() {
     noClasses()
         .that()
-        .resideInAnyPackage("br.com.branlycrm.identity..", "br.com.branlycrm.tenant..")
+        .resideInAnyPackage(
+            "br.com.branlycrm.identity..",
+            "br.com.branlycrm.tenant..",
+            "br.com.branlycrm.onboarding..")
         .should()
         .dependOnClassesThat()
         .resideInAPackage("br.com.branlycrm.provisioning..")
@@ -101,9 +105,34 @@ class ArchitectureTest {
         .resideInAnyPackage(
             "br.com.branlycrm.identity..",
             "br.com.branlycrm.tenant..",
+            "br.com.branlycrm.onboarding..",
             "br.com.branlycrm.provisioning..",
             "br.com.branlycrm.config..")
         .check(CODE);
+  }
+
+  /**
+   * Onboarding works on the control database only: it never opens a clinic database, so an
+   * invitation flow can never read patient data (ADR-026, ADR-028).
+   */
+  @Test
+  void onboardingNeverOpensClinicDatabases() {
+    noClasses()
+        .that()
+        .resideInAPackage("br.com.branlycrm.onboarding..")
+        .should()
+        .dependOnClassesThat()
+        .haveSimpleNameStartingWith("TenantConnection")
+        .orShould()
+        .dependOnClassesThat()
+        .haveSimpleName("TenantSecretReader")
+        .check(CODE);
+  }
+
+  /** Modules form a hierarchy; onboarding orchestrates and nothing depends back on it. */
+  @Test
+  void modulesAreFreeOfCycles() {
+    slices().matching("br.com.branlycrm.(*)..").should().beFreeOfCycles().check(CODE);
   }
 
   @Test

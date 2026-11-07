@@ -36,3 +36,11 @@ management:
   endpoint:
     health:
       show-details: never
+app:
+  public-origin: ${APP_PUBLIC_ORIGIN:http://localhost:8088}
+  mail:
+    provider: ${MAIL_PROVIDER:local}
+    local-directory: ${MAIL_LOCAL_DIRECTORY:${java.io.tmpdir}/branly-mail}
+    resend-api-key: ${RESEND_API_KEY:}
+    from-address: ${MAIL_FROM_ADDRESS:no-reply@example.test}
+    from-name: ${MAIL_FROM_NAME:Branly CRM}

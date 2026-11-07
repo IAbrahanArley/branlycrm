@@ -472,6 +472,18 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
   - `AWAITING_OWNER` → `ACTIVE` ou `SUSPENDED`;
   - `ACTIVE` → `SUSPENDED`;
   - `SUSPENDED` → `ACTIVE`. Nunca `SUSPENDED` → `AWAITING_OWNER`, que deixaria `activate_awaiting_clinic` tirar uma suspensão.
+- **Detalhes do convite (PR 2):**
+  - validade de 7 dias; reenviar gira o token;
+  - senha de 12 caracteres a 72 bytes (limite do bcrypt);
+  - sem login automático depois do aceite;
+  - conta não verificada é tomada pelo token, que prova o e-mail;
+  - e-mail enviado depois do commit, com o link só de `APP_PUBLIC_ORIGIN`;
+  - convite de equipe só em clínica `ACTIVE`; convite de gestor da agência só em `PROVISIONING` ou `AWAITING_OWNER` sem nenhuma participação `OWNER`, ativa ou não, e nunca aceito por um admin ativo da própria agência;
+  - a API não altera contas: a tomada de conta não verificada é a função `claim_unverified_account` (V10);
+  - limites de envio por convite e por clínica.
+- **Limites conhecidos:**
+  - as checagens de agência suspensa e de emissor ativo não travam as linhas de `agencies` e `agency_memberships`, então uma suspensão concorrente pode ser confirmada logo depois de um aceite;
+  - o preview não reconfere a autoridade do emissor; quem tem o token vê o nome da clínica, mas o aceite falha.
 - **Contrato do aceite (PR 2):**
   - o aceite trava a linha da clínica (`FOR NO KEY UPDATE`) antes de inserir o `OWNER`, porque a FK da participação não conflita com a trava do provisionador;
   - aceita só clínica `PROVISIONING` ou `AWAITING_OWNER`;

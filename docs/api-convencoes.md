@@ -85,6 +85,13 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `INVALID_INPUT` | 400 | Entrada inválida (`fields` diz quais) | Handlers |
 | `RATE_LIMITED` | 429 | Excesso de tentativas de login; respeitar `Retry-After` | `LoginRateLimitFilter` |
 | `SERVICE_UNAVAILABLE` | 503 | Banco indisponível ou espera de lock esgotada; respeitar `Retry-After` | Handlers |
+| `INVITATION_INVALID` | 404 | Convite desconhecido, vencido, usado, revogado ou cuja autoridade de quem emitiu caiu; sempre a mesma resposta | Convites |
+| `INVITATION_LOGIN_REQUIRED` | 409 | Já existe conta verificada para o e-mail: entrar com ela e aceitar de novo | Convites |
+| `INVITATION_ACCOUNT_MISMATCH` | 409 | A sessão é de outra conta, não do e-mail convidado | Convites |
+| `MEMBER_ALREADY_ACTIVE` | 409 | O e-mail já é de um membro ativo da clínica | Convites |
+| `INVITATION_NOT_FOUND` | 404 | Convite pendente inexistente na clínica selecionada, inclusive de outra clínica | Convites de equipe |
+| `INVITATION_FORBIDDEN` | 403 | O papel de quem age não alcança o papel do convite | Convites de equipe |
+| `INVITATION_SEND_LIMIT` | 429 | Limite de e-mails de convite: 5 por convite, 1 por minuto por convite e 100 por clínica a cada 24 horas | Convites de equipe |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Corpo com tipo diferente de JSON | `GlobalErrorHandler` |

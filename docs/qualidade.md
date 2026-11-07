@@ -33,6 +33,18 @@ Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` ge
   - dois proprietários se rebaixando ao mesmo tempo;
   - revogação na requisição seguinte.
 - `ApiConventionsIT`: corpo de erro padrão e códigos (401, credenciais inválidas com corpo único, CSRF, clínica, entrada inválida com `fields`, rota inexistente, método não permitido), ausência de SQL e de dados pessoais nos erros, paginação estável com total e filtros, limite de OFFSET e 429 do login.
+- `TeamInvitationIT` (como `crm_control_runtime`, HTTP com cookies e CSRF):
+  - convite e aceite sem conta, com login depois; só o hash do token no banco;
+  - tokens desconhecidos, vencidos, revogados e girados com a mesma resposta;
+  - conta verificada exige login da própria conta, sessão de outra conta é recusada e a senha não muda;
+  - conta inativa recusada; conta não verificada tomada pelo token com sessões antigas revogadas;
+  - alcance do `MANAGER`, membro ativo, ex-membro reativado, emissor rebaixado e convite de outra clínica com 404.
+- `InvitationAcceptanceIT`: quatro aceites simultâneos do mesmo token criam uma conta e uma participação; convite de gestor da agência ativa clínica `AWAITING_OWNER` ou espera o provisionamento; morre com clínica que já tem dono, de outra agência, emissor que saiu ou agência suspensa; 429 nas rotas anônimas.
+- `InvitationAcceptanceIT` também cobre:
+  - convite de agência recusado em clínica que já teve dono ou em `FAILED`, e quando o próprio admin da agência tenta aceitar;
+  - dois convites para o mesmo e-mail novo ao mesmo tempo: uma conta, o outro recebe `INVITATION_LOGIN_REQUIRED` e continua pendente;
+  - preview e aceite sem CSRF recebem 403.
+- `InvitationDomainTest`: token, e-mail, senha, origem pública e alcance de convite.
 - `ControlRuntimeGrantsIT`: banco central como `crm_control_runtime` depois da V8. A API não cria clínicas, não muda status nem agência e não grava contas nem participações. `updated_at` só serve para travar. `activate_awaiting_clinic` só ativa `AWAITING_OWNER` com dono. Cobre também as transições recusadas e a chave de idempotência por agência.
 - `ClientRolesMigrationIT`: V7 aplicada sobre dados da V6: conversão dos papéis, `active` preservado, nomes antigos recusados pela constraint e trigger de último proprietário ainda ativo.
 - `PageQueryTest` e `TeamQueryTest`: limites e validação de paginação e filtros.

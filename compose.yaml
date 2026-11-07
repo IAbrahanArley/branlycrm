@@ -53,6 +53,13 @@ services:
       SPRING_DATASOURCE_USERNAME: crm_control_runtime
       SPRING_DATASOURCE_PASSWORD: ${CONTROL_RUNTIME_PASSWORD:?Defina CONTROL_RUNTIME_PASSWORD}
       APP_TENANCY_SECRETS_DIRECTORY: /run/branly/tenant-secrets
+      # ADR-021: e-mail only in the API. Locally, messages are files in the container.
+      APP_PUBLIC_ORIGIN: ${APP_PUBLIC_ORIGIN:-http://localhost:8088}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-local}
+      MAIL_LOCAL_DIRECTORY: /tmp/branly-mail
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@example.test}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Branly CRM}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
     volumes:
       # Read-only: only the future provisioner writes clinic credentials (ADR-016).
       - tenant_secrets:/run/branly/tenant-secrets:ro

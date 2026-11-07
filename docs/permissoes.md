@@ -160,6 +160,11 @@ A matriz do catálogo vigente é executável em `tenant/domain/ClinicRole` (uma 
 | `GET /v1/clinic/team` | Membros da clínica selecionada (`TEAM_VIEW`) |
 | `PUT /v1/clinic/team/{subjectId}/role` | Muda o papel (`TEAM_MANAGE` + regras acima) |
 | `DELETE /v1/clinic/team/{subjectId}` | Desativa o membro sem apagar o histórico |
+| `GET /v1/clinic/team/invitations` | Convites pendentes da clínica selecionada (`TEAM_MANAGE`), vencidos inclusive |
+| `POST /v1/clinic/team/invitations` | Convida ou reemite o convite pendente do e-mail; `MANAGER` só para `ATTENDANT` e `VIEWER` |
+| `POST /v1/clinic/team/invitations/{id}/resend` | Novo token e validade; o link anterior para de funcionar |
+| `DELETE /v1/clinic/team/invitations/{id}` | Revoga; convite de outra clínica responde 404 |
+| `POST /v1/invitations/preview` e `/accept` | Públicas, com CSRF e limite de tentativas ([autenticacao.md](autenticacao.md)) |
 
 ## Migração do catálogo novo (V7)
 
