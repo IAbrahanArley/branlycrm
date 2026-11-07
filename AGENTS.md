@@ -118,7 +118,7 @@ O agente principal é o **coordenador**. Ele delega a papéis especializados qua
 | `security` | Não | Threat modeling: tenant, IDOR, sessão/CSRF, segredos, dados pessoais | [SECURITY.md](docs/agents/SECURITY.md) |
 | `reviewer` | Não | Revisão do diff real por severidade, antes de entregar | [REVIEWER.md](docs/agents/REVIEWER.md) |
 
-No Claude Code, os papéis estão em `.claude/agents/`. No Codex, use os mesmos documentos de `docs/agents/` como instrução de papel.
+No Claude Code, os papéis estão em `.claude/agents/`. No Codex, use os mesmos documentos de `docs/agents/` como instrução de papel. Backend no Claude Code e frontend no Codex em paralelo: pastas, posse de arquivos e contrato em [`docs/agents/PARALELO.md`](docs/agents/PARALELO.md).
 
 **Regras:**
 - Um escritor por arquivo. O coordenador define quais arquivos cada implementador pode tocar. Lockfiles, `pom.xml`, `compose.yaml`, `.env.example`, `TASKS.md` e Git pertencem ao coordenador.

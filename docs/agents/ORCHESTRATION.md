@@ -2,6 +2,8 @@
 
 O agente principal coordena. Ele delega aos papéis `architect`, `backend`, `frontend`, `qa`, `security` e `reviewer` quando o cliente suportar subagentes. Não presuma execução paralela automática: confirme o comportamento na sessão. Regras de ownership e aprovação: [AGENTS.md §9–§10](../../AGENTS.md).
 
+Para dividir backend (Claude Code) e frontend (Codex) em paralelo, ver [PARALELO.md](PARALELO.md).
+
 ## Protocolo por tarefa
 
 1. **Coordenador:** lê a tarefa em `TASKS.md`, confere as dependências no código e monta o plano com ownership de arquivos.

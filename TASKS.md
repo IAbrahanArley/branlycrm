@@ -600,6 +600,68 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Entregas:** onboarding da agência e de uma clínica real de teste, anúncio real "Clique para WhatsApp", roteiro de feedback e registro de bugs.
 **Aceite:** todos os critérios de aceite do MVP (seção 9 do documento do cliente) demonstrados em uso real autorizado.
 
+## Frontend em paralelo (Codex)
+
+Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.md](docs/agents/PARALELO.md). Contrato: [docs/api/openapi.json](docs/api/openapi.json). Só tocam `frontend/`.
+
+### [ ] FE-001 — Base do painel (P0)
+**Depende de:** contrato atual (sessão, CSRF, erros).
+**Entregas:**
+- Cliente HTTP único:
+  - chama `/api` na mesma origem e busca o CSRF em `GET /api/v1/auth/csrf`;
+  - renova o CSRF depois de login e logout;
+  - envia o cabeçalho indicado em toda mutação;
+  - trata erros pelo `code`.
+- Proteção das rotas do painel:
+  - 401 leva ao login;
+  - `SESSION_REVOKED` encerra a sessão local;
+  - 403 mostra permissão negada.
+- Layout do painel (`/app`) responsivo, com área para a clínica atual.
+- Componentes de estado: carregando, vazio, erro e sem permissão.
+**Aceite:**
+- Nenhum token em `localStorage` ou `sessionStorage`.
+- Toda resposta de erro mostra a `message` do servidor ou um texto por `code`.
+- `lint`, `typecheck` e `build` passam.
+
+### [ ] FE-002 — Login, logout e seleção de clínica (P0)
+**Depende de:** FE-001.
+**Entregas:**
+- Tela `/login`, com o login como formulário (`email`, `password`).
+- Logout.
+- Seleção da clínica a partir de `GET /api/v1/auth/clinics` e `PUT /api/v1/auth/clinic/{tenantId}`, com troca de clínica.
+- Painel mostra a clínica e o papel atuais (`GET /api/v1/auth/clinic`).
+**Aceite:**
+- `INVALID_CREDENTIALS` tem uma mensagem única, sem revelar se o e-mail existe.
+- 429 respeita `Retry-After`.
+- `CLINIC_NOT_SELECTED` leva à seleção.
+- Acessível por teclado.
+
+### [ ] FE-003 — Equipe e convites (P1)
+**Depende de:** FE-002.
+**Entregas:**
+- Lista paginada da equipe com filtros `role` e `active`.
+- Troca de papel e desativação.
+- Convites pendentes: convidar, reenviar e revogar, mostrando `delivery` e vencidos.
+- Ações exibidas pelas permissões de `GET /api/v1/auth/clinic`, só como dica; o servidor decide.
+**Aceite:**
+- Os códigos `MEMBER_CHANGE_FORBIDDEN`, `LAST_OWNER`, `INVITATION_FORBIDDEN`, `MEMBER_ALREADY_ACTIVE` e `INVITATION_SEND_LIMIT` têm mensagens claras.
+- Estados vazio e de erro.
+- Funciona no celular.
+
+### [ ] FE-004 — Aceite de convite (P1)
+**Depende de:** FE-001.
+**Entregas:**
+- Página `/convite`:
+  - lê o token do fragmento (`#token=`) e o remove da barra com `history.replaceState`;
+  - usa `Referrer-Policy: no-referrer`;
+  - mostra a prévia (`POST /api/v1/invitations/preview`).
+- Aceite com nome e senha quando não há conta, ou pedido de login quando `requiresLogin`.
+- Depois do aceite, encaminha ao login.
+**Aceite:**
+- O token nunca vai para a URL do servidor, para logs nem para storage.
+- `INVITATION_INVALID`, `INVITATION_LOGIN_REQUIRED` e `INVITATION_ACCOUNT_MISMATCH` têm mensagens próprias.
+- A senha segue a regra do servidor (12 caracteres a 72 bytes), validada também no servidor.
+
 ## Retirado do MVP
 
 - [~] CRM-041 — Agenda comercial e disponibilidade. Saiu pela ADR-024; o funil registra Agendado e Compareceu. Volta como sugestão SUG-001.

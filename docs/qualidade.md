@@ -45,6 +45,7 @@ Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` ge
   - dois convites para o mesmo e-mail novo ao mesmo tempo: uma conta, o outro recebe `INVITATION_LOGIN_REQUIRED` e continua pendente;
   - preview e aceite sem CSRF recebem 403.
 - `InvitationDomainTest`: token, e-mail, senha, origem pública e alcance de convite.
+- `OpenApiContractIT`: o arquivo `docs/api/openapi.json`, que o frontend usa, é igual ao que a API documenta. Ao mudar o contrato, regenerar com `./mvnw verify -Dopenapi.write=true`.
 - `ControlRuntimeGrantsIT`: banco central como `crm_control_runtime` depois da V8. A API não cria clínicas, não muda status nem agência e não grava contas nem participações. `updated_at` só serve para travar. `activate_awaiting_clinic` só ativa `AWAITING_OWNER` com dono. Cobre também as transições recusadas e a chave de idempotência por agência.
 - `ClientRolesMigrationIT`: V7 aplicada sobre dados da V6: conversão dos papéis, `active` preservado, nomes antigos recusados pela constraint e trigger de último proprietário ainda ativo.
 - `PageQueryTest` e `TeamQueryTest`: limites e validação de paginação e filtros.
