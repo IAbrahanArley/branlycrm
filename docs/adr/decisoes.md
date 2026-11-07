@@ -481,9 +481,21 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
   - convite de equipe só em clínica `ACTIVE`; convite de gestor da agência só em `PROVISIONING` ou `AWAITING_OWNER` sem nenhuma participação `OWNER`, ativa ou não, e nunca aceito por um admin ativo da própria agência;
   - a API não altera contas: a tomada de conta não verificada é a função `claim_unverified_account` (V10);
   - limites de envio por convite e por clínica.
+- **Carteira (PR 3):**
+  - criação de clínica idempotente por `requestId` dentro da agência;
+  - no máximo 20 clínicas em preparação por agência (`app.agency.max-unfinished-clinics`);
+  - reemissão do convite do gestor só enquanto a clínica nunca teve dono;
+  - a carteira mostra só dados do registro, nunca o e-mail do gestor;
+  - o comando de plataforma usa a credencial `crm_platform_operator`, imprime o link uma vez (sem o e-mail) e não envia e-mail; o serviço do Compose não guarda log (`logging: none`);
+  - o operador não tem nenhum privilégio direto em convites: emite convite de admin de agência só pela função `platform_issue_agency_admin_invitation` (V12), com tipo AGENCY fixo e agência ativa;
+  - a API nunca cria convite AGENCY (trigger da V12), e o aceite recusa convite AGENCY com emissor;
+  - o aceite trava o convite pelo ID e pelo hash do token, então um link girado nunca vence uma corrida;
+  - reemissão do convite do gestor: até 5 e-mails por clínica por dia, independente do endereço, 1 por minuto e 200 por agência por dia;
+  - o limite de clínicas em preparação é serializado por agência (`pg_advisory_xact_lock`).
 - **Limites conhecidos:**
   - as checagens de agência suspensa e de emissor ativo não travam as linhas de `agencies` e `agency_memberships`, então uma suspensão concorrente pode ser confirmada logo depois de um aceite;
-  - o preview não reconfere a autoridade do emissor; quem tem o token vê o nome da clínica, mas o aceite falha.
+  - o preview não reconfere a autoridade do emissor; quem tem o token vê o nome da clínica, mas o aceite falha;
+  - quando existir a desativação de admin de agência, ela precisa revogar os convites AGENCY pendentes daquele e-mail; senão, um link antigo reativa o acesso.
 - **Contrato do aceite (PR 2):**
   - o aceite trava a linha da clínica (`FOR NO KEY UPDATE`) antes de inserir o `OWNER`, porque a FK da participação não conflita com a trava do provisionador;
   - aceita só clínica `PROVISIONING` ou `AWAITING_OWNER`;

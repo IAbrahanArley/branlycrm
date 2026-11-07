@@ -100,6 +100,48 @@ public class InvitationRepository {
         .findFirst();
   }
 
+  /**
+   * Re-reads the invitation under a row lock, matching the token too: a rotation committed after
+   * the first read makes the old token fail here, so a rotated link never wins a race.
+   */
+  public Optional<Invitation> lockWithToken(UUID invitationId, byte[] tokenHash) {
+    return jdbc
+        .query(
+            COLUMNS + " WHERE invitation_id = ? AND token_hash = ? FOR UPDATE",
+            INVITATION,
+            invitationId,
+            tokenHash)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * E-mails sent for the owner invitations an agency issued for one clinic in the last 24 hours,
+   * whatever the address, and seconds since the last one (security review, M1).
+   */
+  public SendHistory agencyOwnerSends(UUID tenantId) {
+    return jdbc.queryForObject(
+        """
+        SELECT COALESCE(sum(send_count) FILTER (WHERE last_sent_at > now() - interval '1 day'), 0)
+                 AS sends,
+               COALESCE(EXTRACT(EPOCH FROM now() - max(last_sent_at)), 1e9) AS since
+        FROM invitations WHERE tenant_id = ? AND issuer_agency_id IS NOT NULL
+        """,
+        (row, index) -> new SendHistory(row.getInt("sends"), row.getDouble("since")),
+        tenantId);
+  }
+
+  /** Owner invitation e-mails an agency sent across its portfolio in the last 24 hours. */
+  public int agencySendsInLastDay(UUID agencyId) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT COALESCE(sum(send_count), 0) FROM invitations WHERE issuer_agency_id = ?"
+                + " AND last_sent_at > now() - interval '1 day'",
+            Integer.class,
+            agencyId);
+    return count == null ? 0 : count;
+  }
+
   /** Re-reads the invitation under a row lock, after the clinic lock (ADR-028 lock order). */
   public Optional<Invitation> lock(UUID invitationId) {
     return jdbc
@@ -117,6 +159,20 @@ public class InvitationRepository {
                 + " FOR UPDATE",
             INVITATION,
             invitationId,
+            tenantId)
+        .stream()
+        .findFirst();
+  }
+
+  /** The pending first-owner invitation an agency issued for a clinic (at most one, V9). */
+  public Optional<Invitation> lockPendingAgencyOwner(UUID tenantId) {
+    return jdbc
+        .query(
+            COLUMNS
+                + " WHERE tenant_id = ? AND issuer_agency_id IS NOT NULL AND"
+                + PENDING
+                + " FOR UPDATE",
+            INVITATION,
             tenantId)
         .stream()
         .findFirst();

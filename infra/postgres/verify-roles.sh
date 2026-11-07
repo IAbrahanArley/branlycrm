@@ -79,8 +79,55 @@ BEGIN
    RAISE EXCEPTION 'Runtime can update clinic columns other than updated_at';
  END IF;
  IF EXISTS (SELECT 1 FROM information_schema.column_privileges
-            WHERE grantee = current_user AND table_name = 'tenants' AND privilege_type = 'INSERT') THEN
-   RAISE EXCEPTION 'Runtime can create clinics before the agency service exists';
+            WHERE grantee = current_user AND table_name = 'tenants' AND privilege_type = 'INSERT'
+              AND column_name NOT IN ('tenant_id', 'clinic_name', 'database_name', 'database_user', 'credential_reference', 'agency_id', 'agency_request_id')) THEN
+   RAISE EXCEPTION 'Runtime can create clinics choosing more than the allowed columns';
+ END IF;
+ IF EXISTS (SELECT 1 FROM information_schema.column_privileges
+            WHERE grantee = current_user AND table_name = 'tenant_provisioning_tasks' AND privilege_type = 'INSERT'
+              AND column_name <> 'tenant_id') THEN
+   RAISE EXCEPTION 'Runtime can choose provisioning task columns';
+ END IF;
+ -- V11: the platform operator writes agencies and agency invitations only.
+ IF has_table_privilege('crm_platform_operator','user_accounts','SELECT')
+    OR has_column_privilege('crm_platform_operator','user_accounts','password_hash','SELECT')
+    OR has_table_privilege('crm_platform_operator','tenants','SELECT')
+    OR has_table_privilege('crm_platform_operator','tenant_memberships','SELECT')
+    OR has_table_privilege('crm_platform_operator','agency_memberships','INSERT')
+    OR has_table_privilege('crm_platform_operator','invitations','DELETE') THEN
+   RAISE EXCEPTION 'Platform operator reaches beyond agencies and agency invitations';
+ END IF;
+ IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'crm_platform_operator' AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls)) THEN
+   RAISE EXCEPTION 'Platform operator has elevated privileges';
+ END IF;
+ -- V12: the operator reaches invitations only through the issuing function; column checks catch
+ -- grants that has_table_privilege would miss.
+ IF has_any_column_privilege('crm_platform_operator','invitations','SELECT')
+    OR has_any_column_privilege('crm_platform_operator','invitations','INSERT')
+    OR has_any_column_privilege('crm_platform_operator','invitations','UPDATE')
+    OR has_any_column_privilege('crm_platform_operator','user_accounts','SELECT')
+    OR has_any_column_privilege('crm_platform_operator','tenants','SELECT')
+    OR has_any_column_privilege('crm_platform_operator','tenant_memberships','SELECT')
+    OR has_any_column_privilege('crm_platform_operator','agencies','UPDATE') THEN
+   RAISE EXCEPTION 'Platform operator has direct privileges beyond creating agencies';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'platform_issue_agency_admin_invitation' AND prosecdef
+                AND proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp'])
+    OR has_function_privilege('public','platform_issue_agency_admin_invitation(uuid,varchar,bytea,timestamptz)','EXECUTE')
+    OR has_function_privilege(current_user,'platform_issue_agency_admin_invitation(uuid,varchar,bytea,timestamptz)','EXECUTE') THEN
+   RAISE EXCEPTION 'platform_issue_agency_admin_invitation is missing or reachable beyond the operator';
+ END IF;
+ IF EXISTS (SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member WHERE r.rolname = 'crm_platform_operator') THEN
+   RAISE EXCEPTION 'Platform operator is a member of other roles';
+ END IF;
+ -- V11: the runtime adds or reactivates agency admins only.
+ IF EXISTS (SELECT 1 FROM information_schema.column_privileges
+            WHERE grantee = current_user AND table_name = 'agency_memberships' AND privilege_type = 'UPDATE'
+              AND column_name <> 'active')
+    OR has_table_privilege(current_user,'agency_memberships','DELETE')
+    OR has_any_column_privilege(current_user,'agencies','INSERT')
+    OR has_any_column_privilege(current_user,'agencies','UPDATE') THEN
+   RAISE EXCEPTION 'Runtime can change agencies or agency memberships beyond reactivation';
  END IF;
  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'activate_awaiting_clinic' AND prosecdef
                 AND proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']) THEN

@@ -48,19 +48,49 @@ class ControlRuntimeGrantsIT {
   }
 
   @Test
-  void runtimeCannotCreateClinicsYet() {
-    // The column grant (never status) comes with the agency service that validates the agency.
+  void runtimeCreatesClinicsOnlyThroughTheAllowedColumnsAndTheyStartProvisioning() {
+    // V11: the agency portfolio creates clinics, never choosing their status.
+    UUID agency = agency();
     UUID tenant = UUID.randomUUID();
     String suffix = suffix(tenant);
+    runtime.update(
+        "INSERT INTO tenants (tenant_id, clinic_name, database_name, database_user,"
+            + " credential_reference, agency_id, agency_request_id)"
+            + " VALUES (?, 'Clínica sintética', ?, ?, ?, ?, ?)",
+        tenant,
+        "clinic_" + suffix,
+        "tenant_" + suffix,
+        "TENANT_SECRET_" + suffix.toUpperCase(Locale.ROOT),
+        agency,
+        UUID.randomUUID());
+    assertThat(status(tenant)).isEqualTo("PROVISIONING");
+    runtime.update("INSERT INTO tenant_provisioning_tasks (tenant_id) VALUES (?)", tenant);
+    assertThat(
+            superuser.queryForObject(
+                "SELECT admin_subject_id IS NULL FROM tenant_provisioning_tasks"
+                    + " WHERE tenant_id = ?",
+                Boolean.class,
+                tenant))
+        .isTrue();
+
+    UUID other = UUID.randomUUID();
+    String otherSuffix = suffix(other);
     assertDenied(
         () ->
             runtime.update(
                 "INSERT INTO tenants (tenant_id, clinic_name, database_name, database_user,"
-                    + " credential_reference) VALUES (?, 'Clínica sintética', ?, ?, ?)",
-                tenant,
-                "clinic_" + suffix,
-                "tenant_" + suffix,
-                "TENANT_SECRET_" + suffix.toUpperCase(Locale.ROOT)));
+                    + " credential_reference, status) VALUES (?, 'Clínica', ?, ?, ?, 'ACTIVE')",
+                other,
+                "clinic_" + otherSuffix,
+                "tenant_" + otherSuffix,
+                "TENANT_SECRET_" + otherSuffix.toUpperCase(Locale.ROOT)));
+    assertDenied(
+        () ->
+            runtime.update(
+                "INSERT INTO tenant_provisioning_tasks (tenant_id, admin_subject_id)"
+                    + " VALUES (?, ?)",
+                other,
+                UUID.randomUUID()));
   }
 
   @Test
@@ -210,6 +240,18 @@ class ControlRuntimeGrantsIT {
       assertThat(activate(clinic)).as(other).isFalse();
       assertThat(status(clinic)).isEqualTo(other);
     }
+  }
+
+  @Test
+  void runtimeNeverIssuesAgencyAdminInvitations() {
+    UUID agency = agency();
+    assertBrl02(
+        () ->
+            runtime.update(
+                "INSERT INTO invitations (token_hash, email, kind, agency_id, role, expires_at)"
+                    + " VALUES (decode(repeat('44', 32), 'hex'), 'x@example.test', 'AGENCY', ?,"
+                    + " 'AGENCY_ADMIN', now() + interval '1 day')",
+                agency));
   }
 
   @Test

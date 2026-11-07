@@ -45,7 +45,18 @@ Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` ge
   - dois convites para o mesmo e-mail novo ao mesmo tempo: uma conta, o outro recebe `INVITATION_LOGIN_REQUIRED` e continua pendente;
   - preview e aceite sem CSRF recebem 403.
 - `InvitationDomainTest`: token, e-mail, senha, origem pública e alcance de convite.
+- `AgencyPortfolioIT` (API como `crm_control_runtime`, comando como `crm_platform_operator`):
+  - fluxo completo da plataforma ao gestor, com a agência sem participação nem acesso à clínica;
+  - idempotência e criação concorrente com o mesmo `requestId`;
+  - isolamento entre agências e clínicas diretas, com a mesma resposta;
+  - reemissão com rotação ou troca de endereço;
+  - limite de clínicas em preparação e agência suspensa;
+  - comando idempotente e restrito aos próprios grants: sem leitura ou escrita direta de convites (nem de clínica), flags repetidas e nome divergente recusados;
+  - limite de reemissão por clínica que não muda ao trocar de endereço;
+  - criação concorrente no limite de clínicas em preparação;
+  - criação e reemissão recusadas para agência suspensa, e POST sem CSRF recusado.
 - `OpenApiContractIT`: o arquivo `docs/api/openapi.json`, que o frontend usa, é igual ao que a API documenta. Ao mudar o contrato, regenerar com `./mvnw verify -Dopenapi.write=true`.
+- `ControlRuntimeGrantsIT` também prova que a API não cria convite de admin de agência (V12).
 - `ControlRuntimeGrantsIT`: banco central como `crm_control_runtime` depois da V8. A API não cria clínicas, não muda status nem agência e não grava contas nem participações. `updated_at` só serve para travar. `activate_awaiting_clinic` só ativa `AWAITING_OWNER` com dono. Cobre também as transições recusadas e a chave de idempotência por agência.
 - `ClientRolesMigrationIT`: V7 aplicada sobre dados da V6: conversão dos papéis, `active` preservado, nomes antigos recusados pela constraint e trigger de último proprietário ainda ativo.
 - `PageQueryTest` e `TeamQueryTest`: limites e validação de paginação e filtros.

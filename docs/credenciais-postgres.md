@@ -7,6 +7,7 @@ Implementado em 05/11/2026. ADR-016. Esta é a primeira parte da etapa 1 do onbo
 | Papel | Uso | Privilégios |
 |---|---|---|
 | POSTGRES_USER | Bootstrap administrativo local | Somente contêiner PostgreSQL e db-bootstrap; nunca API |
+| crm_platform_operator | Comando de plataforma (`APP_MODE=platform`, ADR-028) | CONNECT e USAGE. Lê e cria `agencies`; convites de admin de agência só pela função `platform_issue_agency_admin_invitation` (V12). Nenhum privilégio direto em convites, contas, clínicas ou participações |
 | crm_control_runtime | Requisições da API | CONNECT e USAGE. Leitura das tabelas centrais autorizadas. Desde a V8 (ADR-028): ainda não cria clínicas (entra com o serviço da agência, só por colunas sem `status`), sem `UPDATE` de status ou agência (só `updated_at`, para travas), sem escrita direta em contas e participações (salvo `UPDATE (role, active)` da V6; a V9 dá `INSERT` por coluna em contas, participações e convites para o aceite, e a V10 tira qualquer `UPDATE` de contas em favor de `claim_unverified_account`) e ativa clínicas apenas por `activate_awaiting_clinic`. Somente leitura do histórico Flyway |
 | crm_control_migrator | Migrações centrais | Proprietário das tabelas e funções da aplicação, CREATE no schema; sem SUPERUSER/CREATEDB/CREATEROLE |
 | crm_tenant_provisioner | Provisionador (ADR-018) | CREATEDB/CREATEROLE sem superusuário; CONNECT só em `postgres` e nos bancos de clínica que cria, nunca no controle; credencial não entregue à API |

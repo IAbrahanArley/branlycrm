@@ -1,5 +1,6 @@
 package br.com.branlycrm.onboarding.services;
 
+import br.com.branlycrm.agency.repositories.AgencyRepository;
 import br.com.branlycrm.common.exceptions.InvalidInputException;
 import br.com.branlycrm.identity.domain.UserAccount;
 import br.com.branlycrm.identity.repositories.UserAccountRepository;
@@ -35,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  *
  * A session of another account is refused instead of absorbing an invitation sent to someone else.
- * Agency invitations are accepted with the agency module.
+ * Agency admin invitations create only the agency membership.
  */
 // Only the HTTP process: the provisioner has no password encoder nor mail.
 @ConditionalOnWebApplication
@@ -50,16 +51,19 @@ public class InvitationAcceptanceService {
   private final InvitationRepository invitations;
   private final UserAccountRepository accounts;
   private final TeamRepository team;
+  private final AgencyRepository agencies;
   private final PasswordEncoder passwords;
 
   public InvitationAcceptanceService(
       InvitationRepository invitations,
       UserAccountRepository accounts,
       TeamRepository team,
+      AgencyRepository agencies,
       PasswordEncoder passwords) {
     this.invitations = invitations;
     this.accounts = accounts;
     this.team = team;
+    this.agencies = agencies;
     this.passwords = passwords;
   }
 
@@ -85,13 +89,17 @@ public class InvitationAcceptanceService {
   @Transactional
   public void accept(String rawToken, Optional<UUID> sessionSubject, NewAccount newAccount) {
     Invitation found = usable(rawToken);
-    if (found.kind() != InvitationKind.CLINIC) throw invalid();
+    byte[] tokenHash = InvitationToken.parse(rawToken).orElseThrow().hash();
+    if (found.kind() == InvitationKind.AGENCY) {
+      acceptAgencyAdmin(found, tokenHash, sessionSubject, newAccount);
+      return;
+    }
     String status =
         team.lockClinicForInvitation(found.tenantId())
             .orElseThrow(InvitationAcceptanceService::invalid);
     Invitation invitation =
         invitations
-            .lock(found.invitationId())
+            .lockWithToken(found.invitationId(), tokenHash)
             .filter(locked -> locked.usableAt(invitations.clock()))
             .orElseThrow(InvitationAcceptanceService::invalid);
     Set<String> receiving = invitation.issuedByAgency() ? AGENCY_RECEIVING : TEAM_RECEIVING;
@@ -123,6 +131,36 @@ public class InvitationAcceptanceService {
       // Under the clinic lock this cannot happen; never confirm an owner left without access.
       throw new IllegalStateException("Awaiting clinic could not be activated");
     }
+  }
+
+  /**
+   * Agency admin invitation (issued by the platform command). The invitation row lock serializes
+   * acceptances of the same token; the agency must still be ACTIVE. Only the agency membership is
+   * created: no clinic access comes with it (ADR-026).
+   */
+  private void acceptAgencyAdmin(
+      Invitation found, byte[] tokenHash, Optional<UUID> sessionSubject, NewAccount newAccount) {
+    Invitation invitation =
+        invitations
+            .lockWithToken(found.invitationId(), tokenHash)
+            .filter(locked -> locked.usableAt(invitations.clock()))
+            .orElseThrow(InvitationAcceptanceService::invalid);
+    if (!"ACTIVE".equals(agencies.status(invitation.agencyId()).orElse(null))) throw invalid();
+    // Only the platform issues agency admin invitations (ADR-028); V12 enforces it in the
+    // database too, so an invitation with an issuer is never valid here.
+    if (invitation.invitedBy() != null) throw invalid();
+    UUID subject = resolveAccount(invitation.email(), sessionSubject, newAccount);
+    Optional<Boolean> membership = agencies.lockMembershipActive(invitation.agencyId(), subject);
+    if (membership.orElse(false)) {
+      throw new InvitationException(
+          InvitationException.Reason.MEMBER_ALREADY_ACTIVE, "Você já administra esta agência.");
+    }
+    if (membership.isPresent()) {
+      agencies.reactivateAdmin(invitation.agencyId(), subject);
+    } else {
+      agencies.insertAdmin(invitation.agencyId(), subject);
+    }
+    invitations.markAccepted(invitation.invitationId(), subject);
   }
 
   /**
