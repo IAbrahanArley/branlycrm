@@ -96,12 +96,12 @@ class TeamManagementIT {
     member(clinicA, ownerA2, "OWNER", true);
     member(clinicA, managerA, "MANAGER", true);
     member(clinicA, managerA2, "MANAGER", true);
-    member(clinicA, receptionA, "RECEPTION", true);
-    member(clinicA, salesA, "SALES", true);
-    member(clinicA, professionalA, "PROFESSIONAL", true);
-    member(clinicA, inactiveA, "SALES", false);
+    member(clinicA, receptionA, "ATTENDANT", true);
+    member(clinicA, salesA, "ATTENDANT", true);
+    member(clinicA, professionalA, "VIEWER", true);
+    member(clinicA, inactiveA, "ATTENDANT", false);
     member(clinicB, ownerB, "OWNER", true);
-    member(clinicB, outsiderB, "SALES", true);
+    member(clinicB, outsiderB, "ATTENDANT", true);
   }
 
   @Test
@@ -127,17 +127,17 @@ class TeamManagementIT {
     assertThat(ownerClinic.at("/permissions/DATA_EXPORT").asText()).isEqualTo("ALL");
     JsonNode managerClinic = current(manager, "MANAGER");
     assertThat(managerClinic.at("/permissions/TEAM_VIEW").asText()).isEqualTo("ALL");
-    assertThat(managerClinic.at("/permissions/DATA_EXPORT").asText()).isEqualTo("NONE");
-    JsonNode receptionClinic = current(reception, "RECEPTION");
+    assertThat(managerClinic.at("/permissions/DATA_EXPORT").asText()).isEqualTo("ALL");
+    assertThat(managerClinic.at("/permissions/AUDIT_VIEW").asText()).isEqualTo("NONE");
+    JsonNode receptionClinic = current(reception, "ATTENDANT");
     assertThat(receptionClinic.at("/permissions/TEAM_VIEW").asText()).isEqualTo("NONE");
-    assertThat(receptionClinic.at("/permissions/TASK_READ").asText()).isEqualTo("OWN");
-    JsonNode salesClinic = current(sales, "SALES");
-    assertThat(salesClinic.at("/permissions/OPPORTUNITY_READ").asText()).isEqualTo("OWN");
-    assertThat(salesClinic.at("/permissions/OPPORTUNITY_REASSIGN").asText()).isEqualTo("NONE");
-    JsonNode professionalClinic = current(professional, "PROFESSIONAL");
-    assertThat(professionalClinic.at("/permissions/PIPELINE_VIEW").asText()).isEqualTo("NONE");
-    assertThat(professionalClinic.at("/permissions/APPOINTMENT_ATTENDANCE").asText())
-        .isEqualTo("OWN");
+    assertThat(receptionClinic.at("/permissions/LEAD_TAKE").asText()).isEqualTo("OWN");
+    JsonNode salesClinic = current(sales, "ATTENDANT");
+    assertThat(salesClinic.at("/permissions/SALE_REGISTER").asText()).isEqualTo("ALL");
+    assertThat(salesClinic.at("/permissions/LEAD_ASSIGN").asText()).isEqualTo("NONE");
+    JsonNode professionalClinic = current(professional, "VIEWER");
+    assertThat(professionalClinic.at("/permissions/LEAD_WRITE").asText()).isEqualTo("NONE");
+    assertThat(professionalClinic.at("/permissions/MONTHLY_REPORT_VIEW").asText()).isEqualTo("ALL");
 
     for (Browser browser : List.of(owner, manager)) {
       var response = browser.get("/v1/clinic/team");
@@ -163,7 +163,7 @@ class TeamManagementIT {
         subjects.add(member.get("subjectId").asText());
         if (member.get("subjectId").asText().equals(inactiveA.toString())) {
           assertThat(member.get("active").asBoolean()).isFalse();
-          assertThat(member.get("role").asText()).isEqualTo("SALES");
+          assertThat(member.get("role").asText()).isEqualTo("ATTENDANT");
         }
         if (member.get("subjectId").asText().equals(managerA.toString())) {
           assertThat(member.get("email").asText()).isEqualTo("manager-a@example.test");
@@ -187,31 +187,33 @@ class TeamManagementIT {
   void managerChangesOnlyOperationalMembersToOperationalRoles() throws Exception {
     Browser manager = selected("manager-a@example.test", clinicA);
 
-    var changed = changeRole(manager, salesA, "RECEPTION");
+    var changed = changeRole(manager, salesA, "VIEWER");
     assertThat(changed.statusCode()).isEqualTo(200);
     JsonNode view = Browser.JSON.readTree(changed.body());
     assertThat(view.get("subjectId").asText()).isEqualTo(salesA.toString());
-    assertThat(view.get("role").asText()).isEqualTo("RECEPTION");
+    assertThat(view.get("role").asText()).isEqualTo("VIEWER");
     assertThat(view.get("active").asBoolean()).isTrue();
     assertThat(changed.body()).doesNotContainIgnoringCase("password");
-    assertThat(role(clinicA, salesA)).isEqualTo("RECEPTION");
+    assertThat(role(clinicA, salesA)).isEqualTo("VIEWER");
 
     // Visible member, but the manager's role does not reach it: 403, nothing changes.
-    assertThat(changeRole(manager, ownerA1, "SALES").statusCode()).isEqualTo(403);
-    assertThat(changeRole(manager, managerA2, "SALES").statusCode()).isEqualTo(403);
+    assertThat(changeRole(manager, ownerA1, "ATTENDANT").statusCode()).isEqualTo(403);
+    assertThat(changeRole(manager, managerA2, "ATTENDANT").statusCode()).isEqualTo(403);
     assertThat(changeRole(manager, salesA, "MANAGER").statusCode()).isEqualTo(403);
     assertThat(changeRole(manager, salesA, "OWNER").statusCode()).isEqualTo(403);
-    assertThat(changeRole(manager, managerA, "SALES").statusCode()).isEqualTo(403);
+    assertThat(changeRole(manager, managerA, "ATTENDANT").statusCode()).isEqualTo(403);
     assertThat(manager.delete("/v1/clinic/team/" + ownerA1, true).statusCode()).isEqualTo(403);
     assertThat(manager.delete("/v1/clinic/team/" + managerA2, true).statusCode()).isEqualTo(403);
     assertThat(manager.delete("/v1/clinic/team/" + managerA, true).statusCode()).isEqualTo(403);
     assertThat(role(clinicA, ownerA1)).isEqualTo("OWNER");
     assertThat(role(clinicA, managerA2)).isEqualTo("MANAGER");
     assertThat(role(clinicA, managerA)).isEqualTo("MANAGER");
-    assertThat(role(clinicA, salesA)).isEqualTo("RECEPTION");
+    assertThat(role(clinicA, salesA)).isEqualTo("VIEWER");
 
     // Invalid input and missing CSRF never reach the change.
-    assertThat(changeRole(manager, salesA, "ADMIN").statusCode()).isEqualTo(400);
+    for (String retired : List.of("ADMIN", "RECEPTION", "SALES", "PROFESSIONAL")) {
+      assertThat(changeRole(manager, salesA, retired).statusCode()).as(retired).isEqualTo(400);
+    }
     assertThat(
             manager.putJson("/v1/clinic/team/" + salesA + "/role", "{\"role\":", true).statusCode())
         .isEqualTo(400);
@@ -219,23 +221,23 @@ class TeamManagementIT {
         .isEqualTo(400);
     assertThat(
             manager
-                .putJson("/v1/clinic/team/not-a-uuid/role", "{\"role\":\"SALES\"}", true)
+                .putJson("/v1/clinic/team/not-a-uuid/role", "{\"role\":\"ATTENDANT\"}", true)
                 .statusCode())
         .isEqualTo(400);
     assertThat(
             manager
-                .putJson("/v1/clinic/team/" + salesA + "/role", "{\"role\":\"SALES\"}", false)
+                .putJson("/v1/clinic/team/" + salesA + "/role", "{\"role\":\"ATTENDANT\"}", false)
                 .statusCode())
         .isEqualTo(403);
     assertThat(manager.delete("/v1/clinic/team/" + professionalA, false).statusCode())
         .isEqualTo(403);
-    assertThat(role(clinicA, salesA)).isEqualTo("RECEPTION");
+    assertThat(role(clinicA, salesA)).isEqualTo("VIEWER");
     assertThat(active(clinicA, professionalA)).isTrue();
 
     // A member of another clinic, a random UUID and an inactive member answer the same 404.
-    var foreign = changeRole(manager, outsiderB, "RECEPTION");
-    var absent = changeRole(manager, UUID.randomUUID(), "RECEPTION");
-    var inactive = changeRole(manager, inactiveA, "RECEPTION");
+    var foreign = changeRole(manager, outsiderB, "VIEWER");
+    var absent = changeRole(manager, UUID.randomUUID(), "VIEWER");
+    var inactive = changeRole(manager, inactiveA, "VIEWER");
     assertThat(foreign.statusCode()).isEqualTo(404);
     assertThat(absent.statusCode()).isEqualTo(404);
     assertThat(inactive.statusCode()).isEqualTo(404);
@@ -246,15 +248,15 @@ class TeamManagementIT {
     assertThat(foreignDelete.statusCode()).isEqualTo(404);
     assertThat(absentDelete.statusCode()).isEqualTo(404);
     assertThat(foreignDelete.body()).isEqualTo(absentDelete.body());
-    assertThat(role(clinicB, outsiderB)).isEqualTo("SALES");
+    assertThat(role(clinicB, outsiderB)).isEqualTo("ATTENDANT");
     assertThat(active(clinicB, outsiderB)).isTrue();
-    assertThat(role(clinicA, inactiveA)).isEqualTo("SALES");
+    assertThat(role(clinicA, inactiveA)).isEqualTo("ATTENDANT");
 
     // Deactivating an operational member keeps the membership row (history), inactive.
     assertThat(manager.delete("/v1/clinic/team/" + professionalA, true).statusCode())
         .isEqualTo(204);
     assertThat(active(clinicA, professionalA)).isFalse();
-    assertThat(changeRole(manager, professionalA, "SALES").statusCode()).isEqualTo(404);
+    assertThat(changeRole(manager, professionalA, "ATTENDANT").statusCode()).isEqualTo(404);
   }
 
   @Test
@@ -295,7 +297,7 @@ class TeamManagementIT {
     // Sole owner of an ACTIVE clinic: demote, deactivate or delete fails with BRL01.
     assertThat(
             jdbc.update(
-                "UPDATE tenant_memberships SET role = 'SALES' WHERE subject_id = ?", ownerA2))
+                "UPDATE tenant_memberships SET role = 'ATTENDANT' WHERE subject_id = ?", ownerA2))
         .isOne();
     assertLastOwner(
         "UPDATE tenant_memberships SET role = 'MANAGER' WHERE tenant_id = ? AND subject_id = ?",
@@ -343,7 +345,7 @@ class TeamManagementIT {
     assertLastOwner("UPDATE tenants SET status = 'ACTIVE' WHERE tenant_id = ?", clinicA);
     UUID provisioning = clinic("Clínica Nova", "PROVISIONING");
     assertLastOwner("UPDATE tenants SET status = 'ACTIVE' WHERE tenant_id = ?", provisioning);
-    member(provisioning, ownerB, "PROFESSIONAL", true);
+    member(provisioning, ownerB, "VIEWER", true);
     assertLastOwner("UPDATE tenants SET status = 'ACTIVE' WHERE tenant_id = ?", provisioning);
     member(provisioning, ownerA1, "OWNER", true);
     assertThat(
@@ -387,11 +389,32 @@ class TeamManagementIT {
   }
 
   @Test
+  void attendantAndViewerCannotChangeRolesNorDeactivateAnyone() throws Exception {
+    Browser attendant = selected("reception-a@example.test", clinicA);
+    Browser viewer = selected("professional-a@example.test", clinicA);
+    for (Browser browser : List.of(attendant, viewer)) {
+      for (UUID target : List.of(salesA, professionalA, receptionA, ownerA1)) {
+        var change = changeRole(browser, target, "VIEWER");
+        assertThat(change.statusCode()).isEqualTo(403);
+        assertThat(code(change)).isEqualTo("CLINIC_ACCESS_DENIED");
+        var deactivate = browser.delete("/v1/clinic/team/" + target, true);
+        assertThat(deactivate.statusCode()).isEqualTo(403);
+        assertThat(code(deactivate)).isEqualTo("CLINIC_ACCESS_DENIED");
+      }
+    }
+    assertThat(role(clinicA, salesA)).isEqualTo("ATTENDANT");
+    assertThat(role(clinicA, receptionA)).isEqualTo("ATTENDANT");
+    assertThat(role(clinicA, ownerA1)).isEqualTo("OWNER");
+    assertThat(active(clinicA, professionalA)).isTrue();
+    assertThat(active(clinicA, salesA)).isTrue();
+  }
+
+  @Test
   void revokedMembershipAndRoleChangesApplyOnTheNextRequest() throws Exception {
     Browser owner = selected("owner-a1@example.test", clinicA);
     Browser sales = selected("sales-a@example.test", clinicA);
     Browser manager = selected("manager-a@example.test", clinicA);
-    current(sales, "SALES");
+    current(sales, "ATTENDANT");
     assertThat(manager.get("/v1/clinic/team").statusCode()).isEqualTo(200);
 
     assertThat(owner.delete("/v1/clinic/team/" + salesA, true).statusCode()).isEqualTo(204);
@@ -401,11 +424,11 @@ class TeamManagementIT {
     assertThat(sales.put("/v1/auth/clinic/" + clinicA, true).statusCode()).isEqualTo(403);
     assertThat(active(clinicA, salesA)).isFalse();
 
-    assertThat(changeRole(owner, managerA, "SALES").statusCode()).isEqualTo(200);
+    assertThat(changeRole(owner, managerA, "ATTENDANT").statusCode()).isEqualTo(200);
     assertThat(manager.get("/v1/clinic/team").statusCode()).isEqualTo(403);
-    current(manager, "SALES");
-    assertThat(changeRole(manager, professionalA, "RECEPTION").statusCode()).isEqualTo(403);
-    assertThat(role(clinicA, professionalA)).isEqualTo("PROFESSIONAL");
+    current(manager, "ATTENDANT");
+    assertThat(changeRole(manager, professionalA, "ATTENDANT").statusCode()).isEqualTo(403);
+    assertThat(role(clinicA, professionalA)).isEqualTo("VIEWER");
   }
 
   private static Callable<HttpResponse<String>> demoteAfter(

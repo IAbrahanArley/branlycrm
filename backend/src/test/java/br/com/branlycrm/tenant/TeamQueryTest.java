@@ -27,8 +27,8 @@ class TeamQueryTest {
   void acceptsBothActiveFlags() {
     assertThat(TeamQuery.of(null, "true", FIRST).active()).isTrue();
     assertThat(TeamQuery.of(null, "false", FIRST).active()).isFalse();
-    TeamQuery combined = TeamQuery.of("SALES", "false", FIRST);
-    assertThat(combined.role()).isEqualTo(ClinicRole.SALES);
+    TeamQuery combined = TeamQuery.of("ATTENDANT", "false", FIRST);
+    assertThat(combined.role()).isEqualTo(ClinicRole.ATTENDANT);
     assertThat(combined.active()).isFalse();
     assertThat(combined.page()).isSameAs(FIRST);
   }
@@ -42,7 +42,20 @@ class TeamQueryTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ADMIN", "owner", "Owner", " OWNER", "OWNER ", "OWNER,SALES", "1", "*"})
+  @ValueSource(
+      strings = {
+        "ADMIN",
+        "RECEPTION",
+        "SALES",
+        "PROFESSIONAL",
+        "owner",
+        "Owner",
+        " OWNER",
+        "OWNER ",
+        "OWNER,VIEWER",
+        "1",
+        "*"
+      })
   void unknownRolesReportRole(String role) {
     assertInvalid(() -> TeamQuery.of(role, null, FIRST), "role");
   }

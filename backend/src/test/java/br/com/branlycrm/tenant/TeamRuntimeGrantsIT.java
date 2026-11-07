@@ -61,12 +61,12 @@ class TeamRuntimeGrantsIT {
     UUID clinic = clinic(superuser);
     UUID owner = member(superuser, clinic, "OWNER");
     UUID coOwner = member(superuser, clinic, "OWNER");
-    UUID seller = member(superuser, clinic, "SALES");
+    UUID seller = member(superuser, clinic, "ATTENDANT");
     assertThat(runtimeUser()).isEqualTo(RUNTIME);
 
     // Locks (FOR NO KEY UPDATE, FOR SHARE/UPDATE OF m) and UPDATE(role, active) suffice.
-    assertThat(team.changeRole(clinic, owner, seller, ClinicRole.RECEPTION).role())
-        .isEqualTo("RECEPTION");
+    assertThat(team.changeRole(clinic, owner, seller, ClinicRole.VIEWER).role())
+        .isEqualTo("VIEWER");
     team.deactivate(clinic, owner, seller);
     team.changeRole(clinic, owner, coOwner, ClinicRole.MANAGER);
 

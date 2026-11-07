@@ -64,7 +64,7 @@ class SessionAuthenticationIT {
     member(clinicA, coOwnerA, "OWNER", true);
     member(clinicB, ownerB, "OWNER", true);
     member(suspendedClinic, ownerA, "OWNER", true);
-    member(revokedClinic, ownerA, "RECEPTION", false);
+    member(revokedClinic, ownerA, "ATTENDANT", false);
   }
 
   @Test

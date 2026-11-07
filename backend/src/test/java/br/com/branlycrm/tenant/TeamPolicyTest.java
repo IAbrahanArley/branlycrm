@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 /** Who may change whose role or deactivate whom (docs/permissoes.md, "Regras invariantes"). */
 class TeamPolicyTest {
   private static final Set<ClinicRole> OPERATIONAL =
-      EnumSet.of(ClinicRole.RECEPTION, ClinicRole.SALES, ClinicRole.PROFESSIONAL);
+      EnumSet.of(ClinicRole.ATTENDANT, ClinicRole.VIEWER);
   private static final UUID TENANT = UUID.randomUUID();
 
   /** Every new role, plus {@code null} for deactivation. */
@@ -62,7 +62,7 @@ class TeamPolicyTest {
   @Test
   void managerMayDeactivateOperationalMembersButNotOwnersOrManagers() {
     ClinicAccess manager = actor(ClinicRole.MANAGER);
-    assertThat(TeamPolicy.mayManage(manager, member(UUID.randomUUID(), ClinicRole.SALES), null))
+    assertThat(TeamPolicy.mayManage(manager, member(UUID.randomUUID(), ClinicRole.ATTENDANT), null))
         .isTrue();
     assertThat(TeamPolicy.mayManage(manager, member(UUID.randomUUID(), ClinicRole.OWNER), null))
         .isFalse();

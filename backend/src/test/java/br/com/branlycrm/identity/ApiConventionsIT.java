@@ -47,7 +47,8 @@ class ApiConventionsIT {
   static final PostgreSQLContainer POSTGRES = TestPostgres.container();
 
   private static final String PASSWORD = "Synthetic conventions integration secret 2026!";
-  private static final String[] ROLES = {"MANAGER", "RECEPTION", "SALES", "PROFESSIONAL", "OWNER"};
+  // Five slots (ATTENDANT twice) so roles and the i % 4 active flag stay spread out.
+  private static final String[] ROLES = {"MANAGER", "ATTENDANT", "VIEWER", "OWNER", "ATTENDANT"};
   private static final int EXTRA_MEMBERS = 29;
 
   @LocalServerPort int port;
@@ -82,7 +83,7 @@ class ApiConventionsIT {
     ownerA = account("owner-a@example.test", "Synthetic member 00", true);
     member(clinicA, ownerA, "OWNER", true);
     receptionA = account("reception-a@example.test", "Synthetic member 01", true);
-    member(clinicA, receptionA, "RECEPTION", true);
+    member(clinicA, receptionA, "ATTENDANT", true);
     for (int i = 2; i <= EXTRA_MEMBERS; i++) {
       // Some names repeat on purpose so the subject_id tie-break is exercised.
       String name =
@@ -92,7 +93,8 @@ class ApiConventionsIT {
     }
     ownerB = account("owner-b@example.test", "Synthetic member 00", true);
     member(clinicB, ownerB, "OWNER", true);
-    member(clinicB, account("sales-b@example.test", "Synthetic member 02", true), "SALES", true);
+    member(
+        clinicB, account("sales-b@example.test", "Synthetic member 02", true), "ATTENDANT", true);
     // An unverified account answers login exactly like a missing one.
     account("unverified@example.test", "Synthetic member 99", false);
 
@@ -137,7 +139,7 @@ class ApiConventionsIT {
     assertError(owner.post("/v1/auth/logout", false), 403, "CSRF_INVALID");
     assertError(owner.put("/v1/auth/clinic/" + clinicA, false), 403, "CSRF_INVALID");
     assertError(
-        owner.putJson("/v1/clinic/team/" + receptionA + "/role", "{\"role\":\"SALES\"}", false),
+        owner.putJson("/v1/clinic/team/" + receptionA + "/role", "{\"role\":\"VIEWER\"}", false),
         403,
         "CSRF_INVALID");
     // The session survived the refused logout.
@@ -202,7 +204,7 @@ class ApiConventionsIT {
     }
 
     assertInvalid(
-        owner.putJson("/v1/clinic/team/not-a-uuid/role", "{\"role\":\"SALES\"}", true),
+        owner.putJson("/v1/clinic/team/not-a-uuid/role", "{\"role\":\"VIEWER\"}", true),
         "subjectId");
     assertInvalid(owner.delete("/v1/clinic/team/not-a-uuid", true), "subjectId");
     assertInvalid(
@@ -211,7 +213,7 @@ class ApiConventionsIT {
     assertInvalid(owner.putJson("/v1/clinic/team/" + receptionA + "/role", "{}", true), "role");
     assertInvalid(
         owner.putJson("/v1/clinic/team/" + receptionA + "/role", "{\"role\":", true), "body");
-    assertThat(role(receptionA)).isEqualTo("RECEPTION");
+    assertThat(role(receptionA)).isEqualTo("ATTENDANT");
 
     // Empty values fall back to the defaults instead of failing.
     var empty = owner.get("/v1/clinic/team?page=&pageSize=&role=&active=");
@@ -306,7 +308,8 @@ class ApiConventionsIT {
     }
     assertFiltered(owner, "?active=true", Member::active);
     assertFiltered(owner, "?active=false", m -> !m.active());
-    assertFiltered(owner, "?role=SALES&active=false", m -> m.role().equals("SALES") && !m.active());
+    assertFiltered(
+        owner, "?role=ATTENDANT&active=false", m -> m.role().equals("ATTENDANT") && !m.active());
     assertFiltered(owner, "?role=OWNER&active=true", m -> m.role().equals("OWNER") && m.active());
     assertFiltered(
         owner,
@@ -318,9 +321,9 @@ class ApiConventionsIT {
 
     // A combination without matches is an empty page, not an error.
     jdbc.update(
-        "UPDATE tenant_memberships SET active = true WHERE tenant_id = ? AND role = 'PROFESSIONAL'",
+        "UPDATE tenant_memberships SET active = true WHERE tenant_id = ? AND role = 'VIEWER'",
         clinicA);
-    JsonNode none = page(owner, "?role=PROFESSIONAL&active=false");
+    JsonNode none = page(owner, "?role=VIEWER&active=false");
     assertThat(none.get("items").size()).isZero();
     assertThat(none.get("total").asLong()).isZero();
   }
