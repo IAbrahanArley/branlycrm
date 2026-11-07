@@ -13,6 +13,8 @@ Comece por aqui:
 - [Papéis e orquestração dos agentes](agents/ORCHESTRATION.md)
 - [Papéis e permissões das clínicas](permissoes.md)
 - [Convenções da API: erros, paginação, filtros](api-convencoes.md)
+- [Contrato OpenAPI para o frontend](api/openapi.json)
+- [Backend no Claude Code e frontend no Codex em paralelo](agents/PARALELO.md)
 
 Referência:
 

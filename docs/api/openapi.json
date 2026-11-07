@@ -1,0 +1,1610 @@
+{
+  "components" : {
+    "schemas" : {
+      "ApiError" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "fields" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ClinicSelectionView" : {
+        "properties" : {
+          "tenantId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ClinicView" : {
+        "properties" : {
+          "clinicName" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "tenantId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CsrfToken" : {
+        "properties" : {
+          "headerName" : {
+            "type" : "string"
+          },
+          "parameterName" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CsrfView" : {
+        "properties" : {
+          "headerName" : {
+            "type" : "string"
+          },
+          "parameterName" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CurrentClinicView" : {
+        "properties" : {
+          "permissions" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "tenantId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "IdentityView" : {
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "subjectId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "InvitationAcceptRequest" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "InvitationPreviewView" : {
+        "properties" : {
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "requiresLogin" : {
+            "type" : "boolean"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "targetName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "InvitationTokenRequest" : {
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "IssuedInvitationView" : {
+        "properties" : {
+          "delivery" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "invitationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PageViewTeamInvitationView" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TeamInvitationView"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageSize" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageViewTeamMemberView" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TeamMemberView"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageSize" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RoleChangeRequest" : {
+        "properties" : {
+          "role" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TeamInvitationRequest" : {
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TeamInvitationView" : {
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "expired" : {
+            "type" : "boolean"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "invitationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TeamMemberView" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "subjectId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "csrf" : {
+        "in" : "header",
+        "name" : "X-CSRF-TOKEN",
+        "type" : "apiKey"
+      },
+      "session" : {
+        "in" : "cookie",
+        "name" : "BRANLY_SESSION",
+        "type" : "apiKey"
+      }
+    }
+  },
+  "info" : {
+    "description" : "Sessão por cookie e CSRF em mutações. Dados de clínica exigem participação ativa; o tenant nunca é aceito apenas por parâmetro do cliente.",
+    "title" : "Branly CRM API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/v1/auth/clinic" : {
+      "get" : {
+        "operationId" : "current",
+        "responses" : {
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Selected clinic with role and permission scopes (UI hint only)",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/auth/clinic/{tenantId}" : {
+      "put" : {
+        "operationId" : "select",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: tenantId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; CSRF_INVALID"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Select a clinic after validating the membership",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/auth/clinics" : {
+      "get" : {
+        "operationId" : "clinics",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ClinicView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Active memberships in active clinics",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/auth/csrf" : {
+      "get" : {
+        "operationId" : "csrf",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "token",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/CsrfToken"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CsrfView"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "summary" : "Obtain the CSRF token before login or mutations",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/auth/login" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/x-www-form-urlencoded" : {
+              "schema" : {
+                "properties" : {
+                  "email" : {
+                    "type" : "string"
+                  },
+                  "password" : {
+                    "format" : "password",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "email", "password" ],
+                "type" : "object"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Authenticated"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_CREDENTIALS"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CSRF_INVALID"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "RATE_LIMITED; honor Retry-After"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        } ],
+        "summary" : "Authenticate with e-mail and password; renews the session id",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/auth/logout" : {
+      "post" : {
+        "responses" : {
+          "204" : {
+            "description" : "Session ended"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CSRF_INVALID"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ],
+          "session" : [ ]
+        } ],
+        "summary" : "Invalidate the session and remove its cookie",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/auth/me" : {
+      "get" : {
+        "operationId" : "me",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IdentityView"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Authenticated identity, without credentials",
+        "tags" : [ "Session" ]
+      }
+    },
+    "/v1/clinic/team" : {
+      "get" : {
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "description" : "1-based page, default 1",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Items per page, 1 to 100, default 25",
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "OWNER, MANAGER, ATTENDANT or VIEWER",
+          "in" : "query",
+          "name" : "role",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "true or false; omitted lists both",
+          "in" : "query",
+          "name" : "active",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: page, pageSize, role or active"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED: role without team access"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "List members of the selected clinic (OWNER, MANAGER), paginated",
+        "tags" : [ "Team" ]
+      }
+    },
+    "/v1/clinic/team/invitations" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [ {
+          "description" : "1-based page, default 1",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Items per page, 1 to 100, default 25",
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: page or pageSize"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Pending invitations of the selected clinic (OWNER, MANAGER), paginated",
+        "tags" : [ "Team invitations" ]
+      },
+      "post" : {
+        "operationId" : "invite",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TeamInvitationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IssuedInvitationView"
+                }
+              }
+            },
+            "description" : "Invitation issued; delivery SENT or FAILED"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: email, role or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN (role beyond the actor's reach); CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MEMBER_ALREADY_ACTIVE or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Invite an address, or reissue its pending invitation",
+        "tags" : [ "Team invitations" ]
+      }
+    },
+    "/v1/clinic/team/invitations/{invitationId}" : {
+      "delete" : {
+        "operationId" : "revoke",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "invitationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Invitation revoked"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: invitationId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVITATION_NOT_FOUND: not a pending invitation of the selected clinic"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Revoke a pending invitation",
+        "tags" : [ "Team invitations" ]
+      }
+    },
+    "/v1/clinic/team/invitations/{invitationId}/resend" : {
+      "post" : {
+        "operationId" : "resend",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "invitationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IssuedInvitationView"
+                }
+              }
+            },
+            "description" : "Invitation reissued; delivery SENT or FAILED"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: invitationId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVITATION_NOT_FOUND: not a pending invitation of the selected clinic"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Resend a pending invitation with a new token and expiry",
+        "tags" : [ "Team invitations" ]
+      }
+    },
+    "/v1/clinic/team/{subjectId}" : {
+      "delete" : {
+        "operationId" : "deactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "subjectId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Member deactivated"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed); CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MEMBER_NOT_FOUND: not an active member of the selected clinic"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LAST_OWNER or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Deactivate a member; history and authorship are kept",
+        "tags" : [ "Team" ]
+      }
+    },
+    "/v1/clinic/team/{subjectId}/role" : {
+      "put" : {
+        "operationId" : "changeRole",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "subjectId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RoleChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: role, subjectId or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed); CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MEMBER_NOT_FOUND: not an active member of the selected clinic"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LAST_OWNER or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Change a member's role",
+        "tags" : [ "Team" ]
+      }
+    },
+    "/v1/invitations/accept" : {
+      "post" : {
+        "operationId" : "accept",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InvitationAcceptRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Membership created or reactivated"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: displayName, password or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVITATION_INVALID: unknown, expired, used, revoked or no longer authorized"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVITATION_LOGIN_REQUIRED, INVITATION_ACCOUNT_MISMATCH or MEMBER_ALREADY_ACTIVE"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "RATE_LIMITED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        } ],
+        "summary" : "Accept an invitation; creates the account when none exists",
+        "tags" : [ "Invitations" ]
+      }
+    },
+    "/v1/invitations/preview" : {
+      "post" : {
+        "operationId" : "preview",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InvitationTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/InvitationPreviewView"
+                }
+              }
+            },
+            "description" : "Kind, target name, role and expiry"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVITATION_INVALID: unknown, expired, used or revoked"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "RATE_LIMITED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        } ],
+        "summary" : "What an invitation grants, for its token holder",
+        "tags" : [ "Invitations" ]
+      }
+    }
+  },
+  "tags" : [ {
+    "description" : "Invite, resend and revoke for the selected clinic",
+    "name" : "Team invitations"
+  }, {
+    "description" : "Authenticated identity and clinic selection",
+    "name" : "Session"
+  }, {
+    "description" : "Preview and accept an invitation",
+    "name" : "Invitations"
+  }, {
+    "description" : "Members and roles of the selected clinic",
+    "name" : "Team"
+  } ]
+}
