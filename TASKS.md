@@ -626,6 +626,8 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.md](docs/agents/PARALELO.md). Contrato: [docs/api/openapi.json](docs/api/openapi.json). Só tocam `frontend/`.
 
+**Ajustadas em 07/11/2026** depois da CRM-018 (agências): FE-001, FE-002 e FE-004 ganharam itens, e a FE-005 é nova. Códigos de erro em [api-convencoes.md](docs/api-convencoes.md).
+
 ### [ ] FE-001 — Base do painel (P0)
 **Depende de:** contrato atual (sessão, CSRF, erros).
 **Entregas:**
@@ -637,7 +639,8 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - Proteção das rotas do painel:
   - 401 leva ao login;
   - `SESSION_REVOKED` encerra a sessão local;
-  - 403 mostra permissão negada.
+  - 403 mostra permissão negada;
+  - `STATE_CONFLICT` (409) mostra que a operação conflita com o estado atual e sugere recarregar.
 - Layout do painel (`/app`) responsivo, com área para a clínica atual.
 - Componentes de estado: carregando, vazio, erro e sem permissão.
 **Aceite:**
@@ -652,6 +655,11 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - Logout.
 - Seleção da clínica a partir de `GET /api/v1/auth/clinics` e `PUT /api/v1/auth/clinic/{tenantId}`, com troca de clínica.
 - Painel mostra a clínica e o papel atuais (`GET /api/v1/auth/clinic`).
+- Destino depois do login:
+  - quem tem clínicas segue para a seleção ou para o painel;
+  - quem não tem clínica, mas administra agência (`GET /api/v1/agencies` não vazio), vai para `/agencia` (FE-005);
+  - quem administra agência e também tem clínicas pode alternar entre as duas áreas;
+  - quem não tem nenhum dos dois vê uma tela de "sem acesso" com o logout.
 **Aceite:**
 - `INVALID_CREDENTIALS` tem uma mensagem única, sem revelar se o e-mail existe.
 - 429 respeita `Retry-After`.
@@ -677,12 +685,33 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
   - lê o token do fragmento (`#token=`) e o remove da barra com `history.replaceState`;
   - usa `Referrer-Policy: no-referrer`;
   - mostra a prévia (`POST /api/v1/invitations/preview`).
+- A prévia diz o que o convite dá, pelo `kind`:
+  - `CLINIC`: participar da clínica `targetName` com o papel `role`;
+  - `AGENCY`: administrar a agência `targetName`.
 - Aceite com nome e senha quando não há conta, ou pedido de login quando `requiresLogin`.
 - Depois do aceite, encaminha ao login.
 **Aceite:**
 - O token nunca vai para a URL do servidor, para logs nem para storage.
-- `INVITATION_INVALID`, `INVITATION_LOGIN_REQUIRED` e `INVITATION_ACCOUNT_MISMATCH` têm mensagens próprias.
+- `INVITATION_INVALID`, `INVITATION_LOGIN_REQUIRED`, `INVITATION_ACCOUNT_MISMATCH` e `MEMBER_ALREADY_ACTIVE` têm mensagens próprias.
 - A senha segue a regra do servidor (12 caracteres a 72 bytes), validada também no servidor.
+
+### [ ] FE-005 — Carteira da agência (P1)
+**Depende de:** FE-002.
+**Entregas:**
+- Área `/agencia`:
+  - agências do usuário (`GET /api/v1/agencies`), com escolha quando houver mais de uma;
+  - carteira paginada (`GET /api/v1/agencies/{agencyId}/clinics`) com a situação da clínica (`PROVISIONING`, `AWAITING_OWNER`, `ACTIVE`, `SUSPENDED`, `FAILED`) e o estado do convite do gestor (`PENDING`, `EXPIRED`, `ACCEPTED`, `NONE`), em texto e não só por cor.
+- Formulário de nova clínica (`POST /api/v1/agencies/{agencyId}/clinics`):
+  - campos: nome da clínica e e-mail do gestor;
+  - o `requestId` é gerado no navegador (`crypto.randomUUID()`) ao abrir o formulário e reaproveitado em toda nova tentativa até dar certo, para que um duplo clique ou uma falha de rede não criem duas clínicas;
+  - 201 mostra a clínica criada; 200 (`created: false`) avisa que ela já existia.
+- Reemissão do convite do gestor (`POST /api/v1/agencies/{agencyId}/clinics/{tenantId}/owner-invitation`), só para clínicas `PROVISIONING` ou `AWAITING_OWNER` com convite diferente de `ACCEPTED`; pode trocar o e-mail.
+- Mostrar `delivery: FAILED` com a opção de reenviar.
+**Aceite:**
+- Mensagens próprias para `AGENCY_NOT_FOUND`, `CLINIC_NOT_FOUND`, `IDEMPOTENCY_KEY_REUSED`, `AGENCY_PENDING_CLINIC_LIMIT`, `AGENCY_CLINIC_HAS_OWNER` e `INVITATION_SEND_LIMIT` (429, respeitando `Retry-After` quando houver).
+- **Sem dados de pacientes:** a área da agência nunca mostra nem pede dados de pacientes, e não oferece abrir a clínica (a agência não tem participação; ADR-026).
+- Estados de carregamento, vazio ("nenhuma clínica na carteira") e erro; funciona no celular e por teclado.
+- `lint`, `typecheck` e `build` passam.
 
 ## Retirado do MVP
 
