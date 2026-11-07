@@ -33,7 +33,7 @@ public final class SessionErrorHandler {
   }
 
   @ExceptionHandler(DataAccessException.class)
-  ResponseEntity<ApiError> unavailable() {
-    return ApiErrors.unavailable();
+  ResponseEntity<ApiError> unavailable(DataAccessException exception) {
+    return ApiErrors.dataAccess(exception);
   }
 }

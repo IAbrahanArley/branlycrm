@@ -20,6 +20,17 @@ public record TenantDatabase(
     }
   }
 
+  /** The only valid binding for a new clinic: every name derived from its UUID. */
+  public static TenantDatabase forTenant(UUID tenantId) {
+    if (tenantId == null) throw new IllegalArgumentException("Tenant is required");
+    String suffix = suffix(tenantId);
+    return new TenantDatabase(
+        tenantId,
+        "clinic_" + suffix,
+        "tenant_" + suffix,
+        "TENANT_SECRET_" + suffix.toUpperCase(Locale.ROOT));
+  }
+
   private static String suffix(UUID tenantId) {
     return tenantId.toString().replace("-", "");
   }

@@ -12,6 +12,7 @@ public final class TestPostgres {
   public static final String PROVISIONER = "crm_tenant_provisioner";
   public static final String WORKER = "crm_provisioning_worker";
   public static final String RUNTIME = "crm_control_runtime";
+  public static final String PLATFORM = "crm_platform_operator";
   public static final String PASSWORD = "synthetic-role-password-2026";
 
   private static final DockerImageName IMAGE =
@@ -42,10 +43,19 @@ public final class TestPostgres {
               + "'");
       sql.execute("CREATE ROLE " + WORKER + " LOGIN NOINHERIT PASSWORD '" + PASSWORD + "'");
       sql.execute("CREATE ROLE " + RUNTIME + " LOGIN NOINHERIT PASSWORD '" + PASSWORD + "'");
+      sql.execute("CREATE ROLE " + PLATFORM + " LOGIN NOINHERIT PASSWORD '" + PASSWORD + "'");
       sql.execute("REVOKE ALL ON DATABASE " + control + " FROM PUBLIC");
-      sql.execute("GRANT CONNECT ON DATABASE " + control + " TO " + RUNTIME + ", " + WORKER);
+      sql.execute(
+          "GRANT CONNECT ON DATABASE "
+              + control
+              + " TO "
+              + RUNTIME
+              + ", "
+              + WORKER
+              + ", "
+              + PLATFORM);
       sql.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC");
-      sql.execute("GRANT USAGE ON SCHEMA public TO " + RUNTIME + ", " + WORKER);
+      sql.execute("GRANT USAGE ON SCHEMA public TO " + RUNTIME + ", " + WORKER + ", " + PLATFORM);
       sql.execute("REVOKE ALL ON DATABASE postgres FROM PUBLIC");
       sql.execute("GRANT CONNECT ON DATABASE postgres TO " + PROVISIONER);
       sql.execute("REVOKE ALL ON DATABASE template1 FROM PUBLIC");

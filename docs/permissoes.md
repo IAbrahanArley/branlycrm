@@ -164,6 +164,10 @@ A matriz do catálogo vigente é executável em `tenant/domain/ClinicRole` (uma 
 | `POST /v1/clinic/team/invitations` | Convida ou reemite o convite pendente do e-mail; `MANAGER` só para `ATTENDANT` e `VIEWER` |
 | `POST /v1/clinic/team/invitations/{id}/resend` | Novo token e validade; o link anterior para de funcionar |
 | `DELETE /v1/clinic/team/invitations/{id}` | Revoga; convite de outra clínica responde 404 |
+| `GET /v1/agencies` | Agências ativas que o usuário administra |
+| `GET /v1/agencies/{agencyId}/clinics` | Carteira da agência: só dados do registro (nome, situação, estado do convite do gestor), nunca dados de pacientes |
+| `POST /v1/agencies/{agencyId}/clinics` | Cria clínica na carteira com `requestId` idempotente; a clínica nasce `PROVISIONING` e o gestor recebe convite |
+| `POST /v1/agencies/{agencyId}/clinics/{tenantId}/owner-invitation` | Reemite o convite do gestor enquanto a clínica nunca teve dono |
 | `POST /v1/invitations/preview` e `/accept` | Públicas, com CSRF e limite de tentativas ([autenticacao.md](autenticacao.md)) |
 
 ## Migração do catálogo novo (V7)

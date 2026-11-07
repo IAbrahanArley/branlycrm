@@ -170,7 +170,7 @@ O frontend acompanha cada API aprovada.
   - Deploy: aplicar a V7 antes da API nova e sem versões misturadas. Também registrado.
   - Correções feitas: documentação desatualizada e teste HTTP de recusa.
 
-### [-] CRM-018 — Agências parceiras e carteira de clínicas (P0)
+### [x] CRM-018 — Agências parceiras e carteira de clínicas (P0)
 **Depende de:** CRM-017, CRM-011.
 **Atende:** perfil Admin da assessoria (seção 1.2 do documento do cliente), ADR-026.
 **Entregas:**
@@ -213,7 +213,29 @@ O frontend acompanha cada API aprovada.
      - preview sem reconferir a autoridade (só quem tem o token vê o nome da clínica);
      - janela sem trava na suspensão de agência;
      - teste de `delivery: FAILED`.
-3. **Módulo `agency`** (carteira e criação de clínica) e comando de plataforma.
+3. **Módulo `agency`** (carteira e criação de clínica) e comando de plataforma (`feat/crm-018-agency-portfolio`). **Pronto para PR:**
+   - **Banco:** V11 com grants da carteira e papel `crm_platform_operator`; V12 restringe o operador a uma função e impede a API de criar convites de agência.
+   - **Agência:** módulo `agency` com agências do admin e carteira só com dados do registro.
+   - **Carteira:** criação idempotente de clínica com tarefa sem admin e convite do gestor; reemissão só antes de haver dono, com limites por clínica e por agência.
+   - **Aceite:** convite de admin de agência.
+   - **Plataforma:** comando `create-agency` e `invite-agency-admin`.
+   - **Erros:** BRL02 vira `STATE_CONFLICT`.
+   - **Testes:** `./mvnw -B -ntp clean verify` → 123 unitários (2 ignorados no Windows) e 67 de integração. O `AgencyPortfolioIT` faz o fluxo completo da plataforma ao gestor, com a API como runtime e o comando como operador.
+   - **Compose:** V11 e V12 aplicadas, `verify-roles.sh` passou e o comando de plataforma rodou (link na saída, sem e-mail e sem log guardado).
+   - **Revisão de `security`:** o achado alto foi corrigido (operador podia ler e girar convites de clínica). Médios corrigidos: reemissão por endereço e link no log. Baixos corrigidos: limite serializado, trava pelo hash do token, convite AGENCY só da plataforma, replay com status real, nome sem caracteres de controle, parser estrito e reemissão sem `FAILED`.
+
+**Concluída (07/11/2026)** com os três PRs. Aceite cumprido:
+- isolamento entre agências e clínicas diretas, com a mesma resposta;
+- usuário só de agência não lê dados de clínica (sem participação, 403 ao selecionar);
+- criação idempotente sob repetição e concorrência;
+- revisões de `architect` e `security`.
+
+**Pendências:**
+- 2FA de Admin da agência e de `OWNER` (CRM-016) antes de dados reais;
+- auditoria (CRM-070);
+- suspensão de agência e saída de clínica;
+- revogar convites pendentes ao desativar admin de agência;
+- telas (FE).
 
 **Bloqueio para dados reais:** Admin da agência e `OWNER` sem 2FA até a CRM-016.
 

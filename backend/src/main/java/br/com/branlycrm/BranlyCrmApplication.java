@@ -23,6 +23,16 @@ public class BranlyCrmApplication {
           .run(args);
       return;
     }
+    // Platform command (ADR-028): runs once with its own credential and exits; no HTTP server.
+    if ("platform".equals(System.getenv("APP_MODE"))) {
+      var context =
+          new SpringApplicationBuilder(BranlyCrmApplication.class)
+              .web(WebApplicationType.NONE)
+              .properties("app.platform.enabled=true")
+              .run(args);
+      System.exit(SpringApplication.exit(context));
+      return;
+    }
     SpringApplication.run(BranlyCrmApplication.class, args);
   }
 }

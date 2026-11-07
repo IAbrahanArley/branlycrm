@@ -78,7 +78,9 @@ class ArchitectureTest {
         .resideInAnyPackage(
             "br.com.branlycrm.identity..",
             "br.com.branlycrm.tenant..",
-            "br.com.branlycrm.onboarding..")
+            "br.com.branlycrm.agency..",
+            "br.com.branlycrm.onboarding..",
+            "br.com.branlycrm.platform..")
         .should()
         .dependOnClassesThat()
         .resideInAPackage("br.com.branlycrm.provisioning..")
@@ -105,7 +107,9 @@ class ArchitectureTest {
         .resideInAnyPackage(
             "br.com.branlycrm.identity..",
             "br.com.branlycrm.tenant..",
+            "br.com.branlycrm.agency..",
             "br.com.branlycrm.onboarding..",
+            "br.com.branlycrm.platform..",
             "br.com.branlycrm.provisioning..",
             "br.com.branlycrm.config..")
         .check(CODE);
@@ -126,6 +130,33 @@ class ArchitectureTest {
         .orShould()
         .dependOnClassesThat()
         .haveSimpleName("TenantSecretReader")
+        .check(CODE);
+  }
+
+  /** The agency module reads the registry only; it never opens a clinic database (ADR-026). */
+  @Test
+  void agenciesNeverOpenClinicDatabases() {
+    noClasses()
+        .that()
+        .resideInAPackage("br.com.branlycrm.agency..")
+        .should()
+        .dependOnClassesThat()
+        .haveSimpleNameStartingWith("TenantConnection")
+        .orShould()
+        .dependOnClassesThat()
+        .haveSimpleName("TenantSecretReader")
+        .check(CODE);
+  }
+
+  /** The platform command and its credential stay out of every other module (ADR-028). */
+  @Test
+  void nothingDependsOnThePlatformCommand() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackage("br.com.branlycrm.platform..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("br.com.branlycrm.platform..")
         .check(CODE);
   }
 

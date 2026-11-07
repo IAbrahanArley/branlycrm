@@ -48,7 +48,24 @@ Nenhum banco é apagado automaticamente.
 
 ## Disparo
 
-Ainda não há cadastro público: a criação da tarefa (clínica `PROVISIONING` mais a linha em `tenant_provisioning_tasks`) virá na etapa 2 do [plano de onboarding](plano-onboarding.md), na mesma transação do pedido de cadastro. Até lá, as tarefas são criadas apenas por testes, ou manualmente em ambiente local com dados sintéticos.
+- **Pela agência:** `POST /v1/agencies/{agencyId}/clinics` cria, numa transação, a clínica (`PROVISIONING`, com `agency_id`), a tarefa sem administrador e o convite do gestor. O provisionador deixa a clínica `AWAITING_OWNER`, e o aceite a ativa (ADR-028).
+- **Pela plataforma:** agências e admins de agência são criados pelo comando de plataforma (seção abaixo).
+- **Cadastro público** (clínica direta): continua previsto na CRM-014.
+
+## Comando de plataforma
+
+Processo sem HTTP (`APP_MODE=platform`) com a credencial `crm_platform_operator`, que só cria agências e convites de admin de agência:
+
+```bash
+docker compose --profile tools run --rm platform create-agency --request-id <uuid> --name "<nome>" --admin-email <e-mail>
+docker compose --profile tools run --rm platform invite-agency-admin --agency-id <uuid> --email <e-mail>
+```
+
+- **Saída:** o link do convite (validade de 72 horas) sai uma única vez na saída padrão, sem o e-mail, nunca no logger nem por e-mail. O serviço não guarda log no Docker (`logging: none`) e deve rodar sempre com `--rm`.
+- **Permissões:** o operador só cria agências e chama `platform_issue_agency_admin_invitation` (V12); não lê nem altera convites, contas, clínicas ou participações.
+- **Validação:** flags desconhecidas ou repetidas são recusadas, e um `--request-id` já usado com outro nome também.
+- **Repetição:** repetir o comando reaproveita a agência e gira o convite pendente, e o link anterior para de funcionar.
+- **Auditoria:** ainda não há auditoria central dessas operações (CRM-070).
 
 ## Pools de conexão
 

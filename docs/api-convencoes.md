@@ -92,6 +92,12 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `INVITATION_NOT_FOUND` | 404 | Convite pendente inexistente na clínica selecionada, inclusive de outra clínica | Convites de equipe |
 | `INVITATION_FORBIDDEN` | 403 | O papel de quem age não alcança o papel do convite | Convites de equipe |
 | `INVITATION_SEND_LIMIT` | 429 | Limite de e-mails de convite: 5 por convite, 1 por minuto por convite e 100 por clínica a cada 24 horas | Convites de equipe |
+| `AGENCY_NOT_FOUND` | 404 | Agência inexistente, suspensa ou que o usuário não administra; sempre a mesma resposta | Agências |
+| `CLINIC_NOT_FOUND` | 404 | Clínica fora da carteira da agência: de outra agência, direta ou inexistente | Carteira da agência |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | O mesmo `requestId` já criou uma clínica com outros dados | Carteira da agência |
+| `AGENCY_PENDING_CLINIC_LIMIT` | 409 | Clínicas demais em preparação na agência (padrão: 20) | Carteira da agência |
+| `AGENCY_CLINIC_HAS_OWNER` | 409 | A clínica já teve gestor; convites passam a ser da própria clínica | Carteira da agência |
+| `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02) | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Corpo com tipo diferente de JSON | `GlobalErrorHandler` |

@@ -25,6 +25,7 @@ services:
       CONTROL_MIGRATION_PASSWORD: ${CONTROL_MIGRATION_PASSWORD:?Defina CONTROL_MIGRATION_PASSWORD}
       TENANT_PROVISIONER_PASSWORD: ${TENANT_PROVISIONER_PASSWORD:?Defina TENANT_PROVISIONER_PASSWORD}
       PROVISIONING_WORKER_PASSWORD: ${PROVISIONING_WORKER_PASSWORD:?Defina PROVISIONING_WORKER_PASSWORD}
+      PLATFORM_OPERATOR_PASSWORD: ${PLATFORM_OPERATOR_PASSWORD:?Defina PLATFORM_OPERATOR_PASSWORD}
     volumes:
       - ./infra/postgres/bootstrap-roles.sh:/bootstrap/bootstrap-roles.sh:ro
     depends_on:
@@ -97,6 +98,27 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+  # Platform command (ADR-028): run on demand, never as a server. Example:
+  # docker compose --profile tools run --rm platform create-agency --request-id <uuid> --name "<nome>" --admin-email <e-mail>
+  platform:
+    image: branlycrm-backend
+    build: ./backend
+    profiles: ["tools"]
+    # The invitation link must not stay in `docker logs`; the attached run still prints it.
+    logging:
+      driver: none
+    environment:
+      APP_MODE: platform
+      SPRING_FLYWAY_ENABLED: 'false'
+      SPRING_DOCKER_COMPOSE_ENABLED: 'false'
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
+      SPRING_DATASOURCE_USERNAME: crm_platform_operator
+      SPRING_DATASOURCE_PASSWORD: ${PLATFORM_OPERATOR_PASSWORD:?Defina PLATFORM_OPERATOR_PASSWORD}
+      APP_PUBLIC_ORIGIN: ${APP_PUBLIC_ORIGIN:-http://localhost:8088}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
   frontend:
     build: ./frontend
     environment:
