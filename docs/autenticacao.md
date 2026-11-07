@@ -6,7 +6,7 @@ Implementação inicial em 05/11/2026. ADR-015.
 
 Organização conforme ADR-017 e [padroes-backend.md](padroes-backend.md). identity/repositories/UserAccountRepository e tenant/repositories/TenantRegistryRepository concentram SQL. identity/services/IdentityService valida estado da identidade; tenant/services/TenantAccessService valida participação; identity/services/SessionService coordena seleção e devolve DTOs (IdentityView, ClinicView, ClinicSelectionView, CsrfView). SessionController é final, com OpenAPI nos métodos; SessionErrorHandler traduz TenantAccessException em 403. Filtros e principal ficam em identity/security; a cadeia de segurança em config/SecurityConfiguration.
 
-Banco central: user_accounts com UUID permanente, e-mail normalizado único, hash bcrypt, estado ativo, verificação de e-mail e versão de autenticação. tenant_memberships referencia a identidade global com chave estrangeira. Papéis são por clínica: OWNER, MANAGER, RECEPTION, SALES, PROFESSIONAL (ADR-020, V6). Não são autoridades globais na sessão; o papel é relido a cada autorização, então uma mudança vale na requisição seguinte.
+Banco central: user_accounts com UUID permanente, e-mail normalizado único, hash bcrypt, estado ativo, verificação de e-mail e versão de autenticação. tenant_memberships referencia a identidade global com chave estrangeira. Papéis são por clínica: OWNER, MANAGER, ATTENDANT, VIEWER (ADR-025, V7; antes, os cinco da ADR-020 e V6). Não são autoridades globais na sessão; o papel é relido a cada autorização, então uma mudança vale na requisição seguinte.
 
 ## Protocolo HTTP
 

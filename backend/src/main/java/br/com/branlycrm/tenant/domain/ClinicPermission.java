@@ -1,33 +1,42 @@
 package br.com.branlycrm.tenant.domain;
 
-/** Actions of the permission matrix in docs/permissoes.md, one per row. */
+/** Actions of the permission matrix in docs/permissoes.md (ADR-025), one per row. */
 public enum ClinicPermission {
   CLINIC_SETTINGS_VIEW,
   CLINIC_SETTINGS_EDIT,
   SUBSCRIPTION_VIEW,
   TEAM_VIEW,
   TEAM_MANAGE,
-  PIPELINE_VIEW,
-  PIPELINE_EDIT,
-  CONTACT_CREATE,
+  /** Funnel, stages, loss reasons, procedures, professionals and quick replies. */
+  COMMERCIAL_SETTINGS_EDIT,
+  CHANNEL_VIEW,
   CONTACT_READ,
-  CONTACT_READ_BASIC,
-  CONTACT_EDIT,
+  /** Create, edit, tags and consent. */
+  CONTACT_WRITE,
   CONTACT_ARCHIVE,
-  OPPORTUNITY_CREATE,
-  OPPORTUNITY_ASSIGN_ON_CREATE,
-  OPPORTUNITY_READ,
-  OPPORTUNITY_UPDATE,
-  OPPORTUNITY_CLOSE,
-  OPPORTUNITY_REASSIGN,
-  ACTIVITY_WRITE,
-  TASK_CREATE_OWN,
-  TASK_ASSIGN,
+  CONTACT_IMPORT,
+  /** Kanban, list and timeline. */
+  LEAD_READ,
+  /** Create, move stage, temperature and notes. */
+  LEAD_WRITE,
+  /** Become the responsible: {@link AccessScope#OWN} means only for oneself. */
+  LEAD_TAKE,
+  LEAD_ASSIGN,
+  LEAD_ORIGIN_EDIT,
+  /** Register a sale or a loss. */
+  SALE_REGISTER,
+  SALE_CORRECT,
+  INBOX_READ,
+  /** Reply, take the conversation, send media and templates. */
+  INBOX_REPLY,
+  /** Create and assign tasks. */
+  TASK_WRITE,
   TASK_READ,
-  APPOINTMENT_MANAGE,
-  APPOINTMENT_READ,
-  APPOINTMENT_ATTENDANCE,
-  REPORTS_VIEW,
+  /** One's own notifications; ownership is enforced by the notifications module. */
+  NOTIFICATIONS_VIEW,
+  LEAD_LIST_VIEW,
   DATA_EXPORT,
+  RECEPTION_DASHBOARD_VIEW,
+  MONTHLY_REPORT_VIEW,
   AUDIT_VIEW
 }

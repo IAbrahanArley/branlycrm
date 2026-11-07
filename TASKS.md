@@ -142,7 +142,7 @@ O frontend acompanha cada API aprovada.
   - e-mail de ex-membros (CRM-073);
   - decidir antes da CRM-013 se a gestão de equipe fica toda no módulo `tenant` (hoje o controller está em `identity`).
 
-### [ ] CRM-017 — Migrar para os papéis do cliente (P0)
+### [x] CRM-017 — Migrar para os papéis do cliente (P0)
 **Depende de:** CRM-012.
 **Atende:** ADM-02 (ADR-025).
 **Entregas:**
@@ -157,6 +157,18 @@ O frontend acompanha cada API aprovada.
 - Matriz testada linha a linha.
 - `TeamManagementIT` e `TeamRuntimeGrantsIT` passam com o catálogo novo.
 - Nenhuma clínica ativa fica sem `OWNER`.
+**Estado (06/11/2026):** concluída na branch `feat/crm-017-client-roles`.
+- **Banco:** `V7__client_roles.sql` troca a constraint e converte os papéis antigos.
+- **Código:** `ClinicRole` com `OWNER`, `MANAGER`, `ATTENDANT` e `VIEWER`. `ClinicPermission` segue a matriz vigente de [permissoes.md](docs/permissoes.md). O `MANAGER` gerencia só `ATTENDANT` e `VIEWER`.
+- **Testes:** `./mvnw -B -ntp clean verify` → 102 unitários (2 ignorados no Windows) e 33 de integração passaram. Entre eles:
+  - `ClinicRoleTest`: matriz linha a linha;
+  - `ClientRolesMigrationIT`: V6 com papéis antigos → V7, nomes antigos recusados, trigger de último proprietário ativo;
+  - `TeamManagementIT`: Atendente e Somente leitura recebem 403 ao mudar papel ou desativar alguém, e nomes antigos recebem 400;
+  - `TeamRuntimeGrantsIT` e `ApiConventionsIT`.
+- **Revisão de `security`:** sem achados altos.
+  - Acesso: ex-`PROFESSIONAL` passa a ler a clínica toda como `VIEWER`. Não há dados reais em nenhum ambiente, então ninguém foi afetado. Registrado em permissoes.md.
+  - Deploy: aplicar a V7 antes da API nova e sem versões misturadas. Também registrado.
+  - Correções feitas: documentação desatualizada e teste HTTP de recusa.
 
 ### [ ] CRM-018 — Agências parceiras e carteira de clínicas (P0)
 **Depende de:** CRM-017, CRM-011.

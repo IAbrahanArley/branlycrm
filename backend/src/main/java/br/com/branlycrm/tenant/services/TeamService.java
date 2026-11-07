@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Team management of the selected clinic (ADR-020, docs/permissoes.md). Every mutation locks the
+ * Team management of the selected clinic (ADR-025, docs/permissoes.md). Every mutation locks the
  * clinic, re-reads the actor's role under lock and checks the last-owner invariant before writing;
  * the V6 trigger is the backstop. Changes take effect on the next request because roles and
  * memberships are revalidated on every request.

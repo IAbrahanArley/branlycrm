@@ -2,10 +2,10 @@
 
 Referência para o RBAC do servidor e para os testes de permissão de cada módulo.
 
-- **Catálogo alvo** (ADR-025, 06/11/2026): Gestor (`OWNER`, `MANAGER`), Atendente (`ATTENDANT`) e Somente leitura (`VIEWER`), mais os níveis de agência e plataforma (ADR-026). Entra no código em CRM-017.
-- **Catálogo vigente no código** (ADR-020, CRM-012): cinco papéis, descritos a partir de [Catálogo vigente](#catálogo-vigente-adr-020). Vale até a migração de CRM-017; as regras invariantes e as garantias continuam valendo depois dela.
+- **Catálogo vigente** (ADR-025, CRM-017, migração V7): Gestor (`OWNER`, `MANAGER`), Atendente (`ATTENDANT`) e Somente leitura (`VIEWER`), mais os níveis de agência e plataforma (ADR-026), que ainda não estão no código (CRM-018).
+- **Catálogo anterior** (ADR-020, CRM-012): os cinco papéis, mantidos abaixo só como histórico. As regras invariantes e as garantias continuam valendo.
 
-## Catálogo alvo (ADR-025)
+## Catálogo vigente (ADR-025)
 
 | Papel no banco | Nome na interface | Responsabilidade |
 |---|---|---|
@@ -52,7 +52,7 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Relatório mensal | ✓ | ✓ | — | ✓ |
 | Auditoria da clínica | ✓ | — | — | — |
 
-**Conversão na migração de CRM-017:**
+**Conversão feita pela V7 (CRM-017):**
 - `RECEPTION` e `SALES` → `ATTENDANT`;
 - `PROFESSIONAL` → `VIEWER`;
 - `OWNER` e `MANAGER` continuam.
@@ -75,7 +75,9 @@ Não são papéis de clínica e nunca aparecem em `tenant_memberships`.
 - **2FA:** obrigatório para Admin da agência, Super Admin e `OWNER`.
 - **Recusa:** clínica de outra agência e clínica inexistente recebem a mesma resposta.
 
-## Catálogo vigente (ADR-020)
+## Catálogo anterior (ADR-020, histórico)
+
+Substituído pela V7. Os nomes `RECEPTION`, `SALES` e `PROFESSIONAL` são recusados pelo banco e pela API.
 
 ### Papéis
 
@@ -129,13 +131,13 @@ Legenda:
 
 ## Regras invariantes
 
-A matriz acima é executável em `tenant/domain/ClinicRole` (uma linha por `ClinicPermission`) e testada linha a linha. Mudar uma exige mudar a outra.
+A matriz do catálogo vigente é executável em `tenant/domain/ClinicRole` (uma linha por `ClinicPermission`) e testada linha a linha. Mudar uma exige mudar a outra.
 
 - Toda clínica ACTIVE tem pelo menos um `OWNER` ativo. Não é possível remover, rebaixar ou desativar o último, nem ativar uma clínica sem proprietário. O serviço confere isso sob lock, e os triggers da V6 são a última barreira. Só conta como proprietário quem tem participação ativa e conta ativa e verificada, a mesma condição usada para autorizar acesso. Transferir a propriedade é feito promovendo outro membro antes de rebaixar o atual.
 - Desativar a conta do último proprietário (`user_accounts.active`) é operação da plataforma, fora deste fluxo, e ainda não é bloqueada.
 - O provisionador cria a participação do administrador da clínica como `OWNER`.
-- `MANAGER` não pode criar, promover, rebaixar ou desativar `OWNER` nem `MANAGER`. Ninguém altera o próprio papel.
-- "Próprios" (P) é sempre calculado no servidor, a partir do `subject_id` do principal autenticado. Um responsável indicado pelo cliente é validado contra participação ativa na clínica.
+- `MANAGER` não pode criar, promover, rebaixar ou desativar `OWNER` nem `MANAGER`; só gerencia `ATTENDANT` e `VIEWER`. Ninguém altera o próprio papel.
+- "Si" (`OWN`) é sempre calculado no servidor, a partir do `subject_id` do principal autenticado. Um responsável indicado pelo cliente é validado contra participação ativa na clínica.
 - Recusa por papel e recusa por recurso de outro usuário respondem igual a recurso inexistente quando o recurso é identificado por ID, sem revelar que ele existe.
 - Exceção na gestão de equipe: quem pode ver a equipe já vê os membros. Recusa sobre um membro visível (MANAGER sobre OWNER, alterar a si mesmo) responde 403. Alvo que não é membro ativo da clínica selecionada responde 404, inclusive membro inativo: reativar é feito por convite (CRM-013).
 - Endpoints de clínica usam sempre a clínica selecionada na sessão, nunca um identificador de clínica na URL. Sem seleção, a resposta é 409.
@@ -158,6 +160,13 @@ A matriz acima é executável em `tenant/domain/ClinicRole` (uma linha por `Clin
 | `GET /v1/clinic/team` | Membros da clínica selecionada (`TEAM_VIEW`) |
 | `PUT /v1/clinic/team/{subjectId}/role` | Muda o papel (`TEAM_MANAGE` + regras acima) |
 | `DELETE /v1/clinic/team/{subjectId}` | Desativa o membro sem apagar o histórico |
+
+## Migração do catálogo novo (V7)
+
+- **Conversão:** `RECEPTION` e `SALES` viram `ATTENDANT`; `PROFESSIONAL` vira `VIEWER`. `OWNER` e `MANAGER` não mudam, então os triggers de último proprietário não disparam.
+- **Mais leitura para ex-profissionais:** o `PROFESSIONAL` via só a própria agenda e os dados básicos desses contatos. Como `VIEWER`, passa a ler contatos, leads, conversas e o relatório da clínica toda quando esses módulos existirem. Em 06/11/2026 não havia nenhum ambiente com dados reais (o deploy é CRM-072), então nenhuma pessoa real ganhou acesso. Ambientes futuros já nascem no catálogo novo.
+- **Mais exportação para gerentes:** `MANAGER` ganha `DATA_EXPORT`, conforme o documento do cliente. Cada exportação será auditada (CRM-053, CRM-070).
+- **Ordem de deploy:** aplicar a V7 (`migrate`) antes de subir a API nova e não manter API antiga e nova ao mesmo tempo. Uma API que lê um papel que não conhece responde 500 `INTERNAL_ERROR` em toda autorização: a falha é fechada, mas derruba o acesso.
 
 ## Migração do catálogo (V6)
 

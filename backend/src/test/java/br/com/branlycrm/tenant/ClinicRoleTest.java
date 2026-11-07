@@ -17,86 +17,83 @@ import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * The permission matrix of docs/permissoes.md, transcribed by hand and compared row by row with
- * {@link ClinicRole}. The expected table is never derived from production code: a change to either
- * side must break this test until both agree.
+ * The permission matrix of docs/permissoes.md (ADR-025), transcribed by hand and compared row by
+ * row with {@link ClinicRole}. The expected table is never derived from production code: a change
+ * to either side must break this test until both agree.
  *
- * <p>Transcription conventions: "T", "Editar", "Ver" and "✓" are {@code ALL}; "P" and "Só o próprio
- * desempenho" are {@code OWN}; "—" is {@code NONE}. "Equipe: convidar, mudar papel, desativar" is
- * {@code ALL} for MANAGER because the restriction to operational members lives in TeamPolicy.
+ * <p>Transcription conventions: "✓" is {@code ALL}; "Si" is {@code OWN}; "—" is {@code NONE}.
+ * "Equipe: convidar, mudar papel, desativar" is {@code ALL} for MANAGER because the restriction to
+ * ATTENDANT and VIEWER lives in TeamPolicy.
  */
 class ClinicRoleTest {
-  /** Columns in the order of the document: OWNER, MANAGER, RECEPTION, SALES, PROFESSIONAL. */
+  /** Columns in the order of the document: OWNER, MANAGER, ATTENDANT, VIEWER. */
   private static final List<ClinicRole> COLUMNS =
-      List.of(
-          ClinicRole.OWNER,
-          ClinicRole.MANAGER,
-          ClinicRole.RECEPTION,
-          ClinicRole.SALES,
-          ClinicRole.PROFESSIONAL);
+      List.of(ClinicRole.OWNER, ClinicRole.MANAGER, ClinicRole.ATTENDANT, ClinicRole.VIEWER);
 
   private static final Map<ClinicPermission, List<AccessScope>> DOCUMENTED =
       new EnumMap<>(ClinicPermission.class);
 
   static {
-    // Dados da clínica, fuso, horários: Editar | Ver | Ver | Ver | Ver
-    documented(ClinicPermission.CLINIC_SETTINGS_VIEW, ALL, ALL, ALL, ALL, ALL);
-    documented(ClinicPermission.CLINIC_SETTINGS_EDIT, ALL, NONE, NONE, NONE, NONE);
-    // Plano e assinatura: Ver | — | — | — | —
-    documented(ClinicPermission.SUBSCRIPTION_VIEW, ALL, NONE, NONE, NONE, NONE);
-    // Equipe: ver membros: T | T | — | — | —
-    documented(ClinicPermission.TEAM_VIEW, ALL, ALL, NONE, NONE, NONE);
-    // Equipe: convidar, mudar papel, desativar: T | só operacionais (TeamPolicy) | — | — | —
-    documented(ClinicPermission.TEAM_MANAGE, ALL, ALL, NONE, NONE, NONE);
-    // Funis, etapas, procedimentos: Editar | Editar | Ver | Ver | —
-    documented(ClinicPermission.PIPELINE_VIEW, ALL, ALL, ALL, ALL, NONE);
-    documented(ClinicPermission.PIPELINE_EDIT, ALL, ALL, NONE, NONE, NONE);
-    // Contatos: criar: ✓ | ✓ | ✓ | ✓ (fica responsável) | —
-    documented(ClinicPermission.CONTACT_CREATE, ALL, ALL, ALL, ALL, NONE);
-    // Contatos: ver: T | T | T | P | —
-    documented(ClinicPermission.CONTACT_READ, ALL, ALL, ALL, OWN, NONE);
-    // Contatos: ver dados básicos: T | T | T | P | P
-    documented(ClinicPermission.CONTACT_READ_BASIC, ALL, ALL, ALL, OWN, OWN);
-    // Contatos: editar: T | T | T | P | —
-    documented(ClinicPermission.CONTACT_EDIT, ALL, ALL, ALL, OWN, NONE);
-    // Contatos: arquivar: T | T | T | — | —
-    documented(ClinicPermission.CONTACT_ARCHIVE, ALL, ALL, ALL, NONE, NONE);
-    // Oportunidades: criar: ✓ | ✓ | ✓ | ✓ | —
-    documented(ClinicPermission.OPPORTUNITY_CREATE, ALL, ALL, ALL, ALL, NONE);
-    // Oportunidades: escolher responsável ao criar: T | T | T | — | —
-    documented(ClinicPermission.OPPORTUNITY_ASSIGN_ON_CREATE, ALL, ALL, ALL, NONE, NONE);
-    // Oportunidades: ver: T | T | T | P | —
-    documented(ClinicPermission.OPPORTUNITY_READ, ALL, ALL, ALL, OWN, NONE);
-    // Oportunidades: mover etapa e editar valor: T | T | — | P | —
-    documented(ClinicPermission.OPPORTUNITY_UPDATE, ALL, ALL, NONE, OWN, NONE);
-    // Oportunidades: ganhar ou perder: T | T | — | P | —
-    documented(ClinicPermission.OPPORTUNITY_CLOSE, ALL, ALL, NONE, OWN, NONE);
-    // Oportunidades: reatribuir responsável: T | T | — | — | —
-    documented(ClinicPermission.OPPORTUNITY_REASSIGN, ALL, ALL, NONE, NONE, NONE);
-    // Atividades e notas: T | T | T | P | —
-    documented(ClinicPermission.ACTIVITY_WRITE, ALL, ALL, ALL, OWN, NONE);
-    // Tarefas: criar para si: ✓ | ✓ | ✓ | ✓ | ✓
-    documented(ClinicPermission.TASK_CREATE_OWN, ALL, ALL, ALL, ALL, ALL);
-    // Tarefas: atribuir a outros: ✓ | ✓ | ✓ | — | —
-    documented(ClinicPermission.TASK_ASSIGN, ALL, ALL, ALL, NONE, NONE);
-    // Tarefas: ver: T | T | P | P | P
-    documented(ClinicPermission.TASK_READ, ALL, ALL, OWN, OWN, OWN);
-    // Agenda: criar, confirmar, reagendar, cancelar: T | T | T | P | —
-    documented(ClinicPermission.APPOINTMENT_MANAGE, ALL, ALL, ALL, OWN, NONE);
-    // Agenda: ver: T | T | T | P | P
-    documented(ClinicPermission.APPOINTMENT_READ, ALL, ALL, ALL, OWN, OWN);
-    // Agenda: registrar comparecimento ou falta: T | T | T | — | P
-    documented(ClinicPermission.APPOINTMENT_ATTENDANCE, ALL, ALL, ALL, NONE, OWN);
-    // Dashboard e relatórios: T | T | — | só o próprio desempenho | —
-    documented(ClinicPermission.REPORTS_VIEW, ALL, ALL, NONE, OWN, NONE);
-    // Exportação de dados: ✓ | — | — | — | —
-    documented(ClinicPermission.DATA_EXPORT, ALL, NONE, NONE, NONE, NONE);
-    // Auditoria da clínica: Ver | — | — | — | —
-    documented(ClinicPermission.AUDIT_VIEW, ALL, NONE, NONE, NONE, NONE);
+    // Dados da clínica e fuso: editar: ✓ | — | — | —
+    documented(ClinicPermission.CLINIC_SETTINGS_EDIT, ALL, NONE, NONE, NONE);
+    // Dados da clínica e fuso: ver: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.CLINIC_SETTINGS_VIEW, ALL, ALL, ALL, ALL);
+    // Plano e assinatura: ✓ | — | — | —
+    documented(ClinicPermission.SUBSCRIPTION_VIEW, ALL, NONE, NONE, NONE);
+    // Equipe: ver: ✓ | ✓ | — | —
+    documented(ClinicPermission.TEAM_VIEW, ALL, ALL, NONE, NONE);
+    // Equipe: convidar, mudar papel, desativar: ✓ | só ATTENDANT e VIEWER (TeamPolicy) | — | —
+    documented(ClinicPermission.TEAM_MANAGE, ALL, ALL, NONE, NONE);
+    // Configuração comercial: ✓ | ✓ | — | —
+    documented(ClinicPermission.COMMERCIAL_SETTINGS_EDIT, ALL, ALL, NONE, NONE);
+    // Canal WhatsApp: ver estado: ✓ | ✓ | — | —
+    documented(ClinicPermission.CHANNEL_VIEW, ALL, ALL, NONE, NONE);
+    // Contatos: ver e buscar: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.CONTACT_READ, ALL, ALL, ALL, ALL);
+    // Contatos: criar, editar, tags, consentimento: ✓ | ✓ | ✓ | —
+    documented(ClinicPermission.CONTACT_WRITE, ALL, ALL, ALL, NONE);
+    // Contatos: arquivar: ✓ | ✓ | — | —
+    documented(ClinicPermission.CONTACT_ARCHIVE, ALL, ALL, NONE, NONE);
+    // Contatos: importar planilha: ✓ | ✓ | — | —
+    documented(ClinicPermission.CONTACT_IMPORT, ALL, ALL, NONE, NONE);
+    // Leads: ver, Kanban e linha do tempo: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.LEAD_READ, ALL, ALL, ALL, ALL);
+    // Leads: criar, mover etapa, temperatura, notas: ✓ | ✓ | ✓ | —
+    documented(ClinicPermission.LEAD_WRITE, ALL, ALL, ALL, NONE);
+    // Leads: assumir como responsável: ✓ | ✓ | Si | —
+    documented(ClinicPermission.LEAD_TAKE, ALL, ALL, OWN, NONE);
+    // Leads: atribuir ou reatribuir a outro: ✓ | ✓ | — | —
+    documented(ClinicPermission.LEAD_ASSIGN, ALL, ALL, NONE, NONE);
+    // Leads: corrigir origem manualmente: ✓ | ✓ | ✓ | —
+    documented(ClinicPermission.LEAD_ORIGIN_EDIT, ALL, ALL, ALL, NONE);
+    // Vendas e perdas: registrar: ✓ | ✓ | ✓ | —
+    documented(ClinicPermission.SALE_REGISTER, ALL, ALL, ALL, NONE);
+    // Vendas: corrigir ou cancelar registro: ✓ | ✓ | — | —
+    documented(ClinicPermission.SALE_CORRECT, ALL, ALL, NONE, NONE);
+    // Caixa de entrada: ler conversas: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.INBOX_READ, ALL, ALL, ALL, ALL);
+    // Caixa de entrada: responder, assumir, enviar mídia e template: ✓ | ✓ | ✓ | —
+    documented(ClinicPermission.INBOX_REPLY, ALL, ALL, ALL, NONE);
+    // Tarefas: criar e atribuir: ✓ | ✓ | ✓ | —
+    documented(ClinicPermission.TASK_WRITE, ALL, ALL, ALL, NONE);
+    // Tarefas: ver: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.TASK_READ, ALL, ALL, ALL, ALL);
+    // Notificações próprias: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.NOTIFICATIONS_VIEW, ALL, ALL, ALL, ALL);
+    // Lista de leads com filtros: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.LEAD_LIST_VIEW, ALL, ALL, ALL, ALL);
+    // Lista de leads: exportar: ✓ | ✓ | — | —
+    documented(ClinicPermission.DATA_EXPORT, ALL, ALL, NONE, NONE);
+    // Dashboard da recepção: ✓ | ✓ | ✓ | ✓
+    documented(ClinicPermission.RECEPTION_DASHBOARD_VIEW, ALL, ALL, ALL, ALL);
+    // Relatório mensal: ✓ | ✓ | — | ✓
+    documented(ClinicPermission.MONTHLY_REPORT_VIEW, ALL, ALL, NONE, ALL);
+    // Auditoria da clínica: ✓ | — | — | —
+    documented(ClinicPermission.AUDIT_VIEW, ALL, NONE, NONE, NONE);
   }
 
   private static void documented(ClinicPermission permission, AccessScope... byColumn) {
-    if (DOCUMENTED.put(permission, List.of(byColumn)) != null || byColumn.length != 5) {
+    if (DOCUMENTED.put(permission, List.of(byColumn)) != null || byColumn.length != 4) {
       throw new IllegalStateException("Malformed expected row " + permission);
     }
   }
@@ -144,18 +141,32 @@ class ClinicRoleTest {
 
   @Test
   void permissionsMapIsReadOnly() {
-    var permissions = ClinicRole.SALES.permissions();
+    var permissions = ClinicRole.VIEWER.permissions();
     assertThatThrownBy(() -> permissions.put(ClinicPermission.DATA_EXPORT, ALL))
         .isInstanceOf(UnsupportedOperationException.class);
-    assertThat(ClinicRole.SALES.scope(ClinicPermission.DATA_EXPORT)).isEqualTo(NONE);
+    assertThat(ClinicRole.VIEWER.scope(ClinicPermission.DATA_EXPORT)).isEqualTo(NONE);
   }
 
   @Test
-  void onlyReceptionSalesAndProfessionalAreOperational() {
+  void onlyAttendantAndViewerAreOperational() {
     EnumSet<ClinicRole> operational = EnumSet.noneOf(ClinicRole.class);
     for (ClinicRole role : ClinicRole.values()) if (role.operational()) operational.add(role);
-    assertThat(operational)
-        .containsExactlyInAnyOrder(ClinicRole.RECEPTION, ClinicRole.SALES, ClinicRole.PROFESSIONAL);
+    assertThat(operational).containsExactlyInAnyOrder(ClinicRole.ATTENDANT, ClinicRole.VIEWER);
+  }
+
+  @Test
+  void viewerNeverChangesAnything() {
+    for (ClinicPermission write :
+        List.of(
+            ClinicPermission.CONTACT_WRITE,
+            ClinicPermission.LEAD_WRITE,
+            ClinicPermission.LEAD_TAKE,
+            ClinicPermission.SALE_REGISTER,
+            ClinicPermission.INBOX_REPLY,
+            ClinicPermission.TASK_WRITE,
+            ClinicPermission.DATA_EXPORT)) {
+      assertThat(ClinicRole.VIEWER.scope(write)).as("VIEWER × %s", write).isEqualTo(NONE);
+    }
   }
 
   @Test
@@ -167,7 +178,6 @@ class ClinicRoleTest {
         List.of(
             ClinicPermission.CLINIC_SETTINGS_EDIT,
             ClinicPermission.SUBSCRIPTION_VIEW,
-            ClinicPermission.DATA_EXPORT,
             ClinicPermission.AUDIT_VIEW)) {
       for (ClinicRole role : ClinicRole.values()) {
         if (role != ClinicRole.OWNER) {

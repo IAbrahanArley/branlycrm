@@ -51,7 +51,7 @@ public final class TeamController {
       @Parameter(description = "Items per page, 1 to 100, default 25")
           @RequestParam(required = false)
           String pageSize,
-      @Parameter(description = "OWNER, MANAGER, RECEPTION, SALES or PROFESSIONAL")
+      @Parameter(description = "OWNER, MANAGER, ATTENDANT or VIEWER")
           @RequestParam(required = false)
           String role,
       @Parameter(description = "true or false; omitted lists both") @RequestParam(required = false)
