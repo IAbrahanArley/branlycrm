@@ -133,6 +133,10 @@ public class TenantProvisioningService {
   }
 
   private void activate(ProvisioningTask task) {
+    if (task.awaitsInvitedOwner()) {
+      activateForInvitedOwner(task);
+      return;
+    }
     transactions.executeWithoutResult(
         status -> {
           if (!registry.isEligibleAdmin(task.adminSubjectId())) {
@@ -144,6 +148,25 @@ public class TenantProvisioningService {
             throw new ProvisioningException("ADMIN_NOT_OWNER");
           }
           if (!registry.changeStatus(task.tenantId(), "PROVISIONING", "ACTIVE")) {
+            throw new ProvisioningException("TENANT_NOT_PROVISIONING");
+          }
+          if (!tasks.complete(task)) throw new ProvisioningException("LEASE_LOST");
+        });
+  }
+
+  /**
+   * No admin to add (ADR-028): the clinic waits for the owner invitation. If the owner accepted
+   * while the clinic was still provisioning, the membership already exists and the clinic becomes
+   * ACTIVE right away; otherwise it stays AWAITING_OWNER until the acceptance activates it.
+   */
+  private void activateForInvitedOwner(ProvisioningTask task) {
+    transactions.executeWithoutResult(
+        status -> {
+          if (!"PROVISIONING".equals(registry.lockStatus(task.tenantId()))) {
+            throw new ProvisioningException("TENANT_NOT_PROVISIONING");
+          }
+          String next = registry.hasActiveOwner(task.tenantId()) ? "ACTIVE" : "AWAITING_OWNER";
+          if (!registry.changeStatus(task.tenantId(), "PROVISIONING", next)) {
             throw new ProvisioningException("TENANT_NOT_PROVISIONING");
           }
           if (!tasks.complete(task)) throw new ProvisioningException("LEASE_LOST");

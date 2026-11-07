@@ -379,7 +379,7 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 
 ## ADR-026 — Agências parceiras sobre clínicas isoladas
 
-**Data:** 06/11/2026. **Status:** Aceita pelo usuário; desenho detalhado e implementação em CRM-018, com revisão de `architect` e `security`.
+**Data:** 06/11/2026. **Status:** Aceita pelo usuário; desenho detalhado na ADR-028 e implementação em CRM-018.
 
 **Contexto:** O produto é vendido de dois modos: direto a clínicas e por agências de marketing que revendem a uma carteira de clínicas.
 
@@ -436,4 +436,56 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - Novo processo na VM e nova superfície pública, que exige revisão de `security`.
 - Custo por template, inclusive nas notificações ao gestor.
 - A atribuição de origem é parcial e não pode ser prometida como completa.
+
+## ADR-028 — Convites, clínica aguardando o gestor e API com menos permissões
+
+**Data:** 07/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. Implementação em três PRs da CRM-018, com os convites da CRM-013. **Detalha:** ADR-026.
+
+**Contexto:** A agência cria a clínica antes de o gestor ter conta, e o banco exige um `OWNER` para ativar uma clínica (V6). A V4 dava à API `INSERT`, `UPDATE` e `DELETE` em `tenants` e `user_accounts`, sem uso, e criar clínicas pela API passaria a depender disso.
+
+**Decisão:**
+- **Clínica aguardando o gestor:**
+  - a tarefa de provisionamento pode não ter administrador; nesse caso, o provisionador deixa a clínica em `AWAITING_OWNER`;
+  - o gestor entra por convite e, ao aceitar, vira `OWNER` e a clínica é ativada;
+  - se ele aceitar enquanto a clínica ainda está em provisionamento, o provisionador a ativa direto;
+  - os dois lados travam a mesma linha da clínica.
+- **A agência não ganha participação** nas clínicas que cria. Ela só vê dados de pacientes se o gestor a convidar.
+- **Risco aceito:** a agência pode indicar um e-mail próprio como gestor. As travas:
+  - a agência só emite o convite enquanto a clínica não tem `OWNER`;
+  - há no máximo um convite pendente vindo da agência por clínica;
+  - depois do aceite, a agência não emite nenhum convite;
+  - o gestor vê toda a equipe.
+- **Admins de agência** são criados só pelo comando de plataforma, que roda sem HTTP e com credencial própria. O Admin da agência não convida outros admins nesta entrega.
+- **Convites:**
+  - token aleatório guardado só como hash, com validade e uso único;
+  - o token vai no fragmento da URL e no corpo da requisição, nunca no caminho;
+  - conta verificada exige login da própria conta para aceitar, e nunca tem a senha trocada;
+  - conta inativa é recusada.
+- **Permissões da API (V8):**
+  - cria clínicas só pelas colunas permitidas, sem `status`, então toda clínica nasce `PROVISIONING`; essa permissão entra com o serviço da agência (PR 3), não antes;
+  - não muda o status nem a agência de uma clínica, e a única ativação possível é `activate_awaiting_clinic` (`AWAITING_OWNER` → `ACTIVE`, ainda exigindo `OWNER`);
+  - não grava contas nem participações direto; essas permissões voltam coluna por coluna com o fluxo de convites;
+  - mantém `UPDATE` só em `tenants.updated_at`, porque travar linhas exige permissão de escrita em ao menos uma coluna.
+- **Transições de estado** permitidas, com agência imutável (trigger da V8):
+  - `PROVISIONING` → `AWAITING_OWNER`, `ACTIVE` ou `FAILED`;
+  - `FAILED` → `PROVISIONING`;
+  - `AWAITING_OWNER` → `ACTIVE` ou `SUSPENDED`;
+  - `ACTIVE` → `SUSPENDED`;
+  - `SUSPENDED` → `ACTIVE`. Nunca `SUSPENDED` → `AWAITING_OWNER`, que deixaria `activate_awaiting_clinic` tirar uma suspensão.
+- **Contrato do aceite (PR 2):**
+  - o aceite trava a linha da clínica (`FOR NO KEY UPDATE`) antes de inserir o `OWNER`, porque a FK da participação não conflita com a trava do provisionador;
+  - aceita só clínica `PROVISIONING` ou `AWAITING_OWNER`;
+  - cria a participação e confere a conta na mesma transação;
+  - chama `activate_awaiting_clinic` sempre que o status travado for `AWAITING_OWNER`;
+  - a autorização (quem convidou, de qual agência) é conferida no serviço, porque a função não sabe quem a chama.
+
+**Alternativas:**
+- A agência como dona provisória: daria acesso a dados de saúde sem decisão da clínica.
+- Ativar sem dono: quebra o invariante da V6.
+- Exigir aprovação da plataforma para cada convite de gestor: mais seguro, mas faz cada clínica nova depender da equipe Branly. Foi recusada pelo responsável.
+
+**Consequências:**
+- Admin da agência e `OWNER` existem sem segundo fator até a CRM-016, então não pode haver dados reais nem produção antes dela.
+- Ainda não há auditoria central dos convites e do comando de plataforma (CRM-070).
+- Ficam pendentes: retenção dos e-mails em convites, o que significa uma agência suspensa e como uma clínica sai de uma agência.
 

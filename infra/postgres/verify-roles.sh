@@ -31,6 +31,32 @@ BEGIN
    RAISE EXCEPTION 'Runtime can move memberships between clinics or subjects';
  END IF;
  IF NOT has_column_privilege(current_user,'tenant_memberships','role','UPDATE') THEN RAISE EXCEPTION 'Runtime cannot change roles'; END IF;
+ -- V8 (ADR-028): clinics only through allowed columns, no status or agency writes, no direct
+ -- account or membership writes, activation only through activate_awaiting_clinic.
+ IF has_column_privilege(current_user,'tenants','status','UPDATE') OR has_column_privilege(current_user,'tenants','status','INSERT') THEN
+   RAISE EXCEPTION 'Runtime can set clinic status';
+ END IF;
+ IF has_column_privilege(current_user,'tenants','agency_id','UPDATE') THEN RAISE EXCEPTION 'Runtime can move clinics between agencies'; END IF;
+ IF has_table_privilege(current_user,'tenants','DELETE') THEN RAISE EXCEPTION 'Runtime can delete clinics'; END IF;
+ IF has_table_privilege(current_user,'user_accounts','INSERT') OR has_table_privilege(current_user,'user_accounts','UPDATE') OR has_table_privilege(current_user,'user_accounts','DELETE') THEN
+   RAISE EXCEPTION 'Runtime can write accounts directly';
+ END IF;
+ IF has_table_privilege(current_user,'tenant_memberships','INSERT') THEN RAISE EXCEPTION 'Runtime can add memberships directly'; END IF;
+ IF EXISTS (SELECT 1 FROM information_schema.column_privileges
+            WHERE grantee = current_user AND table_name = 'tenants' AND privilege_type = 'UPDATE'
+              AND column_name <> 'updated_at') THEN
+   RAISE EXCEPTION 'Runtime can update clinic columns other than updated_at';
+ END IF;
+ IF EXISTS (SELECT 1 FROM information_schema.column_privileges
+            WHERE grantee = current_user AND table_name = 'tenants' AND privilege_type = 'INSERT') THEN
+   RAISE EXCEPTION 'Runtime can create clinics before the agency service exists';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'activate_awaiting_clinic' AND prosecdef
+                AND proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']) THEN
+   RAISE EXCEPTION 'activate_awaiting_clinic lost SECURITY DEFINER or its fixed search_path';
+ END IF;
+ IF NOT has_function_privilege(current_user,'activate_awaiting_clinic(uuid)','EXECUTE') THEN RAISE EXCEPTION 'Runtime cannot activate awaiting clinics'; END IF;
+ IF has_function_privilege('public','activate_awaiting_clinic(uuid)','EXECUTE') THEN RAISE EXCEPTION 'PUBLIC can activate clinics'; END IF;
 END $$;
 SELECT count(*) >= 0 AS application_tables_accessible FROM tenants;
 ROLLBACK;

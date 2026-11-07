@@ -35,7 +35,9 @@ Diferença em relação ao plano: não há papel `migrator_<id>` com login. As m
 3. **DATABASE:** cria o banco fora de transação. Recusa um banco existente com outro dono (`DATABASE_CONFLICT`). Remove os privilégios de PUBLIC e concede apenas CONNECT.
 4. **MIGRATION:** aplica `db/tenant-migration` como dono, com os placeholders `tenantId` e `runtimeRole`. A V2 grava `tenant_identity` e concede ao runtime somente `USAGE` no schema e `SELECT` na identidade. Depois, confere que todo objeto do schema pertence ao dono.
 5. **VERIFICATION:** faz login como runtime por TCP. Confere o usuário, o banco e a identidade, e que o runtime não tem escrita na identidade, acesso ao histórico do Flyway, CREATE, TEMP, atributos elevados nem participações. Confere também que o CONNECT é negado no banco central e em `postgres`.
-6. **ACTIVATION:** numa única transação do banco central, exige um administrador ativo e verificado, cria a participação ADMIN, passa a clínica de `PROVISIONING` para `ACTIVE` e conclui a tarefa.
+6. **ACTIVATION:** numa única transação do banco central.
+   - **Com administrador** (caminho do cadastro público, CRM-014): exige um administrador ativo e verificado, cria a participação `OWNER`, passa a clínica de `PROVISIONING` para `ACTIVE` e conclui a tarefa.
+   - **Sem administrador** (clínica criada por agência, ADR-028): trava a linha da clínica e não inventa dono. Se o gestor convidado já aceitou durante o provisionamento, a clínica vai para `ACTIVE`; senão, para `AWAITING_OWNER`, e o aceite do convite a ativa por `activate_awaiting_clinic`. O aceite trava a mesma linha antes de criar o `OWNER`, então nenhum dos dois lados deixa a clínica parada com dono.
 
 A tarefa é assumida com `FOR UPDATE SKIP LOCKED` e um prazo de posse (`lease`, 5 min). O número da tentativa funciona como token: um processo que perdeu a posse não grava progresso. Em caso de falha:
 - grava só um código estável em `last_error`; nenhum SQL, segredo ou stack trace vai para o banco ou para o log;
@@ -68,9 +70,12 @@ Ainda não foi criada, por decisão registrada na ADR-018: não há entidade de 
 
 ## Verificação
 
+`ControlRuntimeGrantsIT` roda como `crm_control_runtime` e prova as permissões da V8: a API não cria clínicas, não muda status nem agência, não grava contas nem participações, e só ativa clínica `AWAITING_OWNER` com dono. Também cobre as transições recusadas e a chave de idempotência por agência.
+
 `TenantIsolationIT` cria clínicas pelo provisionador real, com papéis sem superusuário, usando o worker como datasource da aplicação. Cobre:
 - **A/B:** runtime A recebe CONNECT negado (42501) em B, no banco central, em `postgres` e em `template1`, e vice-versa. Recusa CREATE TABLE, TEMP, ROLE e DATABASE, escrita em `tenant_identity`, leitura do histórico, `SET ROLE` e `GRANT` do dono.
 - **Privilégios:** migrações como dono; runtime sem participações; provisionador com SET sem INHERIT; provisionador sem acesso ao banco central; worker sem acesso a `password_hash`.
+- **Sem administrador:** a clínica termina em `AWAITING_OWNER` sem nenhuma participação, e só fica acessível depois do dono e da ativação; com o dono aceito durante o provisionamento, termina `ACTIVE`.
 - **Falha e retomada:** falha na ativação até `FAILED`, retomada administrativa e repetição completa de todas as etapas sem duplicar papéis, banco, participação, segredo, histórico ou identidade.
 - **Concorrência:** 4 workers simultâneos provisionam a clínica uma única vez.
 - **Falha fechada:** participação ausente, clínica suspensa, identidade divergente, senha divergente e segredo ausente.

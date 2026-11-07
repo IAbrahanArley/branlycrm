@@ -45,7 +45,8 @@ class SessionAuthenticationIT {
   void resetDisposableFixtures() {
     // Each class owns a disposable container; never clean the developer database.
     // Suspend first: the V6 trigger forbids removing the last owner of an ACTIVE clinic.
-    jdbc.update("UPDATE tenants SET status = 'SUSPENDED'");
+    // Only ACTIVE clinics need it; V8 refuses other transitions to SUSPENDED.
+    jdbc.update("UPDATE tenants SET status = 'SUSPENDED' WHERE status = 'ACTIVE'");
     jdbc.update("DELETE FROM tenant_provisioning_tasks");
     jdbc.update("DELETE FROM tenant_memberships");
     jdbc.update("DELETE FROM tenants");

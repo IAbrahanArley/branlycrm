@@ -42,6 +42,21 @@ public class ProvisioningRegistryRepository {
         .isEmpty();
   }
 
+  /**
+   * Locks the clinic row and returns its status. The invitation acceptance takes the same lock
+   * before adding the owner, so under READ COMMITTED each side sees what the other committed.
+   */
+  public String lockStatus(UUID tenantId) {
+    return jdbc.queryForObject(
+        "SELECT status FROM tenants WHERE tenant_id = ? FOR NO KEY UPDATE", String.class, tenantId);
+  }
+
+  /** Same owner condition as the V6 triggers and the access checks. */
+  public boolean hasActiveOwner(UUID tenantId) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject("SELECT clinic_has_active_owner(?, NULL)", Boolean.class, tenantId));
+  }
+
   public boolean changeStatus(UUID tenantId, String from, String to) {
     return jdbc.update(
             "UPDATE tenants SET status = ? WHERE tenant_id = ? AND status = ?", to, tenantId, from)

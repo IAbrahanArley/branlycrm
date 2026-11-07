@@ -170,7 +170,7 @@ O frontend acompanha cada API aprovada.
   - Deploy: aplicar a V7 antes da API nova e sem versões misturadas. Também registrado.
   - Correções feitas: documentação desatualizada e teste HTTP de recusa.
 
-### [ ] CRM-018 — Agências parceiras e carteira de clínicas (P0)
+### [-] CRM-018 — Agências parceiras e carteira de clínicas (P0)
 **Depende de:** CRM-017, CRM-011.
 **Atende:** perfil Admin da assessoria (seção 1.2 do documento do cliente), ADR-026.
 **Entregas:**
@@ -186,6 +186,18 @@ O frontend acompanha cada API aprovada.
 - **Dados de pacientes:** usuário só de agência não lê dados de nenhuma clínica.
 - **Concorrência:** a criação de clínica é idempotente sob repetição e concorrência.
 - **Revisões:** `architect` antes; `security` obrigatória.
+**Estado (07/11/2026):** em andamento. Desenho revisado pelo `architect` e registrado na ADR-028 (convites da CRM-013 entram junto; agência sem participação; admins de agência só pela plataforma). Dividida em três PRs:
+1. **Banco e provisionamento** (`feat/crm-018-agency-schema`): V8 com agências, `AWAITING_OWNER`, transições e permissões reduzidas da API; provisionador sem administrador. **Pronto para PR:**
+   - `./mvnw -B -ntp clean verify` → 102 unitários (2 ignorados no Windows) e 44 de integração. Entre eles, `ControlRuntimeGrantsIT`, que roda como a API, e os casos novos de `TenantIsolationIT`: clínica sem admin, dono aceito durante o provisionamento e aceite concorrente segurando a trava.
+   - **Compose:** V7 e V8 aplicadas sobre a V6, `verify-roles.sh` passou, a função de ativação pertence ao migrador e ativou uma clínica sintética como runtime, em transação desfeita.
+   - **Revisão de `security`:** sem achados altos. Corrigidos: transição `SUSPENDED` → `AWAITING_OWNER` removida, permissão de criar clínicas adiada para o PR 3, teste de concorrência real e checagens exatas de colunas no script.
+   - **Requisitos para o PR 2** (ADR-028, "Contrato do aceite"):
+     - o aceite trava a clínica antes de inserir o `OWNER`;
+     - o código BRL02 recebe um erro estável na API.
+2. **E-mail, convites e aceite**, inclusive convites de equipe.
+3. **Módulo `agency`** (carteira e criação de clínica) e comando de plataforma.
+
+**Bloqueio para dados reais:** Admin da agência e `OWNER` sem 2FA até a CRM-016.
 
 ### [ ] CRM-016 — Segundo fator (TOTP) para administradores (P0)
 **Depende de:** CRM-011, CRM-018.
