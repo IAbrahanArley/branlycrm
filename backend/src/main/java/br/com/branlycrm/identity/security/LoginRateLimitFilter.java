@@ -8,22 +8,23 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Process-local login throttling. Replace with a shared limiter before running replicas
- * (autenticacao.md).
+ * Process-local throttling of login and of the anonymous invitation endpoints, counted per path and
+ * client address. Replace with a shared limiter before running replicas (autenticacao.md).
  */
 public class LoginRateLimitFilter extends OncePerRequestFilter {
   static final int MAX_ATTEMPTS = 20;
   static final long WINDOW_MILLIS = 60_000;
   static final int MAX_TRACKED_ADDRESSES = 10_000;
 
-  private final String loginPath;
+  private final Set<String> paths;
   private final Map<String, Window> attempts = new HashMap<>();
 
-  public LoginRateLimitFilter(String loginPath) {
-    this.loginPath = loginPath;
+  public LoginRateLimitFilter(Set<String> paths) {
+    this.paths = Set.copyOf(paths);
   }
 
   private record Window(long startsAt, int count) {}
@@ -42,9 +43,10 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
+    String path = request.getServletPath();
     if ("POST".equals(request.getMethod())
-        && loginPath.equals(request.getServletPath())
-        && !allow(request.getRemoteAddr(), System.currentTimeMillis())) {
+        && paths.contains(path)
+        && !allow(path + " " + request.getRemoteAddr(), System.currentTimeMillis())) {
       response.setHeader("Retry-After", "60");
       ApiErrors.write(
           response, 429, ApiErrors.RATE_LIMITED, "Muitas tentativas. Aguarde um minuto.");

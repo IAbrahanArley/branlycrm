@@ -2,13 +2,14 @@ package br.com.branlycrm.identity.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 class LoginRateLimitFilterTest {
-  private final LoginRateLimitFilter filter = new LoginRateLimitFilter("/v1/auth/login");
+  private final LoginRateLimitFilter filter = new LoginRateLimitFilter(Set.of("/v1/auth/login"));
 
   @Test
   void blocksRepeatedAttemptsPerAddressAndExpiresTheWindow() {

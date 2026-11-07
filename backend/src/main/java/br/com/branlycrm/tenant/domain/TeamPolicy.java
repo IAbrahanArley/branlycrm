@@ -9,6 +9,20 @@ public final class TeamPolicy {
   private TeamPolicy() {}
 
   /**
+   * Who may invite someone with {@code role}, or rewrite and revoke a pending invitation for it:
+   * the same reach as changing a member to that role.
+   */
+  public static boolean mayInvite(ClinicRole actorRole, ClinicRole role) {
+    if (actorRole == null || role == null) return false;
+    if (actorRole.scope(ClinicPermission.TEAM_MANAGE) == AccessScope.NONE) return false;
+    return switch (actorRole) {
+      case OWNER -> true;
+      case MANAGER -> role.operational();
+      default -> false;
+    };
+  }
+
+  /**
    * @param newRole the role being assigned, or {@code null} when deactivating
    */
   public static boolean mayManage(ClinicAccess actor, TeamMember target, ClinicRole newRole) {

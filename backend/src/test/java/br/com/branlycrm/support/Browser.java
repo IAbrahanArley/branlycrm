@@ -75,6 +75,14 @@ public final class Browser {
             .PUT(HttpRequest.BodyPublishers.ofString(json)));
   }
 
+  public HttpResponse<String> postJson(String path, String json, boolean withCsrf)
+      throws Exception {
+    return send(
+        csrf(request(path), withCsrf)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(json)));
+  }
+
   public HttpResponse<String> delete(String path, boolean withCsrf) throws Exception {
     return send(csrf(request(path), withCsrf).DELETE());
   }

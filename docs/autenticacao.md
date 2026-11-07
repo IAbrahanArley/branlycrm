@@ -34,7 +34,23 @@ Senha errada, conta inexistente, conta inativa e conta não verificada respondem
 
 A cada requisição autenticada, o servidor consulta estado e auth_version. Desativar usuário, alterar senha/e-mail/verificação incrementa versão no banco e invalida a sessão no próximo acesso. Participação/estado da clínica também são revalidados quando houver seleção; revogação elimina a seleção e retorna 403. A identidade global pode continuar ativa para outras clínicas.
 
-Limitação inicial: 20 tentativas de login por endereço em janela de 60 segundos, com no máximo 10 mil endereços retidos; 429 ao exceder. É local ao processo e se reinicia com ele. Nginx substitui X-Forwarded-For pelo endereço real do cliente conectado. Antes de usar múltiplas réplicas, migrar limitação e sessões para armazenamento compartilhado e definir a política de proxies confiáveis.
+Limitação inicial: 20 tentativas por endereço em janela de 60 segundos, contadas separadamente para o login e para as rotas anônimas de convite (`/v1/invitations/preview` e `/accept`, que também calculam hash de senha), com no máximo 10 mil endereços retidos; 429 ao exceder. É local ao processo e se reinicia com ele. Nginx substitui X-Forwarded-For pelo endereço real do cliente conectado. Antes de usar múltiplas réplicas, migrar limitação e sessões para armazenamento compartilhado e definir a política de proxies confiáveis.
+
+## Convites (ADR-028)
+
+- **Token:** 32 bytes aleatórios em base64url, guardados só como SHA-256. O link é `APP_PUBLIC_ORIGIN/convite#token=...`; o fragmento nunca chega a servidores, e o frontend envia o token no corpo. Validade de 7 dias; reenviar gira o token e invalida o anterior.
+- **Aceite** (`POST /v1/invitations/accept`, anônimo ou com sessão, sempre com CSRF):
+  - e-mail sem conta: cria a conta já verificada, com nome e senha (12 caracteres a 72 bytes);
+  - conta verificada: exige estar logado com ela; a senha nunca é trocada;
+  - conta não verificada: o token prova o e-mail e redefine nome e senha; `auth_version` sobe e derruba sessões antigas;
+  - conta inativa: recusada, sem reativar;
+  - sessão de outra conta: `INVITATION_ACCOUNT_MISMATCH`.
+- **Sem login automático:** depois do aceite, a pessoa entra pelo login normal.
+- **Autoridade de quem emitiu:** é conferida de novo no aceite. Um gestor rebaixado perde os convites que emitiu; o convite de gestor de uma agência morre se a clínica já tem dono, se a agência foi suspensa ou se quem emitiu saiu dela.
+- **Onde cada convite vale:** o de equipe só em clínica `ACTIVE`; o de gestor da agência só em clínica `PROVISIONING` ou `AWAITING_OWNER` que nunca teve participação `OWNER`, e nunca para um admin ativo da própria agência.
+- **Contas não verificadas:** a API não tem `UPDATE` em `user_accounts`. A tomada pelo token passa pela função `claim_unverified_account` (V10), que só altera conta ativa e não verificada.
+- **Limites de envio:** 5 e-mails por convite, no mínimo 1 minuto entre eles e 100 por clínica a cada 24 horas (`INVITATION_SEND_LIMIT`).
+- **E-mail** (ADR-021): `MAIL_PROVIDER=local` grava arquivos e é recusado com origem HTTPS; `resend` usa a API HTTP com `RESEND_API_KEY`. O envio acontece depois do commit; falha deixa o convite pendente e a resposta traz `delivery: FAILED`.
 
 ## O que ainda falta
 

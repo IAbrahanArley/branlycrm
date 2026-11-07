@@ -110,30 +110,81 @@ class ControlRuntimeGrantsIT {
   }
 
   @Test
-  void runtimeCannotWriteAccountsNorAddMembershipsDirectly() {
+  void runtimeWritesAccountsAndMembershipsOnlyThroughTheInvitationColumns() {
+    // V9 (ADR-028): what the invitation acceptance needs, column by column, and nothing else.
     UUID tenant = clinic("ACTIVE", null);
     UUID subject = account();
     assertDenied(
         () ->
             runtime.update(
-                "INSERT INTO user_accounts (email, display_name, password_hash)"
-                    + " VALUES ('new@example.test', 'Synthetic', '{bcrypt}synthetic')"));
+                "INSERT INTO user_accounts (subject_id, email, display_name, password_hash)"
+                    + " VALUES (?, 'chosen-id@example.test', 'Synthetic', '{bcrypt}synthetic')",
+                UUID.randomUUID()));
     assertDenied(
         () ->
             runtime.update(
-                "UPDATE user_accounts SET email_verified = true WHERE subject_id = ?", subject));
+                "INSERT INTO user_accounts (email, display_name, password_hash, active)"
+                    + " VALUES ('inactive@example.test', 'Synthetic', '{bcrypt}synthetic', true)"));
     assertDenied(
         () ->
             runtime.update(
                 "UPDATE user_accounts SET active = false WHERE subject_id = ?", subject));
+    assertDenied(
+        () ->
+            runtime.update(
+                "UPDATE user_accounts SET email = 'other@example.test' WHERE subject_id = ?",
+                subject));
     assertDenied(() -> runtime.update("DELETE FROM user_accounts WHERE subject_id = ?", subject));
     assertDenied(
         () ->
             runtime.update(
-                "INSERT INTO tenant_memberships (tenant_id, subject_id, role)"
-                    + " VALUES (?, ?, 'OWNER')",
+                "INSERT INTO tenant_memberships (tenant_id, subject_id, role, active)"
+                    + " VALUES (?, ?, 'OWNER', true)",
                 tenant,
                 subject));
+    assertDenied(
+        () ->
+            runtime.update(
+                "UPDATE user_accounts SET password_hash = '{bcrypt}x' WHERE subject_id = ?",
+                subject));
+    assertDenied(
+        () ->
+            runtime.update(
+                "UPDATE user_accounts SET email_verified = false WHERE subject_id = ?", subject));
+    assertDenied(
+        () ->
+            runtime.update(
+                "INSERT INTO invitations (token_hash, email, kind, tenant_id, role, expires_at,"
+                    + " accepted_at) VALUES (decode(repeat('00', 32), 'hex'), 'x@example.test',"
+                    + " 'CLINIC', ?, 'VIEWER', now() + interval '1 day', now())",
+                tenant));
+    // V10: only an active, unverified account can be claimed, and only with a bcrypt hash.
+    assertThat(claim(subject, "{bcrypt}new")).as("verified account").isFalse();
+    UUID unverified =
+        superuser.queryForObject(
+            "INSERT INTO user_accounts (email, display_name, password_hash)"
+                + " VALUES ('unverified@example.test', 'Synthetic', '{bcrypt}old')"
+                + " RETURNING subject_id",
+            UUID.class);
+    assertThat(claim(unverified, "plain-text")).isFalse();
+    assertThat(claim(unverified, "{bcrypt}new")).isTrue();
+    assertThat(claim(unverified, "{bcrypt}again")).as("now verified").isFalse();
+    assertDenied(() -> runtime.update("DELETE FROM invitations"));
+    assertDenied(
+        () ->
+            runtime.update(
+                "UPDATE invitations SET email = 'other@example.test', tenant_id = ?", tenant));
+
+    UUID created =
+        runtime.queryForObject(
+            "INSERT INTO user_accounts (email, display_name, password_hash, email_verified)"
+                + " VALUES ('invited@example.test', 'Synthetic', '{bcrypt}synthetic', true)"
+                + " RETURNING subject_id",
+            UUID.class);
+    runtime.update(
+        "INSERT INTO tenant_memberships (tenant_id, subject_id, role) VALUES (?, ?, 'VIEWER')",
+        tenant,
+        created);
     assertThat(runtime.queryForObject("SELECT count(*) FROM agencies", Integer.class)).isNotNull();
   }
 
@@ -222,6 +273,12 @@ class ControlRuntimeGrantsIT {
         .rootCause()
         .extracting(cause -> ((SQLException) cause).getSQLState())
         .isEqualTo("23514");
+  }
+
+  private static boolean claim(UUID subject, String hash) {
+    return Boolean.TRUE.equals(
+        runtime.queryForObject(
+            "SELECT claim_unverified_account(?, 'Synthetic', ?)", Boolean.class, subject, hash));
   }
 
   private static boolean activate(UUID tenant) {

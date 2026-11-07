@@ -194,7 +194,25 @@ O frontend acompanha cada API aprovada.
    - **Requisitos para o PR 2** (ADR-028, "Contrato do aceite"):
      - o aceite trava a clínica antes de inserir o `OWNER`;
      - o código BRL02 recebe um erro estável na API.
-2. **E-mail, convites e aceite**, inclusive convites de equipe.
+2. **E-mail, convites e aceite**, inclusive convites de equipe (`feat/crm-018-invitations`). **Pronto para PR:**
+   - V9 com convites e grants por coluna;
+   - adaptador de e-mail local e Resend;
+   - módulo `onboarding` com aceite (travas clínica → convite → participação), convites de equipe e rotas públicas com CSRF e limite.
+   - **Testes:** `./mvnw -B -ntp clean verify` → 121 unitários (2 ignorados no Windows) e 57 de integração; `TeamInvitationIT` e `InvitationAcceptanceIT` rodam como a API.
+   - **Compose:** V9 e V10 aplicadas, `verify-roles.sh` passou, provisionador sobe sem os beans web e as rotas públicas respondem pelo Nginx.
+   - **Revisão de `security`:** sem achados altos. Corrigidos:
+     - convite de agência limitado a clínica sem dono e em provisionamento;
+     - API sem `UPDATE` em contas (V10);
+     - limites de envio;
+     - relógio atual no aceite;
+     - falha de ativação não confirma o aceite;
+     - erro de serialização vira `FAILED`;
+     - admin da agência não aceita o próprio convite;
+     - checagens exatas no script.
+   - **Pendente:**
+     - preview sem reconferir a autoridade (só quem tem o token vê o nome da clínica);
+     - janela sem trava na suspensão de agência;
+     - teste de `delivery: FAILED`.
 3. **Módulo `agency`** (carteira e criação de clínica) e comando de plataforma.
 
 **Bloqueio para dados reais:** Admin da agência e `OWNER` sem 2FA até a CRM-016.
@@ -220,7 +238,7 @@ O frontend acompanha cada API aprovada.
 - **Configurações da clínica:** nome e fuso.
 - **Telas:** login, aceite de convite, seleção de clínica, carteira da agência e acompanhamento do provisionamento.
 **Aceite:** clínica nova entra no sistema sem enxergar registros de outras; convite vencido, reutilizado ou de outra clínica é recusado; perfis têm acessos adequados.
-**Estado:** o provisionador assíncrono cria banco, papéis e segredo, verifica o isolamento e ativa a clínica com o `OWNER` (ADR-018). **Falta** o restante.
+**Estado:** o provisionador cria banco, papéis e segredo e ativa a clínica com o `OWNER` (ADR-018), ou a deixa `AWAITING_OWNER` (ADR-028). Convites, aceite e reativação de membros entram no PR 2 da CRM-018. **Falta:** nome e fuso da clínica e as telas.
 
 ### [ ] CRM-014 — Cadastro público de clínica direta (P2)
 **Depende de:** CRM-013, CRM-016.
