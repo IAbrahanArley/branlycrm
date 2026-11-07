@@ -33,6 +33,7 @@ Use `clean` depois de mover ou renomear pacotes: classes antigas em `target/` ge
   - dois proprietários se rebaixando ao mesmo tempo;
   - revogação na requisição seguinte.
 - `ApiConventionsIT`: corpo de erro padrão e códigos (401, credenciais inválidas com corpo único, CSRF, clínica, entrada inválida com `fields`, rota inexistente, método não permitido), ausência de SQL e de dados pessoais nos erros, paginação estável com total e filtros, limite de OFFSET e 429 do login.
+- `ControlRuntimeGrantsIT`: banco central como `crm_control_runtime` depois da V8. A API não cria clínicas, não muda status nem agência e não grava contas nem participações. `updated_at` só serve para travar. `activate_awaiting_clinic` só ativa `AWAITING_OWNER` com dono. Cobre também as transições recusadas e a chave de idempotência por agência.
 - `ClientRolesMigrationIT`: V7 aplicada sobre dados da V6: conversão dos papéis, `active` preservado, nomes antigos recusados pela constraint e trigger de último proprietário ainda ativo.
 - `PageQueryTest` e `TeamQueryTest`: limites e validação de paginação e filtros.
 - `TeamRuntimeGrantsIT`: as mesmas operações com o papel `crm_control_runtime` real, depois da redução de permissões da V6.

@@ -7,7 +7,7 @@ Implementado em 05/11/2026. ADR-016. Esta é a primeira parte da etapa 1 do onbo
 | Papel | Uso | Privilégios |
 |---|---|---|
 | POSTGRES_USER | Bootstrap administrativo local | Somente contêiner PostgreSQL e db-bootstrap; nunca API |
-| crm_control_runtime | Requisições da API | CONNECT, USAGE e SELECT/INSERT/UPDATE/DELETE nas tabelas centrais autorizadas; somente leitura do histórico Flyway |
+| crm_control_runtime | Requisições da API | CONNECT e USAGE. Leitura das tabelas centrais autorizadas. Desde a V8 (ADR-028): ainda não cria clínicas (entra com o serviço da agência, só por colunas sem `status`), sem `UPDATE` de status ou agência (só `updated_at`, para travas), sem escrita direta em contas e participações (salvo `UPDATE (role, active)` da V6) e ativa clínicas apenas por `activate_awaiting_clinic`. Somente leitura do histórico Flyway |
 | crm_control_migrator | Migrações centrais | Proprietário das tabelas e funções da aplicação, CREATE no schema; sem SUPERUSER/CREATEDB/CREATEROLE |
 | crm_tenant_provisioner | Provisionador (ADR-018) | CREATEDB/CREATEROLE sem superusuário; CONNECT só em `postgres` e nos bancos de clínica que cria, nunca no controle; credencial não entregue à API |
 | crm_provisioning_worker | Fila do provisionador no controle | Tarefas, status de tenants, inclusão do ADMIN e leitura do estado das contas, sem `password_hash`; credencial não entregue à API |
@@ -37,7 +37,7 @@ $verifyPath = Join-Path (Get-Location) 'infra/postgres/verify-roles.sh'
 docker compose run --rm --no-deps --volume "${verifyPath}:/verify.sh:ro" --entrypoint sh db-bootstrap /verify.sh
 ```
 
-A verificação confirma runtime sem privilégios elevados; recusa CREATE TABLE/CREATE ROLE; histórico Flyway sem UPDATE; provisionador sem CONNECT ao controle; leitura de tabela de aplicação permitida. Operações de teste são revertidas.
+A verificação confirma runtime sem privilégios elevados; desde a V8, também sem escrita de status, agência, contas e participações, `UPDATE` em `tenants` só em `updated_at` e a função `activate_awaiting_clinic` com `SECURITY DEFINER`, `search_path` fixo e sem EXECUTE para PUBLIC; recusa CREATE TABLE/CREATE ROLE; histórico Flyway sem UPDATE; provisionador sem CONNECT ao controle; leitura de tabela de aplicação permitida. Operações de teste são revertidas.
 
 Também foi validada instalação completa em banco vazio temporário (V1–V4), removido ao final, e repetido o teste HTTP de login/CSRF/seleção/revogação/logout com limpeza dos dados temporários.
 

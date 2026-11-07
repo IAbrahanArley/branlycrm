@@ -236,9 +236,15 @@ class TenantIsolationIT {
     assertThat(provisioning.runPending()).isOne();
     assertActive(clinic, admin);
 
-    // Replaying every step against existing objects must reuse them all.
-    superuser.update(
-        "UPDATE tenants SET status = 'PROVISIONING' WHERE tenant_id = ?", clinic.tenantId());
+    // Replaying every step against existing objects must reuse them all. ACTIVE to PROVISIONING
+    // is not a real transition (V8 refuses it), so the replay bypasses the lifecycle trigger.
+    superuser.execute("ALTER TABLE tenants DISABLE TRIGGER tenants_lifecycle_guard");
+    try {
+      superuser.update(
+          "UPDATE tenants SET status = 'PROVISIONING' WHERE tenant_id = ?", clinic.tenantId());
+    } finally {
+      superuser.execute("ALTER TABLE tenants ENABLE TRIGGER tenants_lifecycle_guard");
+    }
     superuser.update(
         "UPDATE tenant_provisioning_tasks SET status = 'PENDING', step = 'SECRET' WHERE tenant_id = ?",
         clinic.tenantId());
@@ -274,6 +280,94 @@ class TenantIsolationIT {
       assertThat(identity(connection))
           .containsExactly(clinic.databaseUser(), clinic.databaseName());
     }
+  }
+
+  @Test
+  void clinicWithoutAdminWaitsForItsInvitedOwner() throws Exception {
+    TenantDatabase clinic = enqueue(null, 5);
+    assertThat(provisioning.runPending()).isOne();
+    assertThat(status(clinic)).isEqualTo("AWAITING_OWNER");
+    assertThat(task(clinic)).containsEntry("status", "DONE").containsEntry("step", "DONE");
+    assertThat(memberships(clinic)).as("no owner is invented").isZero();
+    UUID owner = account(true);
+    assertThatThrownBy(() -> connections.open(clinic.tenantId(), owner))
+        .isInstanceOf(TenantAccessException.class);
+
+    // What the invitation acceptance will do: add the owner, then activate.
+    superuser.update(
+        "INSERT INTO tenant_memberships (tenant_id, subject_id, role) VALUES (?, ?, 'OWNER')",
+        clinic.tenantId(),
+        owner);
+    assertThat(
+            superuser.queryForObject(
+                "SELECT activate_awaiting_clinic(?)", Boolean.class, clinic.tenantId()))
+        .isTrue();
+    assertThat(status(clinic)).isEqualTo("ACTIVE");
+    try (Connection connection = connections.open(clinic.tenantId(), owner)) {
+      assertThat(identity(connection))
+          .containsExactly(clinic.databaseUser(), clinic.databaseName());
+    }
+  }
+
+  @Test
+  void ownerAcceptedDuringProvisioningActivatesTheClinicRightAway() {
+    TenantDatabase clinic = enqueue(null, 5);
+    UUID owner = account(true);
+    superuser.update(
+        "INSERT INTO tenant_memberships (tenant_id, subject_id, role) VALUES (?, ?, 'OWNER')",
+        clinic.tenantId(),
+        owner);
+    assertThat(provisioning.runPending()).isOne();
+    assertThat(status(clinic)).isEqualTo("ACTIVE");
+    assertThat(memberships(clinic)).isOne();
+  }
+
+  @Test
+  void acceptanceHoldingTheClinicLockMakesTheProvisionerActivateAfterItCommits() throws Exception {
+    TenantDatabase clinic = enqueue(null, 5);
+    UUID owner = account(true);
+    // What the PR 2 acceptance must do: lock the clinic first, then add the owner. The membership
+    // foreign key alone takes KEY SHARE, which would not make the provisioner wait.
+    try (Connection acceptance = TestPostgres.admin(POSTGRES, POSTGRES.getDatabaseName())) {
+      acceptance.setAutoCommit(false);
+      try (var lock =
+          acceptance.prepareStatement(
+              "SELECT status FROM tenants WHERE tenant_id = ? FOR NO KEY UPDATE")) {
+        lock.setObject(1, clinic.tenantId());
+        lock.executeQuery().close();
+      }
+      try (var insert =
+          acceptance.prepareStatement(
+              "INSERT INTO tenant_memberships (tenant_id, subject_id, role) VALUES (?, ?, 'OWNER')")) {
+        insert.setObject(1, clinic.tenantId());
+        insert.setObject(2, owner);
+        insert.executeUpdate();
+      }
+      try (var pool = Executors.newSingleThreadExecutor()) {
+        Future<Integer> worker = pool.submit(() -> provisioning.runPending());
+        awaitBlockedOnALock(worker);
+        acceptance.commit();
+        assertThat(worker.get()).isOne();
+      }
+    }
+    assertThat(status(clinic)).isEqualTo("ACTIVE");
+    assertThat(task(clinic)).containsEntry("status", "DONE");
+  }
+
+  /** Waits until the worker reaches the clinic lock: every earlier step runs first. */
+  private void awaitBlockedOnALock(Future<Integer> worker) throws InterruptedException {
+    long deadline = System.nanoTime() + Duration.ofMinutes(2).toNanos();
+    while (System.nanoTime() < deadline) {
+      assertThat(worker.isDone()).as("worker must wait for the acceptance lock").isFalse();
+      Integer waiting =
+          superuser.queryForObject(
+              "SELECT count(*) FROM pg_stat_activity WHERE usename = ? AND wait_event_type = 'Lock'",
+              Integer.class,
+              WORKER);
+      if (waiting != null && waiting > 0) return;
+      Thread.sleep(50);
+    }
+    throw new AssertionError("Provisioner never reached the clinic lock");
   }
 
   @Test
@@ -449,12 +543,20 @@ class TenantIsolationIT {
         database.databaseName(),
         database.databaseUser(),
         database.credentialReference());
-    superuser.update(
-        "INSERT INTO tenant_provisioning_tasks (tenant_id, admin_subject_id, max_attempts)"
-            + " VALUES (?, ?, ?)",
-        tenant,
-        admin,
-        maxAttempts);
+    if (admin == null) {
+      // The owner arrives later by invitation (ADR-028).
+      superuser.update(
+          "INSERT INTO tenant_provisioning_tasks (tenant_id, max_attempts) VALUES (?, ?)",
+          tenant,
+          maxAttempts);
+    } else {
+      superuser.update(
+          "INSERT INTO tenant_provisioning_tasks (tenant_id, admin_subject_id, max_attempts)"
+              + " VALUES (?, ?, ?)",
+          tenant,
+          admin,
+          maxAttempts);
+    }
     return database;
   }
 
