@@ -283,7 +283,7 @@ O frontend acompanha cada API aprovada.
 - **Configurações da clínica:** nome e fuso.
 - **Telas:** login, aceite de convite, seleção de clínica, carteira da agência e acompanhamento do provisionamento.
 **Aceite:** clínica nova entra no sistema sem enxergar registros de outras; convite vencido, reutilizado ou de outra clínica é recusado; perfis têm acessos adequados.
-**Estado:** o provisionador cria banco, papéis e segredo e ativa a clínica com o `OWNER` (ADR-018), ou a deixa `AWAITING_OWNER` (ADR-028). Convites, aceite e reativação de membros entram no PR 2 da CRM-018. **Falta:** nome e fuso da clínica e as telas.
+**Estado:** o provisionador cria banco, papéis e segredo e ativa a clínica com o `OWNER` (ADR-018), ou a deixa `AWAITING_OWNER` (ADR-028). Convites, aceite e reativação de membros entram no PR 2 da CRM-018. **Falta:** nome da clínica, a rota do fuso (o armazenamento entrou na CRM-015, `ClinicSettingsRepository`) e as telas.
 
 ### [ ] CRM-014 — Cadastro público de clínica direta (P2)
 **Depende de:** CRM-013, CRM-016.
@@ -295,10 +295,26 @@ O frontend acompanha cada API aprovada.
 - Não é possível tomar conta existente.
 **Observação:** necessário só para abrir venda direta em autosserviço. No piloto, clínicas diretas são criadas pela plataforma.
 
-### [ ] CRM-015 — Persistência JPA da clínica (P0)
+### [x] CRM-015 — Persistência JPA da clínica (P0)
 **Depende de:** CRM-012.
 **Entregas:** unidade de persistência da clínica sobre `TenantConnectionPools`, com tenant explícito (sem ThreadLocal), sem desligar a JPA central; remoção da regra ArchUnit que proíbe `@Entity` (ADR-018).
 **Aceite:** entidade de clínica só lê e grava no banco da clínica autorizada; teste A/B com a primeira entidade; nenhuma entidade no EntityManager central.
+**Estado (09/11/2026):** concluída na branch `feat/crm-015-tenant-jpa` (ADR-030). Desenho revisado pelo `architect` antes.
+- **Unidade:** `ClinicPersistence` com `SessionFactory` privado (não é bean), tenant por objeto `ClinicTenant` vindo de `ClinicAccess`, sem resolver, e conexões só por `TenantConnectionRepository.open`. Cada módulo registra as entidades com `ClinicEntityRegistration`.
+- **JPA central:** `PersistenceManagedTypes` vazio; metamodel central sem entidades.
+- **Primeira entidade:** `clinic_settings` (fuso IANA), migração de clínica V3 com `SELECT` e `UPDATE (time_zone)` para o runtime, e `ClinicSettingsRepository`. A rota fica para a CRM-013.
+- **Robustez:** transação aninhada falha na hora; `statement_timeout` e `lock_timeout` nas conexões de clínica; códigos estáveis (`CLINIC_DATA_*`); log SQL do Hibernate desligado; banco com identidade de outra clínica sai como incidente.
+- **ArchUnit:** `@Entity` só em `persistence`, sem cache de entidade, JPA só em `persistence`/`repositories`, módulos de controle sem acesso à unidade nem transitivamente, construtores de `ClinicTenant` e `ClinicAccess` restritos.
+- **Testes:** `./mvnw -B -ntp clean verify` → 170 unitários (2 ignorados no Windows) e 99 de integração. Entre eles:
+  - `ClinicPersistenceIT`: A/B de leitura e escrita, sujeito de A recusado em B sem abrir pool, participação desativada, rollback, grants do runtime, schema desatualizado, dado inválido, identidade divergente, aninhamento, `lock_timeout`, metamodel central vazio e mapeamento validado como runtime;
+  - `ClinicPersistenceTest`: tradução de exceções, provedor sem tenant e sessão sem tenant recusada;
+  - `ClinicSettingsTest` e `ArchitectureTest`.
+  - `TenantIsolationIT` passou a contar as migrações de clínica pelo classpath.
+- **Revisões:** `security` sem críticos nem altos. Corrigidos os médios (aninhamento, timeout de lock e fronteira de módulos no ArchUnit) e os baixos de construtores, log SQL, identidade, CHECK do fuso, cache e rollback em `Error`. `reviewer` sem bloqueantes; sugestões aplicadas.
+- **Pendências:**
+  - **comando para aplicar migrações de clínica novas a clínicas já existentes** (hoje só o provisionamento aplica); até lá, clínica antiga responde `CLINIC_DATA_SCHEMA_OUTDATED`, inclusive no Docker local;
+  - motivo de conflito de integridade junto da CRM-020;
+  - `MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes` falhou uma vez numa execução completa (todas as respostas 429) e passou nas seguintes: instabilidade anterior a esta tarefa.
 
 ## Fase 2 — Contatos e histórico
 

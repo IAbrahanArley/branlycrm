@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -270,10 +271,11 @@ class TenantIsolationIT {
             connection
                 .createStatement()
                 .executeQuery(
-                    "SELECT (SELECT count(*) FROM flyway_schema_history WHERE success),"
+                    "SELECT (SELECT count(*) FROM flyway_schema_history"
+                        + " WHERE success AND type = 'SQL' AND version IS NOT NULL),"
                         + " (SELECT count(*) FROM tenant_identity)")) {
       rows.next();
-      assertThat(rows.getInt(1)).isEqualTo(2);
+      assertThat(rows.getInt(1)).isEqualTo(tenantMigrations());
       assertThat(rows.getInt(2)).isOne();
     }
     try (Connection connection = connections.open(clinic.tenantId(), admin)) {
@@ -621,6 +623,13 @@ class TenantIsolationIT {
       rows.next();
       return List.of(rows.getString(1), rows.getString(2));
     }
+  }
+
+  /** Every tenant migration applied exactly once, whatever their number. */
+  private static int tenantMigrations() throws IOException {
+    return new PathMatchingResourcePatternResolver()
+        .getResources("classpath:db/tenant-migration/V*.sql")
+        .length;
   }
 
   private static FileTenantSecretReader reader() {

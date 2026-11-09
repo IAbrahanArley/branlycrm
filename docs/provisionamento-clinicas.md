@@ -83,7 +83,11 @@ docker compose --profile tools run --rm platform invite-agency-admin --agency-id
 
 ## Persistência JPA de clínica
 
-Ainda não foi criada, por decisão registrada na ADR-018: não há entidade de clínica para validar. Ela virá com a primeira entidade de negócio, sobre `TenantConnectionPools` e com o tenant passado explicitamente, sem ThreadLocal. Até lá, o ArchUnit proíbe `@Entity`, para que nenhuma entidade caia no EntityManager central.
+Criada na CRM-015 (ADR-030), com `clinic_settings` como primeira entidade.
+- `ClinicPersistence` guarda um `SessionFactory` privado; as conexões vêm de `TenantConnectionRepository.open`, sobre `TenantConnectionPools`, com o tenant passado explicitamente, sem ThreadLocal.
+- A JPA central declara `PersistenceManagedTypes` vazio, então nenhuma entidade cai no EntityManager central.
+- O ArchUnit exige `@Entity` só em pacotes `persistence`, JPA e Hibernate só em `persistence` e `repositories`, e os pacotes `persistence` usados só por repositórios.
+- `ClinicPersistenceIT` prova: A/B de leitura e escrita; recusa antes de abrir pool; participação desativada; rollback; grants do runtime; tabela ausente com código estável; sessão sem tenant recusada; metamodel central vazio; mapeamento validado contra a clínica provisionada.
 
 ## Verificação
 

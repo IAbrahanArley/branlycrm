@@ -14,15 +14,16 @@ TenantAccessService verifica clínica ACTIVE e participação ativa do sujeito a
 
 Esta etapa não adiciona endpoints públicos, seleção por header ou login. A integração dos serviços com o sujeito autenticado será feita no módulo de identidade. Conexão por operação é provisória; pools com limite global, expiração e fechamento precisam ser implementados antes de escalar.
 
-JPA permanece associado ao banco central e ainda não tem entidades de negócio. Não criar repositories de contatos/agenda nesse EntityManager. O próximo desenho de persistência deve separar explicitamente JPA central e JPA tenant, utilizando provider multitenant ou unidades de persistência próprias.
+A JPA central não gerencia nenhuma entidade (`ControlJpaConfiguration`). Entidades de clínica usam a unidade própria `ClinicPersistence` (ADR-030): sessão aberta com tenant explícito, conexões só por `TenantConnectionRepository.open` e uma transação por chamada, dentro do repositório. Cada módulo registra as próprias entidades com um bean `ClinicEntityRegistration`.
 
 ## Migrações e integridade
 
 - db/migration: migrações do banco central, executadas pelo Flyway da aplicação.
-- db/tenant-migration: migrações de clínicas; NÃO são executadas no banco central nem automaticamente em cada banco nesta etapa.
+- db/tenant-migration: migrações de clínicas, aplicadas pelo provisionador como dono; NÃO são executadas no banco central. Ainda não há comando que aplique migrações novas a clínicas já existentes: até ele existir, tabela ausente falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
 - V2 central garante UUID, nomes vinculados, unicidade, campos obrigatórios, estados válidos, participação sem duplicação e imutabilidade do vínculo banco/tenant.
 - V1 tenant cria vector e tenant_identity com no máximo uma linha. Provisionamento insere a identidade antes de ativar e concede somente SELECT dessa tabela ao papel runtime.
-- Sem tabelas de domínio modeladas ainda: unicidade de telefone normalizado, valores válidos, relacionamentos e conflitos de agenda serão definidos nas migrações correspondentes.
+- V3 tenant cria `clinic_settings` (fuso, linha única), com `SELECT` e `UPDATE (time_zone)` para o runtime.
+- Ainda sem tabelas de negócio: unicidade de telefone normalizado, valores válidos, relacionamentos e conflitos de agenda serão definidos nas migrações correspondentes.
 
 ## Requisitos do provisionador
 

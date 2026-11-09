@@ -20,6 +20,9 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class TenantConnectionRepository {
+  /** SQLState of a clinic database that declares another tenant: an incident, not an outage. */
+  public static final String IDENTITY_MISMATCH = "BRL90";
+
   private final TenantRegistryRepository registry;
   private final TenantSecretReader secrets;
   private final TenantConnectionPools pools;
@@ -70,7 +73,7 @@ public class TenantConnectionRepository {
       statement.setQueryTimeout(5);
       try (var rows = statement.executeQuery()) {
         if (!rows.next() || !tenantId.equals(rows.getObject(1, UUID.class)) || rows.next()) {
-          throw new SQLException("Tenant database identity mismatch");
+          throw new SQLException("Tenant database identity mismatch", IDENTITY_MISMATCH);
         }
       }
     }
