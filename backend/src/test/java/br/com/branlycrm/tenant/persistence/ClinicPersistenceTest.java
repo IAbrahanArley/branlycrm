@@ -35,6 +35,13 @@ class ClinicPersistenceTest {
     assertThat(reason(TenantConnectionRepository.IDENTITY_MISMATCH))
         .isEqualTo(ClinicDataException.Reason.IDENTITY_MISMATCH);
     assertThat(reason("55P03")).isEqualTo(ClinicDataException.Reason.UNAVAILABLE);
+    assertThat(reason("23505")).isEqualTo(ClinicDataException.Reason.CONFLICT);
+    assertThat(
+            ((ClinicDataException)
+                    ClinicPersistence.translate(
+                        new jakarta.persistence.OptimisticLockException("stale")))
+                .reason())
+        .isEqualTo(ClinicDataException.Reason.STALE);
     assertThat(reason(null)).isEqualTo(ClinicDataException.Reason.UNAVAILABLE);
     var translated =
         ClinicPersistence.translate(

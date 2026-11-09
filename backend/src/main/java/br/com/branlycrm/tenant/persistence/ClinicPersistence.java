@@ -4,6 +4,7 @@ import br.com.branlycrm.tenant.exceptions.ClinicDataException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.repositories.TenantConnectionRepository;
 import br.com.branlycrm.tenant.secrets.TenantSecretException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Set;
 import java.util.function.Function;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.StaleStateException;
 import org.hibernate.Transaction;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -46,6 +48,7 @@ public class ClinicPersistence implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(ClinicPersistence.class);
   private static final String UNDEFINED_TABLE = "42P01";
   private static final String UNDEFINED_COLUMN = "42703";
+  private static final String UNIQUE_VIOLATION = "23505";
 
   /**
    * Only a nesting flag per thread; it never carries a tenant, which is always passed explicitly.
@@ -194,6 +197,10 @@ public class ClinicPersistence implements AutoCloseable {
     String state = sqlState(error);
     if (error.reason() == ClinicDataException.Reason.IDENTITY_MISMATCH) {
       LOG.error("SECURITY clinic database identity mismatch tenant={}", tenant.tenantId());
+    } else if (error.reason() == ClinicDataException.Reason.CONFLICT
+        || error.reason() == ClinicDataException.Reason.STALE) {
+      // Expected business outcomes (duplicate, concurrent edit): no alarm.
+      LOG.debug("Clinic data {} tenant={}", error.getMessage(), tenant.tenantId());
     } else {
       LOG.warn(
           "Clinic data failure code={} sqlState={} tenant={}",
@@ -219,6 +226,14 @@ public class ClinicPersistence implements AutoCloseable {
     }
     if (UNDEFINED_TABLE.equals(state) || UNDEFINED_COLUMN.equals(state)) {
       return new ClinicDataException(ClinicDataException.Reason.SCHEMA_OUTDATED, error);
+    }
+    // The caller knows which write it made; the constraint name is never read (its text depends
+    // on the server's message language).
+    if (UNIQUE_VIOLATION.equals(state)) {
+      return new ClinicDataException(ClinicDataException.Reason.CONFLICT, error);
+    }
+    if (error instanceof OptimisticLockException || error instanceof StaleStateException) {
+      return new ClinicDataException(ClinicDataException.Reason.STALE, error);
     }
     return new ClinicDataException(ClinicDataException.Reason.UNAVAILABLE, error);
   }
