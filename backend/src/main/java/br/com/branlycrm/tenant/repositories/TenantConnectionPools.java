@@ -173,6 +173,9 @@ public class TenantConnectionPools implements AutoCloseable {
     config.setInitializationFailTimeout(-1);
     config.addDataSourceProperty("connectTimeout", "5");
     config.addDataSourceProperty("logServerErrorDetail", "false");
+    // Bounds every statement and lock wait, so one slow or blocked transaction cannot hold one of
+    // the few connections of a clinic indefinitely (query timeouts alone miss flushes and locks).
+    config.addDataSourceProperty("options", "-c statement_timeout=10000 -c lock_timeout=3000");
     return new HikariDataSource(config);
   }
 

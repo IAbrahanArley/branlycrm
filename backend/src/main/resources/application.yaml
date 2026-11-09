@@ -47,3 +47,9 @@ app:
   mfa:
     # Base64 of 32 random bytes (openssl rand -base64 32). Required by the API; never logged.
     encryption-key: ${MFA_ENCRYPTION_KEY:}
+logging:
+  level:
+    # Hibernate logs the PostgreSQL message of every JDBC failure, which may contain SQL text or
+    # values. Clinic persistence logs only stable codes and SQLStates instead (ADR-030).
+    org.hibernate.orm.jdbc.error: "OFF"
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"

@@ -38,7 +38,7 @@ Login e logout continuam nos filtros nativos do Spring Security (ADR-015) e são
 
 ## Persistência e segurança
 
-Identidade e registro de tenants usam JDBC em repositórios, porque as consultas de autorização precisam ser explícitas. JPA permanece configurado com `ddl-auto: validate` e `open-in-view: false`, sem entidades de negócio no banco central. Flyway é a fonte do schema; não alterar migrações já aplicadas.
+Identidade e registro de tenants usam JDBC em repositórios, porque as consultas de autorização precisam ser explícitas. A JPA central continua com `ddl-auto: validate` e `open-in-view: false` e não gerencia entidades. Dados de clínica usam `ClinicPersistence` (ADR-030): entidades no pacote `persistence` do módulo, registradas por `ClinicEntityRegistration`; repositórios chamam `inTransaction(ClinicTenant.of(access), ...)` e devolvem records de domínio, nunca entidades. Não aninhar `inTransaction`. Flyway é a fonte do schema; não alterar migrações já aplicadas.
 
 O sujeito vem do principal autenticado; o tenant enviado pelo cliente é somente seletor e é revalidado em cada requisição. `TenantConnectionRepository.open(tenant, sujeito)` verifica participação ativa antes de ler o segredo e confere `tenant_identity` depois de conectar, sem fallback.
 

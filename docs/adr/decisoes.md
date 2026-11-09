@@ -242,7 +242,7 @@ Data de todos os registros: 04/11/2026.
 
 **Alternativas:** Papel `migrator_<id>` com login (segunda senha por clínica sem ganho de isolamento); superusuário no provisionador; executar o provisionamento no processo HTTP; um pool sem limite por clínica.
 
-**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Até lá, o ArchUnit proíbe `@Entity`. O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.
+**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Entregue na CRM-015 (ADR-030). O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.
 
 ## ADR-019 — Planejamento do produto e escopo do MVP
 
@@ -541,3 +541,33 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - O reset pela plataforma grava um aviso pendente, enviado pela API no próximo login (V14); quem não entra de novo não recebe.
 - Bloqueio progressivo por conta, de 15 minutos até 24 horas, com aviso por e-mail. As tentativas são reservadas antes da comparação.
 - Ainda não há auditoria central (CRM-070).
+
+## ADR-030 — Persistência JPA da clínica
+
+**Data:** 09/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. Implementação em CRM-015. **Complementa:** ADR-014 e ADR-018.
+
+**Decisão:**
+- **Unidade própria:** `ClinicPersistence` monta um `SessionFactory` do Hibernate por bootstrap nativo e o guarda como campo privado. Ele nunca vira bean: um bean desse tipo é um `EntityManagerFactory` e desligaria a JPA central do Spring Boot.
+- **Tenant explícito:** cada sessão é aberta com `withOptions().tenantIdentifier(ClinicTenant)`, montado só a partir de `ClinicAccess`. Não há `CurrentTenantIdentifierResolver` nem ThreadLocal; sessão sem tenant é recusada pelo Hibernate.
+- **Conexões:** o `MultiTenantConnectionProvider` só chama `TenantConnectionRepository.open(tenant, sujeito)`. Participação ativa, clínica `ACTIVE`, segredo e `tenant_identity` são conferidos a cada transação. `getAnyConnection` falha, e o boot não lê metadados JDBC (dialeto e versão fixos).
+- **Transação no repositório:** `inTransaction(tenant, callback)` faz uma transação por chamada, com rollback em qualquer exceção. O callback devolve records de domínio. Services continuam sem JPA.
+- **Registro de entidades por módulo:** cada módulo mantém as entidades no próprio pacote `persistence` e declara um bean `ClinicEntityRegistration` com a lista explícita, sem varredura e sem ciclo entre módulos.
+- **JPA central vazia:** `ControlJpaConfiguration` declara `PersistenceManagedTypes` vazio, substituindo a varredura de pacotes do Spring Boot.
+- **Sem caches compartilhados:** cache de segundo nível, cache de consultas e estatísticas ficam desligados.
+- **Erros:** recusas de acesso continuam `TenantAccessException`; falhas de banco viram `ClinicDataException` com código estável (`SCHEMA_OUTDATED`, `INVALID_DATA`, `IDENTITY_MISMATCH`, `UNAVAILABLE`). O log do Hibernate com a mensagem do PostgreSQL fica desligado; a unidade registra só código, SQLState e clínica, e o banco que declara outra clínica sai como incidente de segurança.
+- **Limites:** `inTransaction` aninhado falha na hora (uma flag por thread, sem tenant). As conexões de clínica usam `statement_timeout` de 10 s e `lock_timeout` de 3 s, para que uma transação travada não segure uma das poucas conexões do pool.
+- **ArchUnit:** `@Entity` só em pacotes `persistence`, sem `@Cache`/`@Cacheable`; JPA e Hibernate só em `persistence` e `repositories`; identity, provisioning, platform, config, agency e onboarding não alcançam a unidade nem transitivamente; `ClinicTenant` só por `of(ClinicAccess)` e `ClinicAccess` só pelo registro e pelo `TeamService`.
+- **Primeira entidade:** `clinic_settings` (fuso IANA, linha única), migração de clínica V3, com `SELECT` e `UPDATE (time_zone)` para o runtime.
+
+**Alternativas:**
+- Segundo `EntityManagerFactory` gerenciado pelo Spring (desliga a autoconfiguração central).
+- Resolver de tenant por ThreadLocal (vazamento entre requisições e workers).
+- JDBC puro também no banco da clínica (perde o mapeamento sem ganho de isolamento).
+
+**Consequências:**
+- Banco central e banco da clínica não compartilham transação; nenhum caso de uso pode depender de commit conjunto.
+- `inTransaction` não pode ser aninhado: o pool de cada clínica tem poucas conexões.
+- Conflitos de integridade (único, check) ainda saem como `UNAVAILABLE`; o motivo próprio entra com a primeira tabela que precisar dele (CRM-020).
+- O callback recebe a `Session` inteira: comandos de sessão (`SET`, `doWork`) persistem na conexão do pool da mesma clínica. A revisão de código barra esse uso.
+- O schema da clínica não é validado no boot, porque não há tenant; o `ClinicPersistenceIT` valida as entidades contra uma clínica provisionada, como runtime.
+- Migrações novas de clínica só chegam a clínicas já existentes quando houver o comando de rollout (pendência). Até lá, tabela ausente falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.

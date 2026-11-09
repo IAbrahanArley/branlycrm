@@ -1,11 +1,17 @@
 package br.com.branlycrm.architecture;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import br.com.branlycrm.tenant.domain.ClinicAccess;
+import br.com.branlycrm.tenant.domain.ClinicRole;
+import br.com.branlycrm.tenant.domain.TenantDatabase;
+import br.com.branlycrm.tenant.persistence.ClinicTenant;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class ArchitectureTest {
@@ -30,7 +36,7 @@ class ArchitectureTest {
   void repositoriesDoNotDependOnServicesOrHttp() {
     noClasses()
         .that()
-        .resideInAPackage("..repositories..")
+        .resideInAnyPackage("..repositories..", "..persistence..")
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage(
@@ -88,12 +94,101 @@ class ArchitectureTest {
   }
 
   /**
-   * ADR-018: the only EntityManager today is the central one, so any entity would land in the
-   * control database. Clinic entities wait for the tenant persistence unit.
+   * ADR-030: entities exist only in a module's persistence package, registered explicitly in the
+   * clinic persistence unit. The central EntityManager manages none.
    */
   @Test
-  void noJpaEntitiesUntilTenantPersistenceExists() {
-    noClasses().should().beAnnotatedWith("jakarta.persistence.Entity").check(CODE);
+  void entitiesLiveOnlyInPersistencePackages() {
+    classes()
+        .that()
+        .areAnnotatedWith("jakarta.persistence.Entity")
+        .should()
+        .resideInAPackage("..persistence..")
+        .check(CODE);
+  }
+
+  /** JPA and Hibernate stay in persistence packages and the repositories that use them. */
+  @Test
+  void jpaStaysInPersistenceAndRepositories() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackages("..persistence..", "..repositories..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("jakarta.persistence..", "org.hibernate..")
+        .check(CODE);
+  }
+
+  /**
+   * Clinic entities and the clinic persistence unit are reached only through repositories, so a
+   * service or controller never holds a managed entity nor opens a clinic session.
+   */
+  @Test
+  void persistencePackagesAreUsedOnlyByRepositories() {
+    classes()
+        .that()
+        .resideInAPackage("..persistence..")
+        .should()
+        .onlyHaveDependentClassesThat()
+        .resideInAnyPackage("..persistence..", "..repositories..")
+        .check(CODE);
+  }
+
+  /**
+   * Only business modules that own clinic data reach the clinic persistence unit, even through
+   * another module's repository. Identity, provisioning and the platform command never do.
+   */
+  @Test
+  void controlModulesNeverReachClinicPersistence() {
+    noClasses()
+        .that()
+        .resideInAnyPackage(
+            "br.com.branlycrm.identity..",
+            "br.com.branlycrm.provisioning..",
+            "br.com.branlycrm.platform..",
+            "br.com.branlycrm.config..")
+        .should()
+        .transitivelyDependOnClassesThat()
+        .resideInAPackage("br.com.branlycrm.tenant.persistence..")
+        .check(CODE);
+  }
+
+  /** A clinic tenant comes only from an authorized access, through ClinicTenant.of. */
+  @Test
+  void clinicTenantIsBuiltOnlyFromAnAccess() {
+    noClasses()
+        .that()
+        .doNotHaveFullyQualifiedName(ClinicTenant.class.getName())
+        .should()
+        .callConstructor(ClinicTenant.class, UUID.class, UUID.class)
+        .check(CODE);
+  }
+
+  /**
+   * The role inside a ClinicAccess is trusted by services, so only the registry query and the team
+   * service (which re-reads the role under lock) may build one.
+   */
+  @Test
+  void clinicAccessIsBuiltOnlyFromTheRegistry() {
+    noClasses()
+        .that()
+        .doNotHaveSimpleName("TenantRegistryRepository")
+        .and()
+        .doNotHaveSimpleName("TeamService")
+        .should()
+        .callConstructor(ClinicAccess.class, TenantDatabase.class, UUID.class, ClinicRole.class)
+        .check(CODE);
+  }
+
+  /** No shared cache across sessions: clinic data never outlives its transaction (ADR-030). */
+  @Test
+  void entitiesAreNeverCached() {
+    noClasses()
+        .should()
+        .beAnnotatedWith("org.hibernate.annotations.Cache")
+        .orShould()
+        .beAnnotatedWith("jakarta.persistence.Cacheable")
+        .check(CODE);
   }
 
   /** Shared HTTP contract and helpers never reach into a business or infrastructure module. */
@@ -130,6 +225,9 @@ class ArchitectureTest {
         .orShould()
         .dependOnClassesThat()
         .haveSimpleName("TenantSecretReader")
+        .orShould()
+        .transitivelyDependOnClassesThat()
+        .resideInAPackage("br.com.branlycrm.tenant.persistence..")
         .check(CODE);
   }
 
@@ -145,6 +243,9 @@ class ArchitectureTest {
         .orShould()
         .dependOnClassesThat()
         .haveSimpleName("TenantSecretReader")
+        .orShould()
+        .transitivelyDependOnClassesThat()
+        .resideInAPackage("br.com.branlycrm.tenant.persistence..")
         .check(CODE);
   }
 
