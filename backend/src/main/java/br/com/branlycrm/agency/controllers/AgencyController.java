@@ -39,6 +39,7 @@ public final class AgencyController {
   }
 
   @Operation(summary = "Clinics of an agency portfolio, registry data only, paginated")
+  @ApiResponse(responseCode = "200", description = "Page of portfolio clinics")
   @ApiResponse(responseCode = "400", description = "INVALID_INPUT: agencyId, page or pageSize")
   @ApiResponse(
       responseCode = "404",

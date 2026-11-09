@@ -554,6 +554,16 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewPortfolioClinicView"
+                }
+              }
+            },
+            "description" : "Page of portfolio clinics"
+          },
           "400" : {
             "content" : {
               "application/json" : {
@@ -874,6 +884,16 @@
       "get" : {
         "operationId" : "current",
         "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CurrentClinicView"
+                }
+              }
+            },
+            "description" : "Selected clinic, role and permission scopes"
+          },
           "401" : {
             "content" : {
               "application/json" : {
@@ -945,6 +965,16 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ClinicSelectionView"
+                }
+              }
+            },
+            "description" : "Clinic selected for this session"
+          },
           "400" : {
             "content" : {
               "application/json" : {
@@ -1899,6 +1929,16 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewTeamMemberView"
+                }
+              }
+            },
+            "description" : "Page of members"
+          },
           "400" : {
             "content" : {
               "application/json" : {
@@ -1988,6 +2028,16 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewTeamInvitationView"
+                }
+              }
+            },
+            "description" : "Page of pending invitations"
+          },
           "400" : {
             "content" : {
               "application/json" : {
@@ -2448,6 +2498,16 @@
           "required" : true
         },
         "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TeamMemberView"
+                }
+              }
+            },
+            "description" : "Member with the new role"
+          },
           "400" : {
             "content" : {
               "application/json" : {

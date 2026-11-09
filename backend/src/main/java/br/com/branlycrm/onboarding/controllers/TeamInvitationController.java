@@ -45,6 +45,7 @@ public final class TeamInvitationController {
   }
 
   @Operation(summary = "Pending invitations of the selected clinic (OWNER, MANAGER), paginated")
+  @ApiResponse(responseCode = "200", description = "Page of pending invitations")
   @ApiResponse(responseCode = "400", description = "INVALID_INPUT: page or pageSize")
   @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED")
   @ApiResponse(responseCode = "409", description = "CLINIC_NOT_SELECTED")
