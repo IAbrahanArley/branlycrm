@@ -239,7 +239,7 @@ O frontend acompanha cada API aprovada.
 
 **Bloqueio para dados reais:** Admin da agência e `OWNER` sem 2FA até a CRM-016.
 
-### [ ] CRM-016 — Segundo fator (TOTP) para administradores (P0)
+### [x] CRM-016 — Segundo fator (TOTP) para administradores (P0)
 **Depende de:** CRM-011, CRM-018.
 **Atende:** ADM-03.
 **Entregas:**
@@ -251,6 +251,29 @@ O frontend acompanha cada API aprovada.
 - Código repetido dentro da janela é recusado.
 - Códigos de recuperação são de uso único.
 - Revisão de `security`.
+**Estado (08/11/2026):** concluída na branch `feat/crm-016-totp` (ADR-029). Implementada pelo agente `backend`, com desenho revisado pelo `architect`.
+- **Portão:** `MfaGateFilter` com estado derivado a cada requisição e lista de permitidos. O login continua 204, e o estado sai de `GET /v1/auth/mfa`.
+- **Obrigatoriedade:** para `OWNER` ativo e admin de agência, sem carência; opcional para os demais.
+- **Fator e recuperação:** TOTP feito só com o JDK, segredo em AES-GCM com chave da API, 10 códigos de recuperação em HMAC e avisos por e-mail.
+- **Banco:**
+  - V13 com funções `SECURITY DEFINER` e sem escrita direta;
+  - V14 com reserva de tentativas, bloqueio progressivo até 24 h e avisos pendentes do reset.
+- **Recuperação:** `reset-mfa` no comando de plataforma.
+- **Testes:** `./mvnw -B -ntp clean verify` → 139 unitários (2 ignorados no Windows) e 87 de integração. Cobrem:
+  - varredura de todas as rotas nos estados pendente e de cadastro;
+  - reaproveitamento de sessão e fixação;
+  - repetição e concorrência;
+  - recuperação de uso único;
+  - bloqueios;
+  - troca e desativação;
+  - grants como runtime e operador.
+- **Revisão de `security`:** sem críticos nem altos. Médios corrigidos: bloqueio progressivo com aviso; aviso do reset. Baixos corrigidos: tentativa reservada antes de comparar, aviso de novos códigos, varredura no estado de cadastro, `no-store` e ordem do filtro.
+- **Pendências:**
+  - Super Admin (CRM-060);
+  - auditoria (CRM-070);
+  - guarda e rotação de `MFA_ENCRYPTION_KEY` (CRM-072);
+  - aviso do reset só no próximo login;
+  - telas de cadastro e verificação do segundo fator no frontend (ainda sem tarefa FE).
 
 ### [-] CRM-013 — Convites, onboarding e configurações da clínica (P1)
 **Depende de:** CRM-012, CRM-018.

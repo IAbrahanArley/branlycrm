@@ -120,6 +120,45 @@ BEGIN
  IF EXISTS (SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member WHERE r.rolname = 'crm_platform_operator') THEN
    RAISE EXCEPTION 'Platform operator is a member of other roles';
  END IF;
+ -- V13 (CRM-016): second-factor tables only through SECURITY DEFINER functions.
+ IF has_table_privilege(current_user,'user_mfa_totp','INSERT') OR has_any_column_privilege(current_user,'user_mfa_totp','UPDATE')
+    OR has_table_privilege(current_user,'user_mfa_totp','DELETE')
+    OR has_table_privilege(current_user,'user_mfa_recovery_codes','INSERT') OR has_any_column_privilege(current_user,'user_mfa_recovery_codes','UPDATE')
+    OR has_table_privilege(current_user,'user_mfa_recovery_codes','DELETE')
+    OR has_column_privilege(current_user,'user_mfa_recovery_codes','code_hash','SELECT') THEN
+   RAISE EXCEPTION 'Runtime writes second-factor tables directly or reads recovery hashes';
+ END IF;
+ IF has_any_column_privilege('crm_platform_operator','user_mfa_totp','SELECT')
+    OR has_any_column_privilege('crm_platform_operator','user_mfa_recovery_codes','SELECT')
+    OR NOT has_function_privilege('crm_platform_operator','platform_reset_mfa(varchar)','EXECUTE')
+    OR has_function_privilege(current_user,'platform_reset_mfa(varchar)','EXECUTE') THEN
+   RAISE EXCEPTION 'Second-factor reset is not restricted to the platform operator';
+ END IF;
+ IF EXISTS (SELECT 1 FROM pg_proc WHERE (proname LIKE 'mfa\_%' OR proname = 'platform_reset_mfa')
+            AND (NOT prosecdef OR NOT proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']
+                 OR has_function_privilege('public', oid, 'EXECUTE'))) THEN
+   RAISE EXCEPTION 'A second-factor function is not SECURITY DEFINER with a fixed search_path, or PUBLIC can run it';
+ END IF;
+ -- V14: attempts reserved before comparing, notices only through functions.
+ IF NOT has_function_privilege(current_user,'mfa_reserve_attempt(uuid)','EXECUTE')
+    OR NOT has_function_privilege(current_user,'mfa_finish_failure(uuid)','EXECUTE')
+    OR NOT has_function_privilege(current_user,'account_notice_claim(uuid,uuid)','EXECUTE')
+    OR NOT has_function_privilege(current_user,'account_notice_release(uuid,uuid)','EXECUTE')
+    OR has_function_privilege(current_user,'mfa_register_failure(uuid,integer,interval)','EXECUTE')
+    OR has_function_privilege(current_user,'mfa_start_lock(uuid)','EXECUTE') THEN
+   RAISE EXCEPTION 'Runtime second-factor functions differ from V14';
+ END IF;
+ IF EXISTS (SELECT 1 FROM pg_proc WHERE proname LIKE 'account\_notice\_%'
+            AND (NOT prosecdef OR has_function_privilege('public', oid, 'EXECUTE'))) THEN
+   RAISE EXCEPTION 'An account notice function is not SECURITY DEFINER or PUBLIC can run it';
+ END IF;
+ IF has_table_privilege(current_user,'account_notices','INSERT') OR has_any_column_privilege(current_user,'account_notices','UPDATE')
+    OR has_table_privilege(current_user,'account_notices','DELETE')
+    OR has_any_column_privilege(current_user,'user_mfa_totp','UPDATE')
+    OR has_column_privilege(current_user,'user_mfa_totp','consecutive_locks','SELECT')
+    OR has_any_column_privilege('crm_platform_operator','account_notices','SELECT') THEN
+   RAISE EXCEPTION 'Account notices or lock counters are writable or readable beyond the functions';
+ END IF;
  -- V11: the runtime adds or reactivates agency admins only.
  IF EXISTS (SELECT 1 FROM information_schema.column_privileges
             WHERE grantee = current_user AND table_name = 'agency_memberships' AND privilege_type = 'UPDATE'

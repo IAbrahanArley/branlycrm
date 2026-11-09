@@ -44,3 +44,6 @@ app:
     resend-api-key: ${RESEND_API_KEY:}
     from-address: ${MAIL_FROM_ADDRESS:no-reply@example.test}
     from-name: ${MAIL_FROM_NAME:Branly CRM}
+  mfa:
+    # Base64 of 32 random bytes (openssl rand -base64 32). Required by the API; never logged.
+    encryption-key: ${MFA_ENCRYPTION_KEY:}

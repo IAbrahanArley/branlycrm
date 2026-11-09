@@ -34,7 +34,35 @@ Senha errada, conta inexistente, conta inativa e conta não verificada respondem
 
 A cada requisição autenticada, o servidor consulta estado e auth_version. Desativar usuário, alterar senha/e-mail/verificação incrementa versão no banco e invalida a sessão no próximo acesso. Participação/estado da clínica também são revalidados quando houver seleção; revogação elimina a seleção e retorna 403. A identidade global pode continuar ativa para outras clínicas.
 
-Limitação inicial: 20 tentativas por endereço em janela de 60 segundos, contadas separadamente para o login e para as rotas anônimas de convite (`/v1/invitations/preview` e `/accept`, que também calculam hash de senha), com no máximo 10 mil endereços retidos; 429 ao exceder. É local ao processo e se reinicia com ele. Nginx substitui X-Forwarded-For pelo endereço real do cliente conectado. Antes de usar múltiplas réplicas, migrar limitação e sessões para armazenamento compartilhado e definir a política de proxies confiáveis.
+Limitação inicial: 20 tentativas por endereço em janela de 60 segundos, contadas separadamente para o login, para `/v1/auth/mfa/verify` e para as rotas anônimas de convite (`/v1/invitations/preview` e `/accept`, que também calculam hash de senha), com no máximo 10 mil endereços retidos; 429 ao exceder. É local ao processo e se reinicia com ele. Nginx substitui X-Forwarded-For pelo endereço real do cliente conectado. Antes de usar múltiplas réplicas, migrar limitação e sessões para armazenamento compartilhado e definir a política de proxies confiáveis.
+
+## Segundo fator (CRM-016, ADR-029)
+
+- **Quem precisa:** obrigatório para quem tem participação `OWNER` ativa em qualquer clínica ou é admin ativo de agência, sem carência. Opcional para os demais.
+- **Login:** continua igual (204). O estado sai de `GET /v1/auth/mfa`: `{state, enrolled, required, recoveryCodesRemaining}`, com `state` igual a `COMPLETE`, `MFA_PENDING` ou `ENROLLMENT_REQUIRED`.
+- **Portão:** o `MfaGateFilter`, depois do `SessionValidationFilter`, calcula o estado a cada requisição e nega por padrão:
+  - em `MFA_PENDING`, só csrf, logout, me, `GET /v1/auth/mfa` e `POST /v1/auth/mfa/verify`; o resto recebe 401 `MFA_REQUIRED`;
+  - em `ENROLLMENT_REQUIRED`, só csrf, logout, me, `GET /v1/auth/mfa`, setup e confirm; o resto recebe 403 `MFA_ENROLLMENT_REQUIRED`, inclusive as rotas públicas de convite.
+- **Prova na sessão:** a verificação grava uma prova presa ao sujeito e à `auth_version`. O login seguinte (mesmo navegador, outra conta ou a mesma) remove a prova, e a sessão pendente vence em 5 minutos.
+- **Cadastro:**
+  - `POST /v1/auth/mfa/totp/setup` devolve o segredo e a URI `otpauth://` uma única vez;
+  - `POST /v1/auth/mfa/totp/confirm {code}` ativa o fator e devolve 10 códigos de recuperação uma única vez;
+  - trocar um fator já ativo exige o código atual e derruba todas as sessões.
+- **Verificação** (`POST /v1/auth/mfa/verify {code}` ou `{recoveryCode}`):
+  - troca o id da sessão;
+  - um código só vale uma vez;
+  - 5 falhas na sessão a encerram;
+  - cada tentativa é reservada na conta antes da comparação. 10 falhas seguidas bloqueiam por 15 minutos (429), e a duração dobra a cada bloqueio seguido, até 24 horas (`Retry-After` de até 86400 s). Só um acerto zera os contadores, e cada bloqueio gera um aviso por e-mail;
+  - a rota também entra no limite por endereço.
+- **Desativar e regenerar:** `DELETE /v1/auth/mfa/totp {code}` (recusado para quem é obrigado) e `POST /v1/auth/mfa/recovery-codes {code}`.
+- **Avisos:** geram um aviso por e-mail o cadastro, a troca, a desativação, o uso de código de recuperação, a geração de novos códigos e o bloqueio.
+- **Respostas sensíveis:** setup, confirm e recovery-codes saem com `Cache-Control: no-store`. Fora do estado `COMPLETE`, `recoveryCodesRemaining` é 0.
+- **Armazenamento:** o segredo é cifrado com AES-256-GCM, com chave derivada de `MFA_ENCRYPTION_KEY`, que só a API recebe e sem a qual ela não sobe. Os códigos de recuperação ficam como HMAC, e a API só escreve por funções `SECURITY DEFINER` (V13).
+- **Perdeu o celular e os códigos:** a equipe da plataforma confirma a identidade por fora e roda:
+  ```bash
+  docker compose --profile tools run --rm platform reset-mfa --email <e-mail>
+  ```
+  O comando remove o fator e derruba as sessões. Ele não envia e-mail: grava um aviso pendente (`account_notices`, V14), que a API envia no próximo login da conta. Não há envio em segundo plano, então quem não entra de novo não recebe o aviso.
 
 ## Convites (ADR-028)
 

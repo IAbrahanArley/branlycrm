@@ -219,6 +219,54 @@
         },
         "type" : "object"
       },
+      "MfaCodeRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MfaSetupView" : {
+        "properties" : {
+          "otpauthUri" : {
+            "type" : "string"
+          },
+          "secret" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MfaStatusView" : {
+        "properties" : {
+          "enrolled" : {
+            "type" : "boolean"
+          },
+          "recoveryCodesRemaining" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "required" : {
+            "type" : "boolean"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MfaVerifyRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "recoveryCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "OwnerInvitationRequest" : {
         "properties" : {
           "ownerEmail" : {
@@ -314,6 +362,17 @@
           "tenantId" : {
             "format" : "uuid",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecoveryCodesView" : {
+        "properties" : {
+          "recoveryCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -426,7 +485,17 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
           },
           "500" : {
             "content" : {
@@ -503,7 +572,17 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
           },
           "404" : {
             "content" : {
@@ -602,7 +681,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -612,7 +691,7 @@
                 }
               }
             },
-            "description" : "CSRF_INVALID"
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -721,7 +800,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -731,7 +810,7 @@
                 }
               }
             },
-            "description" : "CSRF_INVALID"
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -803,7 +882,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -813,7 +892,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED"
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
           },
           "409" : {
             "content" : {
@@ -884,7 +963,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -894,7 +973,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED; CSRF_INVALID"
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "500" : {
             "content" : {
@@ -951,7 +1030,17 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
           },
           "500" : {
             "content" : {
@@ -1030,6 +1119,7 @@
     },
     "/v1/auth/login" : {
       "post" : {
+        "description" : "Always 204 on success. Then read GET /v1/auth/mfa: MFA_PENDING needs POST /v1/auth/mfa/verify within 5 minutes, ENROLLMENT_REQUIRED needs the TOTP setup and confirmation; until then other routes answer MFA_REQUIRED or MFA_ENROLLMENT_REQUIRED.",
         "requestBody" : {
           "content" : {
             "application/x-www-form-urlencoded" : {
@@ -1219,6 +1309,559 @@
         "tags" : [ "Session" ]
       }
     },
+    "/v1/auth/mfa" : {
+      "get" : {
+        "description" : "state: MFA_PENDING (send a code to /verify), ENROLLMENT_REQUIRED (set up a factor) or COMPLETE. Allowed in every state.",
+        "operationId" : "status",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MfaStatusView"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Second-factor state of the session",
+        "tags" : [ "Second factor" ]
+      }
+    },
+    "/v1/auth/mfa/recovery-codes" : {
+      "post" : {
+        "description" : "Needs the current TOTP code; the previous codes stop working.",
+        "operationId" : "regenerate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MfaCodeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RecoveryCodesView"
+                }
+              }
+            },
+            "description" : "Ten new recovery codes, shown once"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_CODE_INVALID; INVALID_INPUT: code, body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SESSION_REVOKED after five wrong codes; AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_NOT_ENROLLED"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_LOCKED; honor Retry-After"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Replace the recovery codes",
+        "tags" : [ "Second factor" ]
+      }
+    },
+    "/v1/auth/mfa/totp" : {
+      "delete" : {
+        "description" : "Needs the current code. Owners and agency admins must keep it. Ends every session of the account.",
+        "operationId" : "disable",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MfaCodeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Factor removed; every session ended"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_CODE_INVALID; INVALID_INPUT: code, body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SESSION_REVOKED after five wrong codes; AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_MANDATORY; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_NOT_ENROLLED"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_LOCKED; honor Retry-After"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Turn off an optional TOTP factor",
+        "tags" : [ "Second factor" ]
+      }
+    },
+    "/v1/auth/mfa/totp/confirm" : {
+      "post" : {
+        "description" : "Returns ten recovery codes once and completes the session. Replacing a confirmed factor ends every session of the account, this one included: log in again.",
+        "operationId" : "confirm",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MfaCodeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RecoveryCodesView"
+                }
+              }
+            },
+            "description" : "Factor active; recovery codes shown once"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_CODE_INVALID; INVALID_INPUT: code, body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SESSION_REVOKED after five wrong codes; AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_SETUP_EXPIRED: no setup of this session, expired or replaced"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_LOCKED; honor Retry-After"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Confirm the pending TOTP secret with a code from it",
+        "tags" : [ "Second factor" ]
+      }
+    },
+    "/v1/auth/mfa/totp/setup" : {
+      "post" : {
+        "description" : "Returns the secret and otpauth URI once; the pending secret expires in 10 minutes and only this session can confirm it. Replacing a confirmed factor (COMPLETE) requires its current code in the body; the old factor keeps working until confirmation.",
+        "operationId" : "setup",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MfaCodeRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MfaSetupView"
+                }
+              }
+            },
+            "description" : "Pending secret staged"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_CODE_INVALID; INVALID_INPUT: code, body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SESSION_REVOKED after five wrong codes; AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CSRF_INVALID"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_LOCKED; honor Retry-After"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Start enrolling a TOTP authenticator",
+        "tags" : [ "Second factor" ]
+      }
+    },
+    "/v1/auth/mfa/verify" : {
+      "post" : {
+        "description" : "Only in MFA_PENDING. Renews the session id. Five wrong codes in a session end it; ten for the account lock it for 15 minutes.",
+        "operationId" : "verify",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MfaVerifyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Second factor proved; session COMPLETE"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_CODE_INVALID; INVALID_INPUT: code, body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SESSION_REVOKED after five wrong codes in the session; AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ALREADY_COMPLETE"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_LOCKED or RATE_LIMITED; honor Retry-After"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Prove the second factor with a TOTP code or one recovery code",
+        "tags" : [ "Second factor" ]
+      }
+    },
     "/v1/clinic/team" : {
       "get" : {
         "operationId" : "list_1",
@@ -1274,7 +1917,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1284,7 +1927,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED: role without team access"
+            "description" : "CLINIC_ACCESS_DENIED: role without team access; MFA_ENROLLMENT_REQUIRED"
           },
           "409" : {
             "content" : {
@@ -1363,7 +2006,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1373,7 +2016,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED"
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
           },
           "409" : {
             "content" : {
@@ -1453,7 +2096,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1463,7 +2106,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN (role beyond the actor's reach); CSRF_INVALID"
+            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN (role beyond the actor's reach); MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "409" : {
             "content" : {
@@ -1537,7 +2180,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1547,7 +2190,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN; CSRF_INVALID"
+            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -1638,7 +2281,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1648,7 +2291,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN; CSRF_INVALID"
+            "description" : "CLINIC_ACCESS_DENIED or INVITATION_FORBIDDEN; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -1722,7 +2365,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1732,7 +2375,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed); CSRF_INVALID"
+            "description" : "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed); MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -1823,7 +2466,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1833,7 +2476,7 @@
                 }
               }
             },
-            "description" : "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed); CSRF_INVALID"
+            "description" : "CLINIC_ACCESS_DENIED or MEMBER_CHANGE_FORBIDDEN (own membership, role not allowed); MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -1918,7 +2561,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -1928,7 +2571,7 @@
                 }
               }
             },
-            "description" : "CSRF_INVALID"
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -2030,7 +2673,7 @@
                 }
               }
             },
-            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED"
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
           },
           "403" : {
             "content" : {
@@ -2040,7 +2683,7 @@
                 }
               }
             },
-            "description" : "CSRF_INVALID"
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
           },
           "404" : {
             "content" : {
@@ -2092,6 +2735,9 @@
     }
   },
   "tags" : [ {
+    "description" : "TOTP enrollment, verification and recovery codes",
+    "name" : "Second factor"
+  }, {
     "description" : "Invite, resend and revoke for the selected clinic",
     "name" : "Team invitations"
   }, {

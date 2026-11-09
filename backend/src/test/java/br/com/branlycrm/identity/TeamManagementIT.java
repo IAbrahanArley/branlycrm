@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import br.com.branlycrm.tenant.domain.ClinicPermission;
 import java.net.http.HttpResponse;
@@ -43,7 +44,7 @@ import tools.jackson.databind.JsonNode;
 @Testcontainers
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "spring.docker.compose.enabled=false")
+    properties = {"spring.docker.compose.enabled=false", MfaFixture.KEY_PROPERTY})
 class TeamManagementIT {
   @Container @ServiceConnection
   static final PostgreSQLContainer POSTGRES = TestPostgres.container();
@@ -77,6 +78,8 @@ class TeamManagementIT {
     jdbc.update("DELETE FROM tenant_provisioning_tasks");
     jdbc.update("DELETE FROM tenant_memberships");
     jdbc.update("DELETE FROM tenants");
+    jdbc.update("DELETE FROM user_mfa_recovery_codes");
+    jdbc.update("DELETE FROM user_mfa_totp");
     jdbc.update("DELETE FROM user_accounts");
 
     ownerA1 = account("owner-a1@example.test");
@@ -476,6 +479,7 @@ class TeamManagementIT {
     browser.csrf();
     assertThat(browser.login(email, PASSWORD).statusCode()).isEqualTo(204);
     browser.csrf();
+    MfaFixture.complete(browser, jdbc);
     return browser;
   }
 

@@ -3,6 +3,7 @@ package br.com.branlycrm.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
@@ -40,7 +41,7 @@ import tools.jackson.databind.JsonNode;
 @Testcontainers
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "spring.docker.compose.enabled=false")
+    properties = {"spring.docker.compose.enabled=false", MfaFixture.KEY_PROPERTY})
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ApiConventionsIT {
   @Container @ServiceConnection
@@ -75,6 +76,8 @@ class ApiConventionsIT {
     jdbc.update("DELETE FROM tenant_provisioning_tasks");
     jdbc.update("DELETE FROM tenant_memberships");
     jdbc.update("DELETE FROM tenants");
+    jdbc.update("DELETE FROM user_mfa_recovery_codes");
+    jdbc.update("DELETE FROM user_mfa_totp");
     jdbc.update("DELETE FROM user_accounts");
 
     clinicA = clinic("Clínica A");
@@ -453,6 +456,7 @@ class ApiConventionsIT {
     browser.csrf();
     assertThat(browser.login(email, PASSWORD).statusCode()).isEqualTo(204);
     browser.csrf();
+    MfaFixture.complete(browser, jdbc);
     return browser;
   }
 

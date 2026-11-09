@@ -1,5 +1,7 @@
 package br.com.branlycrm.config;
 
+import br.com.branlycrm.identity.mfa.domain.MfaState;
+import br.com.branlycrm.identity.security.MfaGateFilter;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -80,6 +82,15 @@ public class OpenApiConfiguration {
                             ApiResponses responses = operation.getResponses();
                             if (!PUBLIC_PATHS.contains(path)) {
                               merge(responses, "401", "AUTHENTICATION_REQUIRED or SESSION_REVOKED");
+                              // Second-factor gate (CRM-016), for sessions that have not proved
+                              // or enrolled it; also on the anonymous invitation routes.
+                              String verb = method.name();
+                              if (!MfaGateFilter.allows(MfaState.MFA_PENDING, verb, path)) {
+                                merge(responses, "401", "MFA_REQUIRED");
+                              }
+                              if (!MfaGateFilter.allows(MfaState.ENROLLMENT_REQUIRED, verb, path)) {
+                                merge(responses, "403", "MFA_ENROLLMENT_REQUIRED");
+                              }
                             }
                             if (method != PathItem.HttpMethod.GET) {
                               merge(responses, "403", "CSRF_INVALID");
@@ -127,6 +138,11 @@ public class OpenApiConfiguration {
     return new Operation()
         .addTagsItem("Session")
         .summary("Authenticate with e-mail and password; renews the session id")
+        .description(
+            "Always 204 on success. Then read GET /v1/auth/mfa: MFA_PENDING needs"
+                + " POST /v1/auth/mfa/verify within 5 minutes, ENROLLMENT_REQUIRED needs the TOTP"
+                + " setup and confirmation; until then other routes answer MFA_REQUIRED or"
+                + " MFA_ENROLLMENT_REQUIRED.")
         .addSecurityItem(new SecurityRequirement().addList("csrf"))
         .requestBody(
             new RequestBody()

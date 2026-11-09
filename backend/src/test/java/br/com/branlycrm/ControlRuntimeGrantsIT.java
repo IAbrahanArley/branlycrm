@@ -297,6 +297,139 @@ class ControlRuntimeGrantsIT {
     assertThat(status(awaiting)).isEqualTo("ACTIVE");
   }
 
+  /**
+   * V13 (CRM-016): the runtime reads the factor columns it needs, never the recovery code hashes
+   * nor the counters, and writes only through the mfa_* functions. Nobody but the platform operator
+   * may reset a factor, and PUBLIC executes none of them.
+   */
+  @Test
+  void runtimeChangesSecondFactorDataOnlyThroughTheFunctions() {
+    UUID subject = account();
+    byte[] ciphertext = new byte[36];
+    byte[] nonce = new byte[12];
+    for (String forbidden :
+        new String[] {
+          "INSERT INTO user_mfa_totp (subject_id) VALUES (?)",
+          "UPDATE user_mfa_totp SET last_used_step = NULL WHERE subject_id = ?",
+          "UPDATE user_mfa_totp SET failed_attempts = 0, locked_until = NULL WHERE subject_id = ?",
+          "DELETE FROM user_mfa_totp WHERE subject_id = ?",
+          "INSERT INTO user_mfa_recovery_codes (subject_id, code_hash)"
+              + " VALUES (?, decode(repeat('00', 32), 'hex'))",
+          "UPDATE user_mfa_recovery_codes SET used_at = NULL WHERE subject_id = ?",
+          "DELETE FROM user_mfa_recovery_codes WHERE subject_id = ?",
+          "SELECT code_hash FROM user_mfa_recovery_codes WHERE subject_id = ?",
+          "SELECT failed_attempts FROM user_mfa_totp WHERE subject_id = ?",
+          "SELECT last_used_step FROM user_mfa_totp WHERE subject_id = ?",
+          "SELECT platform_reset_mfa(?::text)",
+          "SELECT mfa_register_failure(?, 10, interval '15 minutes')",
+          "SELECT mfa_start_lock(?)",
+          "SELECT failed_attempts FROM user_mfa_totp WHERE subject_id = ?",
+          "SELECT consecutive_locks FROM user_mfa_totp WHERE subject_id = ?",
+          "INSERT INTO account_notices (subject_id, kind) VALUES (?, 'MFA_RESET')",
+          "UPDATE account_notices SET sent_at = now() WHERE subject_id = ?",
+          "DELETE FROM account_notices WHERE subject_id = ?"
+        }) {
+      assertDenied(() -> runtime.queryForList(forbidden, subject));
+    }
+
+    runtime.queryForObject(
+        "SELECT mfa_stage_secret(?, 1, ?, ?)::text", String.class, subject, ciphertext, nonce);
+    assertThat(
+            runtime.queryForObject(
+                "SELECT pending_nonce FROM user_mfa_totp WHERE subject_id = ?",
+                byte[].class,
+                subject))
+        .isEqualTo(nonce);
+    assertThat(
+            runtime.queryForObject(
+                "SELECT count(*) FROM user_mfa_recovery_codes WHERE subject_id = ?"
+                    + " AND used_at IS NULL",
+                Long.class,
+                subject))
+        .isZero();
+    // The table refuses malformed secrets whatever the caller.
+    assertThatThrownBy(
+            () ->
+                runtime.queryForObject(
+                    "SELECT mfa_stage_secret(?, 1, ?, ?)::text",
+                    String.class,
+                    subject,
+                    new byte[10],
+                    nonce))
+        .hasRootCauseInstanceOf(SQLException.class)
+        .rootCause()
+        .extracting(cause -> ((SQLException) cause).getSQLState())
+        .isEqualTo("23514");
+    // V14: the attempt is reserved before the comparison and the runtime cannot skip the count.
+    var reserved =
+        runtime.queryForMap("SELECT allowed, lock_started FROM mfa_reserve_attempt(?)", subject);
+    assertThat(reserved).containsEntry("allowed", true).containsEntry("lock_started", false);
+    assertThat(
+            superuser.queryForObject(
+                "SELECT failed_attempts FROM user_mfa_totp WHERE subject_id = ?",
+                Integer.class,
+                subject))
+        .isOne();
+    assertThat(
+            runtime.queryForObject(
+                "SELECT count(*) FROM account_notices WHERE subject_id = ? AND sent_at IS NULL",
+                Long.class,
+                subject))
+        .isZero();
+
+    // Runtime functions, the platform one, and V13's mfa_register_failure, replaced in V14.
+    java.util.Map<String, String> owners = new java.util.LinkedHashMap<>();
+    for (String function :
+        new String[] {
+          "mfa_stage_secret(uuid,integer,bytea,bytea)",
+          "mfa_confirm_secret(uuid,bytea,bigint,bytea[])",
+          "mfa_consume_step(uuid,bytea,bigint)",
+          "mfa_consume_recovery(uuid,bytea)",
+          "mfa_reserve_attempt(uuid)",
+          "mfa_finish_failure(uuid)",
+          "mfa_reset_failures(uuid)",
+          "mfa_replace_recovery_codes(uuid,bytea[])",
+          "mfa_disable(uuid)",
+          "account_notice_claim(uuid,uuid)",
+          "account_notice_release(uuid,uuid)"
+        }) {
+      owners.put(function, "runtime");
+    }
+    owners.put("platform_reset_mfa(varchar)", "operator");
+    owners.put("mfa_register_failure(uuid,integer,interval)", "nobody");
+    owners.put("mfa_start_lock(uuid)", "nobody");
+    owners.forEach(
+        (function, owner) -> {
+          assertThat(privilege("public", function)).as("PUBLIC " + function).isFalse();
+          assertThat(privilege(RUNTIME, function))
+              .as("runtime " + function)
+              .isEqualTo(owner.equals("runtime"));
+          assertThat(privilege(TestPostgres.PLATFORM, function))
+              .as("operator " + function)
+              .isEqualTo(owner.equals("operator"));
+        });
+    for (String table :
+        new String[] {"user_mfa_totp", "user_mfa_recovery_codes", "account_notices"}) {
+      assertThat(
+              superuser.queryForObject(
+                  "SELECT has_any_column_privilege(?, ?, 'SELECT')"
+                      + " OR has_table_privilege(?, ?, 'INSERT, UPDATE, DELETE')",
+                  Boolean.class,
+                  TestPostgres.PLATFORM,
+                  table,
+                  TestPostgres.PLATFORM,
+                  table))
+          .as("operator on " + table)
+          .isFalse();
+    }
+  }
+
+  private static boolean privilege(String role, String function) {
+    return Boolean.TRUE.equals(
+        superuser.queryForObject(
+            "SELECT has_function_privilege(?, ?, 'EXECUTE')", Boolean.class, role, function));
+  }
+
   @Test
   void requestIdIsUniqueWithinAnAgencyOnly() {
     UUID agencyA = agency();

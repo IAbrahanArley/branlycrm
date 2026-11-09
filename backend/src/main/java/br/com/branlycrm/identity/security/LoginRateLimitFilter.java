@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -21,10 +22,17 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
   static final int MAX_TRACKED_ADDRESSES = 10_000;
 
   private final Set<String> paths;
+  private final Clock clock;
   private final Map<String, Window> attempts = new HashMap<>();
 
   public LoginRateLimitFilter(Set<String> paths) {
+    this(paths, Clock.systemUTC());
+  }
+
+  /** The application clock, so tests can move past a window. */
+  public LoginRateLimitFilter(Set<String> paths, Clock clock) {
     this.paths = Set.copyOf(paths);
+    this.clock = clock;
   }
 
   private record Window(long startsAt, int count) {}
@@ -46,7 +54,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     String path = request.getServletPath();
     if ("POST".equals(request.getMethod())
         && paths.contains(path)
-        && !allow(path + " " + request.getRemoteAddr(), System.currentTimeMillis())) {
+        && !allow(path + " " + request.getRemoteAddr(), clock.millis())) {
       response.setHeader("Retry-After", "60");
       ApiErrors.write(
           response, 429, ApiErrors.RATE_LIMITED, "Muitas tentativas. Aguarde um minuto.");

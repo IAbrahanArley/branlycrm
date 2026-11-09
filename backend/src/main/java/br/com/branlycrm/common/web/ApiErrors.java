@@ -31,6 +31,12 @@ public final class ApiErrors {
   public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
   public static final String STATE_CONFLICT = "STATE_CONFLICT";
 
+  /** Second factor (CRM-016), answered by the MFA gate before any controller. */
+  public static final String MFA_REQUIRED = "MFA_REQUIRED";
+
+  public static final String MFA_ENROLLMENT_REQUIRED = "MFA_ENROLLMENT_REQUIRED";
+  public static final String MFA_ALREADY_COMPLETE = "MFA_ALREADY_COMPLETE";
+
   /** SQLSTATE of the V8 and V9 triggers: an invalid status transition or immutable field. */
   static final String STATE_GUARD_SQLSTATE = "BRL02";
 

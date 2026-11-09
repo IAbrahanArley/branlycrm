@@ -87,6 +87,31 @@ public final class Browser {
     return send(csrf(request(path), withCsrf).DELETE());
   }
 
+  public HttpResponse<String> deleteJson(String path, String json, boolean withCsrf)
+      throws Exception {
+    return send(
+        csrf(request(path), withCsrf)
+            .header("Content-Type", "application/json")
+            .method("DELETE", HttpRequest.BodyPublishers.ofString(json)));
+  }
+
+  /** Any method, with CSRF and a JSON body: for sweeping every mapped route. */
+  public HttpResponse<String> send(String method, String path, String json) throws Exception {
+    return send(
+        csrf(request(path), true)
+            .header("Content-Type", "application/json")
+            .method(method, HttpRequest.BodyPublishers.ofString(json)));
+  }
+
+  /** Current value of a cookie of this browser, or null. */
+  public String cookie(String name) {
+    return cookies.getCookieStore().getCookies().stream()
+        .filter(cookie -> cookie.getName().equals(name))
+        .map(java.net.HttpCookie::getValue)
+        .findFirst()
+        .orElse(null);
+  }
+
   private HttpResponse<String> form(String path, String body, boolean withCsrf) throws Exception {
     return send(
         csrf(request(path), withCsrf)
