@@ -68,6 +68,7 @@ class OpenApiContractIT {
     assertThat(docs.statusCode()).isEqualTo(200);
 
     String actual = canonical(docs.body());
+    assertEverySuccessIsDocumented(docs.body());
     if (writeRequested()) {
       Files.createDirectories(SNAPSHOT.getParent());
       Files.writeString(SNAPSHOT, actual, StandardCharsets.UTF_8);
@@ -82,6 +83,32 @@ class OpenApiContractIT {
             "The API contract changed: run ./mvnw verify -Dopenapi.write=true and commit"
                 + " docs/api/openapi.json with the change")
         .isEqualTo(actual);
+  }
+
+  /**
+   * Declaring only error responses makes springdoc drop the default 200, and the frontend loses the
+   * response schema. Every operation must document a success, and every 200 must have one.
+   */
+  @SuppressWarnings("unchecked")
+  private static void assertEverySuccessIsDocumented(String json) {
+    Map<String, Object> document = CANONICAL.readValue(json, Map.class);
+    Map<String, Map<String, Map<String, Object>>> paths =
+        (Map<String, Map<String, Map<String, Object>>>) document.get("paths");
+    java.util.List<String> missing = new java.util.ArrayList<>();
+    paths.forEach(
+        (path, operations) ->
+            operations.forEach(
+                (method, operation) -> {
+                  Map<String, Map<String, Object>> responses =
+                      (Map<String, Map<String, Object>>) operation.get("responses");
+                  boolean success =
+                      responses.keySet().stream().anyMatch(code -> code.startsWith("2"));
+                  Map<String, Object> ok = responses.get("200");
+                  if (!success || (ok != null && ok.get("content") == null)) {
+                    missing.add(method.toUpperCase(java.util.Locale.ROOT) + " " + path);
+                  }
+                }));
+    assertThat(missing).as("operations without a documented success response").isEmpty();
   }
 
   @SuppressWarnings("unchecked")

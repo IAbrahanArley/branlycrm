@@ -56,6 +56,7 @@ public final class SessionController {
   }
 
   @Operation(summary = "Selected clinic with role and permission scopes (UI hint only)")
+  @ApiResponse(responseCode = "200", description = "Selected clinic, role and permission scopes")
   @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED")
   @ApiResponse(responseCode = "409", description = "CLINIC_NOT_SELECTED")
   @SecurityRequirement(name = "session")
@@ -66,6 +67,7 @@ public final class SessionController {
   }
 
   @Operation(summary = "Select a clinic after validating the membership")
+  @ApiResponse(responseCode = "200", description = "Clinic selected for this session")
   @ApiResponse(responseCode = "400", description = "INVALID_INPUT: tenantId")
   @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED")
   @SecurityRequirement(name = "session")

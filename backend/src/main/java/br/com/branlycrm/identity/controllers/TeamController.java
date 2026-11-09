@@ -41,6 +41,7 @@ public final class TeamController {
   }
 
   @Operation(summary = "List members of the selected clinic (OWNER, MANAGER), paginated")
+  @ApiResponse(responseCode = "200", description = "Page of members")
   @ApiResponse(responseCode = "400", description = "INVALID_INPUT: page, pageSize, role or active")
   @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED: role without team access")
   @ApiResponse(responseCode = "409", description = "CLINIC_NOT_SELECTED")
@@ -65,6 +66,7 @@ public final class TeamController {
   }
 
   @Operation(summary = "Change a member's role")
+  @ApiResponse(responseCode = "200", description = "Member with the new role")
   @ApiResponse(responseCode = "400", description = "INVALID_INPUT: role, subjectId or body")
   @ApiResponse(
       responseCode = "403",
