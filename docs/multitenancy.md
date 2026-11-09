@@ -23,7 +23,8 @@ A JPA central não gerencia nenhuma entidade (`ControlJpaConfiguration`). Entida
 - V2 central garante UUID, nomes vinculados, unicidade, campos obrigatórios, estados válidos, participação sem duplicação e imutabilidade do vínculo banco/tenant.
 - V1 tenant cria vector e tenant_identity com no máximo uma linha. Provisionamento insere a identidade antes de ativar e concede somente SELECT dessa tabela ao papel runtime.
 - V3 tenant cria `clinic_settings` (fuso, linha única), com `SELECT` e `UPDATE (time_zone)` para o runtime.
-- Ainda sem tabelas de negócio: unicidade de telefone normalizado, valores válidos, relacionamentos e conflitos de agenda serão definidos nas migrações correspondentes.
+- V4 tenant cria `contacts` (telefone E.164 único, inclusive arquivados), `tags`, `contact_tags` e `contact_consents` (só inserção), com a extensão `pg_trgm` e grants por coluna (ADR-032).
+- As demais tabelas de negócio (funil, leads, vendas, conversas) definem as próprias constraints nas migrações correspondentes.
 
 ## Requisitos do provisionador
 

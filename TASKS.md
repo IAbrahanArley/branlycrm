@@ -313,14 +313,14 @@ O frontend acompanha cada API aprovada.
 - **Revisões:** `security` sem críticos nem altos. Corrigidos os médios (aninhamento, timeout de lock e fronteira de módulos no ArchUnit) e os baixos de construtores, log SQL, identidade, CHECK do fuso, cache e rollback em `Error`. `reviewer` sem bloqueantes; sugestões aplicadas.
 - **Pendências:**
   - **comando para aplicar migrações de clínica novas a clínicas já existentes** (hoje só o provisionamento aplica); até lá, clínica antiga responde `CLINIC_DATA_SCHEMA_OUTDATED`, inclusive no Docker local;
-  - motivo de conflito de integridade junto da CRM-020;
+  - ~~motivo de conflito de integridade junto da CRM-020~~ (feito: `CONFLICT` e `STALE`);
   - `MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes` falhou uma vez numa execução completa (todas as respostas 429) e passou nas seguintes: instabilidade anterior a esta tarefa.
 
 ## Fase 2 — Contatos e histórico
 
 Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-migration`), com `GRANT` explícito a `${runtimeRole}` em cada migração.
 
-### [ ] CRM-020 — Modelar contatos, tags e consentimento (P1)
+### [x] CRM-020 — Modelar contatos, tags e consentimento (P1)
 **Depende de:** CRM-015, CRM-017.
 **Atende:** PAC-01, PAC-03, PAC-06, PAC-08.
 **Entregas:**
@@ -333,6 +333,37 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - Telefone duplicado na mesma clínica é recusado, inclusive sob concorrência.
 - Formatos diferentes do mesmo número são normalizados igual.
 - Opt-out mais recente prevalece.
+**Estado (09/11/2026):** concluída na branch `feat/crm-020-contacts` (ADR-032). Desenho revisado pelo `architect`; as 12 decisões foram aprovadas pelo usuário.
+- **Módulo `contact`:** domínio, entidades na persistência da clínica, `ContactRepository`, `TagRepository`, `ConsentRepository` e `ContactException`. Sem API nem RBAC (CRM-021).
+- **Migração de clínica V4:** `contacts`, `tags`, `contact_tags` e `contact_consents`, com `pg_trgm`, CHECK do telefone canônico e da autoria, UNIQUE de telefone inclusive para arquivados e grants por coluna (consentimento só com inserção).
+- **Telefone:** normalizador próprio, com o 9º dígito inserido em celular brasileiro antigo; a criação devolve o contato existente pelo `ON CONFLICT`, sem erro.
+- **Consentimento:** o mais recente prevalece, opt-out vence empate, importação não reverte opt-out, e a ordem do histórico segue as escritas, não o relógio.
+- **Persistência da clínica:** motivos `CONFLICT` e `STALE`, registrados só em DEBUG.
+- **Testes:** `./mvnw -B -ntp clean verify` → 220 unitários (2 ignorados no Windows) e 113 de 114 de integração; a falha é o `MfaLockoutIT` instável (passa isolado). Entre os novos:
+  - `ContactPersistenceIT` (15), com clínicas provisionadas:
+    - mesmo número em formatos diferentes;
+    - 8 criações concorrentes resultam num contato só;
+    - arquivado mantém o número;
+    - versão e duplicidade com o id do contato existente;
+    - busca por nome sem acento, dígitos, número inteiro em formato antigo e e-mail, com curingas literais;
+    - tags e cascata;
+    - consentimento com relógio parado e recuado;
+    - consentimento concorrente;
+    - dado gravado fora das regras como `INVALID_DATA`;
+    - isolamento A/B em leitura, lista, busca, filtro, alteração, vínculo e consentimento;
+    - grants do runtime;
+    - CHECKs como dono;
+    - mapeamento validado como runtime.
+  - `PhoneNumberTest` (38), `ContactDomainTest` (12), `ClinicPersistenceTest` e `ArchitectureTest`.
+- **Revisões:**
+  - `security`: sem críticos nem altos. Médios corrigidos: ordem do consentimento independente do relógio, e-mail validado com Unicode, duplicidade verificada antes do UPDATE e listagem sem observações nem nascimento.
+  - `reviewer`: sem bloqueadores. Corrigidos: dado inválido gravado vira `INVALID_DATA`, arquivamento concorrente idempotente, corrida na criação, busca pelo número inteiro, caracteres invisíveis, limite do `name_search` e código morto.
+- **Pendências:**
+  - a V4 só chega a clínicas existentes pelo rollout `tenant-migrate` (ADR-031, branch `feat/tenant-migration-rollout`, sem merge); mergear antes da CRM-021;
+  - `log_error_verbosity=terse` no PostgreSQL, para o DETAIL de erros não levar dados pessoais ao log do servidor (decisão de infraestrutura, CRM-072);
+  - para a CRM-021: origem do consentimento fixada pelo canal, política de leitura antes de expor o contato existente, termo de busca de 2 caracteres sem índice;
+  - para a CRM-082: o webhook prefixa `+` no `wa_id` de números estrangeiros;
+  - para a CRM-073: finalidade de nascimento e observações no inventário.
 
 ### [ ] CRM-021 — API de contatos (P1)
 **Depende de:** CRM-020, CRM-004.

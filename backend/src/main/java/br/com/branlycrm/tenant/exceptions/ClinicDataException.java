@@ -3,8 +3,7 @@ package br.com.branlycrm.tenant.exceptions;
 /**
  * Failure reading or writing a clinic database through the clinic persistence unit. The message is
  * a stable code: SQL text and values stay in the cause, never in what reaches a client or a log.
- * Missing access is not reported here but as {@link TenantAccessException}. Integrity conflicts
- * (unique, check) get their own reason with the first table that needs one (CRM-020).
+ * Missing access is not reported here but as {@link TenantAccessException}.
  */
 public final class ClinicDataException extends RuntimeException {
   public enum Reason {
@@ -16,6 +15,10 @@ public final class ClinicDataException extends RuntimeException {
     INVALID_DATA,
     /** The connected database declares another clinic: a registry incident, never retried. */
     IDENTITY_MISMATCH,
+    /** A unique constraint refused the write; the calling repository knows which one it touched. */
+    CONFLICT,
+    /** The row changed since it was read (optimistic version check). */
+    STALE,
     /** Connection, lock, timeout or any other database failure. */
     UNAVAILABLE
   }
