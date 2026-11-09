@@ -21,12 +21,19 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <pre>
  * create-agency --request-id UUID --name NAME --admin-email EMAIL
  * invite-agency-admin --agency-id UUID --email EMAIL
+ * reset-mfa --email EMAIL
  * </pre>
  *
  * The invitation link is printed once to standard output, never through the logger and never by
  * e-mail (the Resend key exists only in the API); the address is not printed. Running again with
  * the same arguments reuses the agency and rotates the pending invitation, so the previous link
  * stops working: that is also how a leaked link is revoked.
+ *
+ * <p>{@code reset-mfa} (CRM-016) is the recovery of someone who lost both the authenticator and the
+ * recovery codes, after the identity was checked outside the system: it removes the factor and the
+ * codes and ends every session; an owner or agency admin enrolls again at the next login. It prints
+ * only whether a factor existed, never the address. This process has no mail credential, so the
+ * account is warned by the enrollment notice that follows.
  */
 public class PlatformCommand implements CommandLineRunner {
   static final Duration VALIDITY = Duration.ofHours(72);
@@ -34,7 +41,8 @@ public class PlatformCommand implements CommandLineRunner {
   private static final Map<String, Set<String>> COMMANDS =
       Map.of(
           "create-agency", Set.of("--request-id", "--name", "--admin-email"),
-          "invite-agency-admin", Set.of("--agency-id", "--email"));
+          "invite-agency-admin", Set.of("--agency-id", "--email"),
+          "reset-mfa", Set.of("--email"));
 
   private final PlatformRepository platform;
   private final TransactionTemplate transactions;
@@ -56,6 +64,13 @@ public class PlatformCommand implements CommandLineRunner {
   public void run(String... args) {
     if (args.length == 0 || !COMMANDS.containsKey(args[0])) throw usage();
     Map<String, String> options = options(args, COMMANDS.get(args[0]));
+    if ("reset-mfa".equals(args[0])) {
+      InvitationEmail email = InvitationEmail.of(options.get("--email"));
+      boolean removed =
+          Boolean.TRUE.equals(transactions.execute(status -> platform.resetMfa(email.value())));
+      out.println("mfaFactorRemoved: " + removed);
+      return;
+    }
     Issued issued =
         switch (args[0]) {
           case "create-agency" -> {
@@ -129,6 +144,7 @@ public class PlatformCommand implements CommandLineRunner {
   private static IllegalArgumentException usage() {
     return new IllegalArgumentException(
         "Usage: create-agency --request-id UUID --name NAME --admin-email EMAIL"
-            + " | invite-agency-admin --agency-id UUID --email EMAIL");
+            + " | invite-agency-admin --agency-id UUID --email EMAIL"
+            + " | reset-mfa --email EMAIL");
   }
 }

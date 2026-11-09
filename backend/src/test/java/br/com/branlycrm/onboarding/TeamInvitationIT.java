@@ -4,6 +4,7 @@ import static br.com.branlycrm.onboarding.InvitationFixtures.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
@@ -37,7 +38,11 @@ import tools.jackson.databind.JsonNode;
 @Testcontainers
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"spring.docker.compose.enabled=false", "app.mail.provider=local"})
+    properties = {
+      "spring.docker.compose.enabled=false",
+      "app.mail.provider=local",
+      MfaFixture.KEY_PROPERTY
+    })
 class TeamInvitationIT {
   @Container static final PostgreSQLContainer POSTGRES = TestPostgres.container();
   static final Path MAIL = temporaryDirectory();
@@ -372,6 +377,7 @@ class TeamInvitationIT {
     browser.csrf();
     assertThat(browser.login(email, PASSWORD).statusCode()).as("login " + email).isEqualTo(204);
     browser.csrf();
+    MfaFixture.complete(browser, fixtures.jdbc());
     return browser;
   }
 

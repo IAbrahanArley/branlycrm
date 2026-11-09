@@ -44,6 +44,9 @@ final class InvitationFixtures {
     superuser.update("DELETE FROM agency_memberships");
     superuser.update("DELETE FROM tenants");
     superuser.update("DELETE FROM agencies");
+    superuser.update("DELETE FROM account_notices");
+    superuser.update("DELETE FROM user_mfa_recovery_codes");
+    superuser.update("DELETE FROM user_mfa_totp");
     superuser.update("DELETE FROM user_accounts");
     try (var files = Files.list(mail)) {
       for (Path file : files.toList()) Files.delete(file);

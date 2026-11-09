@@ -160,6 +160,36 @@ class ArchitectureTest {
         .check(CODE);
   }
 
+  /**
+   * CRM-016: the second factor decides its obligation with its own SQL and never reaches the
+   * agency, onboarding or platform modules, which depend on identity.
+   */
+  @Test
+  void secondFactorDependsOnNoBusinessModule() {
+    noClasses()
+        .that()
+        .resideInAPackage("br.com.branlycrm.identity.mfa..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "br.com.branlycrm.agency..",
+            "br.com.branlycrm.onboarding..",
+            "br.com.branlycrm.platform..")
+        .check(CODE);
+  }
+
+  /** Second-factor keys, secrets and recovery codes are handled only inside identity. */
+  @Test
+  void secondFactorCryptoStaysInIdentity() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackage("br.com.branlycrm.identity..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("br.com.branlycrm.identity.mfa.crypto..")
+        .check(CODE);
+  }
+
   /** Modules form a hierarchy; onboarding orchestrates and nothing depends back on it. */
   @Test
   void modulesAreFreeOfCycles() {

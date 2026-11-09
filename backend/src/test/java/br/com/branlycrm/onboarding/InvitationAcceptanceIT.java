@@ -4,6 +4,7 @@ import static br.com.branlycrm.onboarding.InvitationFixtures.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
@@ -43,7 +44,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"spring.docker.compose.enabled=false", "app.mail.provider=local"})
+    properties = {
+      "spring.docker.compose.enabled=false",
+      "app.mail.provider=local",
+      MfaFixture.KEY_PROPERTY
+    })
 class InvitationAcceptanceIT {
   @Container static final PostgreSQLContainer POSTGRES = TestPostgres.container();
   static final Path MAIL = temporaryDirectory();
@@ -230,6 +235,7 @@ class InvitationAcceptanceIT {
     assertThat(agencyAdmin.login("agency-admin@example.test", PASSWORD).statusCode())
         .isEqualTo(204);
     agencyAdmin.csrf();
+    MfaFixture.complete(agencyAdmin, fixtures.jdbc());
     assertThat(code(accept(agencyAdmin, selfToken)))
         .as("an agency admin never becomes owner through its own agency")
         .isEqualTo("INVITATION_INVALID");

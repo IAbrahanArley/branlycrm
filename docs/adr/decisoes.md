@@ -513,3 +513,31 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - Ainda não há auditoria central dos convites e do comando de plataforma (CRM-070).
 - Ficam pendentes: retenção dos e-mails em convites, o que significa uma agência suspensa e como uma clínica sai de uma agência.
 
+## ADR-029 — Segundo fator TOTP para administradores
+
+**Data:** 08/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. Implementação em CRM-016.
+
+**Decisão:**
+- **Quem precisa:** obrigatório, sem carência, para participação `OWNER` ativa em qualquer clínica e para admin ativo de agência. Opcional para os demais. O Super Admin entra na mesma regra na CRM-060.
+- **Estado derivado a cada requisição** (`MfaGateFilter`), nunca guardado como marca:
+  - prova na sessão presa a `subject_id` e `auth_version`, removida a cada login;
+  - lista de permitidos por estado;
+  - login inalterado (204) e estado em `GET /v1/auth/mfa`.
+- **TOTP** (RFC 6238, SHA-1, 6 dígitos, 30 s, janela de ±1):
+  - feito só com o JDK, sem dependência nova;
+  - o segredo é cifrado com AES-256-GCM, com chave derivada por HKDF de `MFA_ENCRYPTION_KEY` (só na API) e AAD com propósito, sujeito e chave;
+  - os códigos de recuperação ficam como HMAC, com cerca de 80 bits cada.
+- **Banco** (V13): tabelas no banco central, com escrita só por funções `SECURITY DEFINER`. Repetição barrada por `last_used_step`, contador persistente de falhas com bloqueio e revogação de sessões por `auth_version`.
+- **Cadastro só com a sessão de senha, com aviso por e-mail** (risco aceito pelo responsável): quem tem só a senha de um administrador que ainda não cadastrou o fator pode cadastrar o próprio celular.
+- **Recuperação de quem perdeu tudo:** o comando de plataforma `reset-mfa`, pela função `platform_reset_mfa`, depois de confirmar a identidade por fora.
+
+**Alternativas:**
+- Confirmar o primeiro cadastro por link no e-mail (mais seguro, mais trabalho agora).
+- Mudar o login para 200 com corpo (quebraria o contrato do frontend).
+- Fatores de autoridade do Spring Security (a exigência é dinâmica e o projeto não usa autoridades globais na sessão).
+
+**Consequências:**
+- A API não sobe sem `MFA_ENCRYPTION_KEY`. Perder essa chave invalida todos os fatores cadastrados (rotação e guarda em CRM-072).
+- O reset pela plataforma grava um aviso pendente, enviado pela API no próximo login (V14); quem não entra de novo não recebe.
+- Bloqueio progressivo por conta, de 15 minutos até 24 horas, com aviso por e-mail. As tentativas são reservadas antes da comparação.
+- Ainda não há auditoria central (CRM-070).

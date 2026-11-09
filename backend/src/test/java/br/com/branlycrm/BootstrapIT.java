@@ -3,6 +3,7 @@ package br.com.branlycrm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +19,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Testcontainers
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "spring.docker.compose.enabled=false")
+    properties = {"spring.docker.compose.enabled=false", MfaFixture.KEY_PROPERTY})
 class BootstrapIT {
   @Container @ServiceConnection
   static final PostgreSQLContainer POSTGRES = TestPostgres.container();
@@ -32,7 +33,7 @@ class BootstrapIT {
             jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank",
                 String.class))
-        .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+        .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM pg_extension WHERE extname = 'vector'", Integer.class))

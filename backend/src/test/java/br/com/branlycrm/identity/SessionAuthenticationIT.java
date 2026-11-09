@@ -3,6 +3,7 @@ package br.com.branlycrm.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import java.util.Locale;
 import java.util.UUID;
@@ -23,7 +24,7 @@ import tools.jackson.databind.JsonNode;
 @Testcontainers
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "spring.docker.compose.enabled=false")
+    properties = {"spring.docker.compose.enabled=false", MfaFixture.KEY_PROPERTY})
 class SessionAuthenticationIT {
   @Container @ServiceConnection
   static final PostgreSQLContainer POSTGRES = TestPostgres.container();
@@ -50,6 +51,8 @@ class SessionAuthenticationIT {
     jdbc.update("DELETE FROM tenant_provisioning_tasks");
     jdbc.update("DELETE FROM tenant_memberships");
     jdbc.update("DELETE FROM tenants");
+    jdbc.update("DELETE FROM user_mfa_recovery_codes");
+    jdbc.update("DELETE FROM user_mfa_totp");
     jdbc.update("DELETE FROM user_accounts");
     ownerA = account("owner-a@example.test", true);
     ownerB = account("owner-b@example.test", true);
@@ -86,6 +89,12 @@ class SessionAuthenticationIT {
     var login = browser.login(" OWNER-A@example.test ", PASSWORD);
     assertThat(login.statusCode()).isEqualTo(204);
     assertThat(login.headers().firstValue("Location")).isEmpty();
+    // The token rotates on login: the pre-login token must no longer authorize mutations.
+    var stale = browser.put("/v1/auth/clinic/" + clinicA, true);
+    assertThat(stale.statusCode()).isEqualTo(403);
+    assertThat(Browser.JSON.readTree(stale.body()).get("code").asText()).isEqualTo("CSRF_INVALID");
+    // An owner proves the second factor before reaching anything else (CRM-016).
+    MfaFixture.complete(browser, jdbc);
 
     var me = browser.get("/v1/auth/me");
     assertThat(me.statusCode()).isEqualTo(200);
@@ -100,9 +109,6 @@ class SessionAuthenticationIT {
     assertThat(clinics.get(0).get("clinicName").asText()).isEqualTo("Clínica A");
     assertThat(clinics.get(0).get("role").asText()).isEqualTo("OWNER");
 
-    // The token rotates on login: the pre-login token must no longer authorize mutations.
-    assertThat(browser.put("/v1/auth/clinic/" + clinicA, true).statusCode()).isEqualTo(403);
-    browser.csrf();
     assertThat(browser.put("/v1/auth/clinic/" + clinicA, false).statusCode()).isEqualTo(403);
     var foreign = browser.put("/v1/auth/clinic/" + clinicB, true);
     var absent = browser.put("/v1/auth/clinic/" + UUID.randomUUID(), true);
@@ -180,6 +186,7 @@ class SessionAuthenticationIT {
     browser.csrf();
     assertThat(browser.login(email, PASSWORD).statusCode()).isEqualTo(204);
     browser.csrf();
+    MfaFixture.complete(browser, jdbc);
     return browser;
   }
 

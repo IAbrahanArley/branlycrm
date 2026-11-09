@@ -3,6 +3,7 @@ package br.com.branlycrm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Testcontainers
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "spring.docker.compose.enabled=false")
+    properties = {"spring.docker.compose.enabled=false", MfaFixture.KEY_PROPERTY})
 class OpenApiContractIT {
   @Container @ServiceConnection
   static final PostgreSQLContainer POSTGRES = TestPostgres.container();

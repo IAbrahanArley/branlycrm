@@ -8,8 +8,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Writes of the platform command, as crm_platform_operator: agencies (V11) and agency admin
- * invitations through platform_issue_agency_admin_invitation (V12). The role has no direct
- * privilege on invitations and cannot read accounts, clinics or memberships.
+ * invitations through platform_issue_agency_admin_invitation (V12), and the second-factor reset
+ * through platform_reset_mfa (V13). The role has no direct privilege on invitations nor on the
+ * second-factor tables and cannot read accounts, clinics or memberships.
  */
 public class PlatformRepository {
   private final JdbcTemplate jdbc;
@@ -54,6 +55,15 @@ public class PlatformRepository {
         email,
         tokenHash,
         Timestamp.from(expiresAt));
+  }
+
+  /**
+   * Removes the second factor and recovery codes of the account and revokes its sessions. True when
+   * a confirmed factor existed; an unknown address is also false.
+   */
+  public boolean resetMfa(String email) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject("SELECT platform_reset_mfa(?)", Boolean.class, email));
   }
 
   public Instant now() {

@@ -97,6 +97,14 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `IDEMPOTENCY_KEY_REUSED` | 409 | O mesmo `requestId` já criou uma clínica com outros dados | Carteira da agência |
 | `AGENCY_PENDING_CLINIC_LIMIT` | 409 | Clínicas demais em preparação na agência (padrão: 20) | Carteira da agência |
 | `AGENCY_CLINIC_HAS_OWNER` | 409 | A clínica já teve gestor; convites passam a ser da própria clínica | Carteira da agência |
+| `MFA_REQUIRED` | 401 | Sessão logada pela senha, mas o segundo fator ainda não foi verificado | `MfaGateFilter` |
+| `MFA_ENROLLMENT_REQUIRED` | 403 | Dono de clínica ou admin de agência sem segundo fator cadastrado | `MfaGateFilter` |
+| `MFA_CODE_INVALID` | 400 | Código errado, já usado ou de recuperação inválido; sempre a mesma resposta | Segundo fator |
+| `MFA_LOCKED` | 429 | Falhas demais na conta (10 em sequência); o bloqueio dobra a cada repetição, até 24 h; respeitar `Retry-After` | Segundo fator |
+| `MFA_SETUP_EXPIRED` | 409 | Cadastro sem segredo pendente válido nesta sessão; refazer o setup | Segundo fator |
+| `MFA_MANDATORY` | 403 | Quem é obrigado a ter o fator não pode desativá-lo | Segundo fator |
+| `MFA_NOT_ENROLLED` | 409 | Operação exige fator cadastrado | Segundo fator |
+| `MFA_ALREADY_COMPLETE` | 409 | Verificação numa sessão já verificada | Segundo fator |
 | `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02) | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |

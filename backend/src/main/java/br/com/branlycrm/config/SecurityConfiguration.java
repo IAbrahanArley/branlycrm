@@ -1,11 +1,16 @@
 package br.com.branlycrm.config;
 
 import br.com.branlycrm.common.web.ApiErrors;
+import br.com.branlycrm.identity.mfa.services.MfaService;
 import br.com.branlycrm.identity.security.CrmPrincipal;
 import br.com.branlycrm.identity.security.LoginRateLimitFilter;
+import br.com.branlycrm.identity.security.MfaGateFilter;
 import br.com.branlycrm.identity.security.SessionValidationFilter;
+import br.com.branlycrm.identity.services.AccountNoticeService;
 import br.com.branlycrm.identity.services.IdentityService;
 import br.com.branlycrm.tenant.services.TenantAccessService;
+import jakarta.servlet.http.HttpSession;
+import java.time.Clock;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +29,9 @@ import org.springframework.security.web.csrf.CsrfException;
 
 /**
  * ADR-015: server session with HttpOnly cookie and CSRF. Login and logout are handled by the native
- * Spring Security filters and answer with plain status codes, never redirects.
+ * Spring Security filters and answer with plain status codes, never redirects. Login stays 204 with
+ * or without a second factor (CRM-016): {@link MfaGateFilter} then confines the session to the
+ * second-factor routes until it is proved or enrolled.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnWebApplication
@@ -61,7 +68,13 @@ public class SecurityConfiguration {
 
   @Bean
   SecurityFilterChain securityFilterChain(
-      HttpSecurity http, IdentityService identities, TenantAccessService tenants) throws Exception {
+      HttpSecurity http,
+      IdentityService identities,
+      TenantAccessService tenants,
+      MfaService mfa,
+      AccountNoticeService notices,
+      Clock clock)
+      throws Exception {
     return http.csrf(Customizer.withDefaults())
         .requestCache(cache -> cache.disable())
         .sessionManagement(
@@ -112,9 +125,19 @@ public class SecurityConfiguration {
                     .passwordParameter("password")
                     .successHandler(
                         (request, response, authentication) -> {
-                          request
-                              .getSession()
-                              .removeAttribute(SessionValidationFilter.SELECTED_TENANT);
+                          // A new login, even of the same account on the same cookie, starts
+                          // without clinic, without second-factor proof and with a fresh clock.
+                          HttpSession session = request.getSession();
+                          session.removeAttribute(SessionValidationFilter.SELECTED_TENANT);
+                          session.removeAttribute(MfaGateFilter.MFA_PROOF);
+                          session.removeAttribute(MfaGateFilter.MFA_FAILURES);
+                          session.removeAttribute(MfaGateFilter.MFA_SETUP_NONCE);
+                          session.setAttribute(
+                              MfaGateFilter.PASSWORD_AUTHENTICATED_AT, clock.instant());
+                          // Notices left by the platform (reset-mfa), which has no mail.
+                          if (authentication.getPrincipal() instanceof CrmPrincipal principal) {
+                            notices.deliverPending(principal);
+                          }
                           response.setStatus(204);
                         })
                     .failureHandler(
@@ -135,12 +158,21 @@ public class SecurityConfiguration {
                     .logoutSuccessHandler(
                         (request, response, authentication) -> response.setStatus(204)))
         .addFilterBefore(
-            // Login and the anonymous invitation endpoints, which hash passwords too.
+            // Login, the anonymous invitation endpoints, which hash passwords too, and the
+            // second-factor code, on top of its per-session and per-account limits.
             new LoginRateLimitFilter(
-                Set.of(LOGIN_PATH, INVITATION_PREVIEW_PATH, INVITATION_ACCEPT_PATH)),
+                Set.of(
+                    LOGIN_PATH,
+                    INVITATION_PREVIEW_PATH,
+                    INVITATION_ACCEPT_PATH,
+                    MfaGateFilter.VERIFY_PATH),
+                clock),
             UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(
             new SessionValidationFilter(identities, tenants), AuthorizationFilter.class)
+        // Same position, registered after it: the stable sort keeps the gate right after the
+        // session validation, whatever the numeric order of the two.
+        .addFilterBefore(new MfaGateFilter(mfa, clock), AuthorizationFilter.class)
         .build();
   }
 }

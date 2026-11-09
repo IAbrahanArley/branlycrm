@@ -8,6 +8,7 @@ import br.com.branlycrm.identity.mail.PublicOrigin;
 import br.com.branlycrm.platform.repositories.PlatformRepository;
 import br.com.branlycrm.platform.services.PlatformCommand;
 import br.com.branlycrm.support.Browser;
+import br.com.branlycrm.support.MfaFixture;
 import br.com.branlycrm.support.TestPostgres;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -54,7 +55,8 @@ import tools.jackson.databind.JsonNode;
     properties = {
       "spring.docker.compose.enabled=false",
       "app.mail.provider=local",
-      "app.agency.max-unfinished-clinics=3"
+      "app.agency.max-unfinished-clinics=3",
+      MfaFixture.KEY_PROPERTY
     })
 class AgencyPortfolioIT {
   @Container static final PostgreSQLContainer POSTGRES = TestPostgres.container();
@@ -612,6 +614,7 @@ class AgencyPortfolioIT {
     Browser browser = anonymous();
     assertThat(browser.login(email, PASSWORD).statusCode()).as("login " + email).isEqualTo(204);
     browser.csrf();
+    MfaFixture.complete(browser, fixtures.jdbc());
     return browser;
   }
 

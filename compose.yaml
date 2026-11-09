@@ -61,6 +61,8 @@ services:
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@example.test}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Branly CRM}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # CRM-016: encrypts TOTP secrets. Only the API receives it, never migrate, provisioner or platform.
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Defina MFA_ENCRYPTION_KEY}
     volumes:
       # Read-only: only the future provisioner writes clinic credentials (ADR-016).
       - tenant_secrets:/run/branly/tenant-secrets:ro
