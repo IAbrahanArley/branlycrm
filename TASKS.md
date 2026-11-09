@@ -649,7 +649,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.md](docs/agents/PARALELO.md). Contrato: [docs/api/openapi.json](docs/api/openapi.json). Só tocam `frontend/`.
 
-**Ajustadas em 07/11/2026** depois da CRM-018 (agências): FE-001, FE-002 e FE-004 ganharam itens, e a FE-005 é nova. Códigos de erro em [api-convencoes.md](docs/api-convencoes.md).
+**Ajustadas em 07/11/2026** depois da CRM-018 (agências): FE-001, FE-002 e FE-004 ganharam itens, e a FE-005 é nova. **Em 09/11/2026**, depois da CRM-016 (segundo fator): FE-002 ajustada e FE-006 nova. Códigos de erro em [api-convencoes.md](docs/api-convencoes.md).
 
 ### [ ] FE-001 — Base do painel (P0)
 **Depende de:** contrato atual (sessão, CSRF, erros).
@@ -678,7 +678,10 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - Logout.
 - Seleção da clínica a partir de `GET /api/v1/auth/clinics` e `PUT /api/v1/auth/clinic/{tenantId}`, com troca de clínica.
 - Painel mostra a clínica e o papel atuais (`GET /api/v1/auth/clinic`).
-- Destino depois do login:
+- Destino depois do login, sempre consultando primeiro `GET /api/v1/auth/mfa` (o login continua respondendo 204):
+  - `MFA_PENDING` vai para a verificação do segundo fator (FE-006);
+  - `ENROLLMENT_REQUIRED` vai para o cadastro do segundo fator (FE-006);
+  - só com `COMPLETE` seguem as regras abaixo;
   - quem tem clínicas segue para a seleção ou para o painel;
   - quem não tem clínica, mas administra agência (`GET /api/v1/agencies` não vazio), vai para `/agencia` (FE-005);
   - quem administra agência e também tem clínicas pode alternar entre as duas áreas;
@@ -735,6 +738,51 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - **Sem dados de pacientes:** a área da agência nunca mostra nem pede dados de pacientes, e não oferece abrir a clínica (a agência não tem participação; ADR-026).
 - Estados de carregamento, vazio ("nenhuma clínica na carteira") e erro; funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam.
+
+### [ ] FE-006 — Segundo fator: cadastro, verificação e gestão (P0)
+**Depende de:** FE-001, FE-002 e o merge da CRM-016 (rotas `/api/v1/auth/mfa/**` no contrato).
+**Contexto:** desde a CRM-016, dono de clínica e admin de agência só usam o sistema depois de cadastrar e verificar um app autenticador (TOTP). Sem estas telas, essas pessoas ficam paradas no primeiro login. Regras em [autenticacao.md](docs/autenticacao.md), seção "Segundo fator".
+**Entregas:**
+- **Estado:** `GET /api/v1/auth/mfa` (`state`, `enrolled`, `required`, `recoveryCodesRemaining`) decide a tela.
+  - O cliente HTTP da FE-001 trata `MFA_REQUIRED` (401), levando à verificação, e `MFA_ENROLLMENT_REQUIRED` (403), levando ao cadastro, em qualquer rota.
+  - Nenhum desses dois casos é tratado como sessão expirada.
+- **Cadastro** (`ENROLLMENT_REQUIRED`, ou opcional pela área de segurança):
+  - `POST /api/v1/auth/mfa/totp/setup` devolve `secret` e `otpauthUri` uma única vez;
+  - mostrar a chave para digitar no app e, se a dependência de QR code for aprovada, o QR da `otpauthUri`;
+  - campo para o código de 6 dígitos;
+  - `POST /api/v1/auth/mfa/totp/confirm {code}`;
+  - `MFA_SETUP_EXPIRED` (409) pede um setup novo.
+- **Códigos de recuperação:**
+  - a resposta do confirm traz os 10 códigos, mostrados uma única vez, com copiar e baixar como texto;
+  - a pessoa confirma que guardou antes de seguir;
+  - nunca vão para storage, URL nem log.
+- **Verificação** (`MFA_PENDING`):
+  - `POST /api/v1/auth/mfa/verify` com `{code}` ou, pela opção "usar código de recuperação", `{recoveryCode}`;
+  - depois do 204, buscar o CSRF de novo, porque a sessão troca de id, e seguir as regras de destino da FE-002;
+  - a sessão pendente vence em 5 minutos: um 401 `SESSION_REVOKED` leva de volta ao login com essa explicação.
+- **Área "Segurança da conta"** (estado `COMPLETE`):
+  - mostra se o fator está ativo e quantos códigos de recuperação restam;
+  - gerar novos códigos (`POST /api/v1/auth/mfa/recovery-codes {code}`);
+  - trocar o fator (setup e confirm com `{code}` atual);
+  - desativar (`DELETE /api/v1/auth/mfa/totp {code}`) só para quem não é obrigado (`required: false`);
+  - trocar ou desativar encerra todas as sessões, inclusive a atual: avisar antes e levar ao login depois.
+**Aceite:**
+- Mensagens próprias para:
+  - `MFA_CODE_INVALID`;
+  - `MFA_LOCKED` (429, mostrando a espera a partir de `Retry-After`, que pode chegar a 24 horas);
+  - `MFA_SETUP_EXPIRED`;
+  - `MFA_MANDATORY`;
+  - `MFA_NOT_ENROLLED`;
+  - `MFA_ALREADY_COMPLETE`.
+- **Sigilo:** o segredo, a `otpauthUri` e os códigos de recuperação nunca vão para `localStorage`, `sessionStorage`, URL, título da página nem console. Ficam só na memória da tela e somem ao sair dela.
+- **Acessibilidade:**
+  - campo de código com `inputmode="numeric"`, `autocomplete="one-time-code"` e rótulo;
+  - foco no campo ao abrir;
+  - erros associados ao campo;
+  - funciona por teclado e no celular.
+- **Fluxo completo:** um dono de clínica novo consegue aceitar o convite, entrar, cadastrar o fator, guardar os códigos e chegar ao painel; no login seguinte, verifica com o app.
+- **Checks:** `lint`, `typecheck` e `build` passam.
+- **Dependência nova:** um gerador de QR code, por exemplo, exige aprovação do responsável. Sem ela, a tela funciona só com a chave em texto.
 
 ## Retirado do MVP
 
