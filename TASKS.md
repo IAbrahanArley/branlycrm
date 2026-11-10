@@ -585,7 +585,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Para a CRM-035:** a venda referencia o id e recusa item inativo em venda nova; o histórico continua lendo os inativos.
 - **Pendente:** tela de configuração do catálogo (frontend, junto com a CRM-036).
 
-### [ ] CRM-035 — Registro de vendas (P1)
+### [x] CRM-035 — Registro de vendas (P1)
 **Depende de:** CRM-032, CRM-034.
 **Atende:** CRM-05, PAC-04, RN-03, RN-04, RN-09.
 **Entregas:**
@@ -600,6 +600,35 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - A venda herda a origem do lead.
 - Correções ficam no histórico.
 - A/B testado.
+**Estado (10/11/2026):** concluída na branch `feat/crm-035-vendas`, no modo MVP. API pronta; a tela rápida vai para o Codex.
+- **Migração de clínica V9:**
+  - `sales`: valor em centavos maior que zero, dia da venda no fuso da clínica (padrão: hoje; nunca no futuro), forma de pagamento opcional, `ACTIVE` ou `CANCELLED` com motivo, e no máximo uma venda ativa por lead;
+  - `sale_events`: imutável, com os valores anteriores e os novos;
+  - `contacts.patient_since`;
+  - runtime sem `DELETE` e com `UPDATE` só nas colunas editáveis.
+- **Rotas:**
+  - `POST /v1/clinic/leads/{leadId}/sale` (`SALE_REGISTER`, inclui o Atendente; `version` do lead): na mesma transação cria a venda, fecha o lead como ganho e marca o contato como paciente;
+  - `PUT /v1/clinic/sales/{id}` (correção) e `POST /{id}/cancellation`, com `version` e motivo, só `SALE_CORRECT` (Proprietário e Gestor);
+  - `GET /v1/clinic/sales` (filtros de contato, lead, situação e período), `GET /{id}` e `GET /{id}/events`.
+- **Decisões:**
+  - cancelar a venda mantém o lead ganho e tira a venda do faturamento; se não restar venda ativa, o contato deixa de ser paciente;
+  - na correção, o item já inativo pode continuar na venda, mas não se troca para outro inativo;
+  - a origem (CRM-090) virá do lead, pela relação, sem cópia.
+- **Contrato:** contatos ganham o campo `patient` (aditivo); códigos `SALE_*` no catálogo de `api-convencoes.md`.
+- **Testes:** `SalesApiIT`:
+  - recusas (sem valor, sem procedimento, centavos fracionários, item inativo);
+  - registro pelo Atendente, com lead ganho e paciente;
+  - correção com histórico e cancelamento pelo Gestor (403 para o Atendente);
+  - isolamento A/B em leitura, alteração e lista;
+  - duas vendas simultâneas no mesmo lead: só uma é registrada;
+  - correção mantendo item inativo (200) ou trocando para um inativo (409), dia futuro (400), e grants da V9 conferidos no banco.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos:
+  - corrida no cancelamento: o contato é travado antes de recalcular "paciente";
+  - CHECK da forma de pagamento nos eventos;
+  - lacunas de teste e javadoc.
+- **Pendente:**
+  - tela rápida de registro (Codex);
+  - uso das vendas ativas no dashboard e no relatório (CRM-051).
 
 ### [ ] CRM-036 — Configuração do funil e dos motivos de perda (P1)
 **Depende de:** CRM-031, CRM-030.

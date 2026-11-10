@@ -88,6 +88,18 @@
         },
         "type" : "object"
       },
+      "CancellationRequest" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ClinicSelectionView" : {
         "properties" : {
           "tenantId" : {
@@ -230,6 +242,9 @@
           "name" : {
             "type" : "string"
           },
+          "patient" : {
+            "type" : "boolean"
+          },
           "phone" : {
             "type" : "string"
           }
@@ -271,6 +286,9 @@
           },
           "notes" : {
             "type" : "string"
+          },
+          "patient" : {
+            "type" : "boolean"
           },
           "phone" : {
             "type" : "string"
@@ -740,6 +758,29 @@
         },
         "type" : "object"
       },
+      "PageViewSaleView" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SaleView"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageSize" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageViewTeamInvitationView" : {
         "properties" : {
           "items" : {
@@ -960,6 +1001,153 @@
         "properties" : {
           "role" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SaleEventView" : {
+        "properties" : {
+          "actorId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "amountCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "paymentMethod" : {
+            "type" : "string"
+          },
+          "previousAmountCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "previousPaymentMethod" : {
+            "type" : "string"
+          },
+          "previousProcedureId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "previousProfessionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "previousSoldOn" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "procedureId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "soldOn" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SaleRequest" : {
+        "properties" : {
+          "amountCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentMethod" : {
+            "type" : "string"
+          },
+          "procedureId" : {
+            "type" : "string"
+          },
+          "professionalId" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "soldOn" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SaleView" : {
+        "properties" : {
+          "amountCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "cancelReason" : {
+            "type" : "string"
+          },
+          "cancelledAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "contactId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "leadId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "paymentMethod" : {
+            "type" : "string"
+          },
+          "procedureId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "soldOn" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -4312,6 +4500,117 @@
         "tags" : [ "Leads" ]
       }
     },
+    "/v1/clinic/leads/{leadId}/sale" : {
+      "post" : {
+        "operationId" : "registerSale",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "leadId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SaleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SaleView"
+                }
+              }
+            },
+            "description" : "Sale registered"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LEAD_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LEAD_STALE, LEAD_CLOSED, SALE_PROCEDURE_UNAVAILABLE, SALE_PROFESSIONAL_UNAVAILABLE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Register the sale of an open lead and close it as won (version is the lead's)",
+        "tags" : [ "Sales" ]
+      }
+    },
     "/v1/clinic/leads/{leadId}/stage" : {
       "put" : {
         "operationId" : "moveLeadStage",
@@ -5349,6 +5648,453 @@
         } ],
         "summary" : "Activate or deactivate a professional (OWNER, MANAGER); idempotent",
         "tags" : [ "Professionals" ]
+      }
+    },
+    "/v1/clinic/sales" : {
+      "get" : {
+        "operationId" : "listSales",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "contactId",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "leadId",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewSaleView"
+                }
+              }
+            },
+            "description" : "Page of sales"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "List sales, newest sale day first",
+        "tags" : [ "Sales" ]
+      }
+    },
+    "/v1/clinic/sales/{saleId}" : {
+      "get" : {
+        "operationId" : "getSale",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "saleId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SaleView"
+                }
+              }
+            },
+            "description" : "Sale"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SALE_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Sale detail",
+        "tags" : [ "Sales" ]
+      },
+      "put" : {
+        "operationId" : "correctSale",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "saleId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SaleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SaleView"
+                }
+              }
+            },
+            "description" : "Sale corrected"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SALE_STALE, SALE_CANCELLED, SALE_PROCEDURE_UNAVAILABLE, SALE_PROFESSIONAL_UNAVAILABLE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Correct an active sale with a reason (OWNER, MANAGER)",
+        "tags" : [ "Sales" ]
+      }
+    },
+    "/v1/clinic/sales/{saleId}/cancellation" : {
+      "post" : {
+        "operationId" : "cancelSale",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "saleId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CancellationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SaleView"
+                }
+              }
+            },
+            "description" : "Sale cancelled"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SALE_STALE, SALE_CANCELLED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Cancel an active sale with a reason (OWNER, MANAGER); the lead stays won",
+        "tags" : [ "Sales" ]
+      }
+    },
+    "/v1/clinic/sales/{saleId}/events" : {
+      "get" : {
+        "operationId" : "listSaleEvents",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "saleId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/SaleEventView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Events"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "The sale's history, oldest first",
+        "tags" : [ "Sales" ]
       }
     },
     "/v1/clinic/tags" : {
@@ -6622,20 +7368,14 @@
     }
   },
   "tags" : [ {
-    "description" : "Procedures the clinic sells",
-    "name" : "Procedures"
-  }, {
     "description" : "TOTP enrollment, verification and recovery codes",
     "name" : "Second factor"
-  }, {
-    "description" : "Invite, resend and revoke for the selected clinic",
-    "name" : "Team invitations"
   }, {
     "description" : "Contacts, their tags and consent in the selected clinic",
     "name" : "Contacts"
   }, {
-    "description" : "Manual tags of the selected clinic",
-    "name" : "Tags"
+    "description" : "Sales registration, correction, cancellation and history",
+    "name" : "Sales"
   }, {
     "description" : "Authenticated identity and clinic selection",
     "name" : "Session"
@@ -6643,17 +7383,26 @@
     "description" : "Preview and accept an invitation",
     "name" : "Invitations"
   }, {
-    "description" : "Members and roles of the selected clinic",
-    "name" : "Team"
-  }, {
     "description" : "Sales funnel stages and loss reasons of the selected clinic",
     "name" : "Pipeline"
   }, {
-    "description" : "Professionals who perform the clinic's procedures",
-    "name" : "Professionals"
-  }, {
     "description" : "Partner agencies and their clinic portfolio",
     "name" : "Agencies"
+  }, {
+    "description" : "Procedures the clinic sells",
+    "name" : "Procedures"
+  }, {
+    "description" : "Invite, resend and revoke for the selected clinic",
+    "name" : "Team invitations"
+  }, {
+    "description" : "Manual tags of the selected clinic",
+    "name" : "Tags"
+  }, {
+    "description" : "Members and roles of the selected clinic",
+    "name" : "Team"
+  }, {
+    "description" : "Professionals who perform the clinic's procedures",
+    "name" : "Professionals"
   }, {
     "description" : "Leads, their transitions, timeline and notes",
     "name" : "Leads"

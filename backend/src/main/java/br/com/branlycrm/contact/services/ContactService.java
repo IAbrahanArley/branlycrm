@@ -200,7 +200,8 @@ public class ContactService {
         contact.archivedAt(),
         contact.version(),
         detail.tags().stream().map(TagService::view).toList(),
-        consentMap(detail.consent()));
+        consentMap(detail.consent()),
+        contact.patient());
   }
 
   private static ContactSummaryView summary(ContactSummary contact) {
@@ -210,7 +211,8 @@ public class ContactService {
         contact.phone().e164(),
         contact.email(),
         contact.createdVia().name(),
-        contact.archivedAt());
+        contact.archivedAt(),
+        contact.patientSince() != null);
   }
 
   private static ContactConsentsView consentsView(List<ConsentRecord> history) {

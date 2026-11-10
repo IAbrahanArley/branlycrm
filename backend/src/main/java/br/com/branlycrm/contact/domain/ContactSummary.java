@@ -13,7 +13,8 @@ public record ContactSummary(
     PhoneNumber phone,
     String email,
     ContactCreatedVia createdVia,
-    Instant archivedAt) {
+    Instant archivedAt,
+    Instant patientSince) {
   public ContactSummary {
     if (id == null || name == null || phone == null || createdVia == null) {
       throw new IllegalArgumentException("Incomplete contact summary");

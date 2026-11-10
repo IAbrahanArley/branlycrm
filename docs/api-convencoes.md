@@ -125,6 +125,10 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `PROCEDURE_DUPLICATE` / `PROFESSIONAL_DUPLICATE` | 409 | Já existe item com o mesmo nome, sem diferenciar maiúsculas, inclusive inativo | Catálogo |
 | `PROCEDURE_STALE` / `PROFESSIONAL_STALE` | 409 | O item mudou desde a leitura (`version`) | Catálogo |
 | `PROCEDURE_LIMIT` / `PROFESSIONAL_LIMIT` | 409 | Limite de 300 procedimentos ou 100 profissionais por clínica | Catálogo |
+| `SALE_NOT_FOUND` | 404 | Venda inexistente nesta clínica (mesma resposta para a de outra clínica) | Vendas |
+| `SALE_STALE` | 409 | A venda mudou desde a leitura (`version`) | Vendas |
+| `SALE_CANCELLED` | 409 | A venda está cancelada e não muda mais | Vendas |
+| `SALE_PROCEDURE_UNAVAILABLE` / `SALE_PROFESSIONAL_UNAVAILABLE` | 409 | Item inexistente, ou inativo numa escolha nova | Vendas |
 | `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02), ou uma escrita concorrente no banco da clínica | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |

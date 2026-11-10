@@ -15,6 +15,8 @@ class PipelineClinicEntities implements ClinicEntityRegistration {
         LossReasonEntity.class,
         LeadEntity.class,
         LeadEventEntity.class,
-        LeadNoteEntity.class);
+        LeadNoteEntity.class,
+        SaleEntity.class,
+        SaleEventEntity.class);
   }
 }

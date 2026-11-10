@@ -79,6 +79,10 @@ public class LeadEntity {
     return version;
   }
 
+  public UUID contactId() {
+    return contactId;
+  }
+
   public LeadStatus status() {
     return status;
   }
