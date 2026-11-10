@@ -5,6 +5,7 @@ import br.com.branlycrm.common.domain.PageResult;
 import br.com.branlycrm.common.dto.response.PageView;
 import br.com.branlycrm.common.exceptions.InvalidInputException;
 import br.com.branlycrm.pipeline.domain.LeadNote;
+import br.com.branlycrm.pipeline.domain.LeadOrigin;
 import br.com.branlycrm.pipeline.domain.LeadSearch;
 import br.com.branlycrm.pipeline.domain.LeadStatus;
 import br.com.branlycrm.pipeline.domain.LeadSummary;
@@ -12,6 +13,7 @@ import br.com.branlycrm.pipeline.domain.Temperature;
 import br.com.branlycrm.pipeline.dto.request.LossRequest;
 import br.com.branlycrm.pipeline.dto.request.NoteRequest;
 import br.com.branlycrm.pipeline.dto.request.OpenLeadRequest;
+import br.com.branlycrm.pipeline.dto.request.OriginRequest;
 import br.com.branlycrm.pipeline.dto.request.ResponsibleChangeRequest;
 import br.com.branlycrm.pipeline.dto.request.StageChangeRequest;
 import br.com.branlycrm.pipeline.dto.request.TemperatureChangeRequest;
@@ -75,7 +77,23 @@ public class LeadRequestService {
     UUID contact = uuid(request.contactId(), "contactId", true);
     Temperature temperature = optional(Temperature.class, request.temperature(), "temperature");
     UUID responsible = uuid(request.responsibleId(), "responsibleId", false);
-    return leads.open(tenantId, actor, contact, temperature, responsible);
+    if (request.origin() == null) {
+      return leads.open(tenantId, actor, contact, temperature, responsible);
+    }
+    LeadOrigin origin = manual(request.origin());
+    return leads.open(tenantId, actor, contact, temperature, responsible, origin);
+  }
+
+  public LeadView correctOrigin(UUID tenantId, UUID actor, UUID leadId, OriginRequest request) {
+    if (request == null) throw new InvalidInputException("body");
+    LeadOrigin origin = manual(request);
+    return leads.correctOrigin(tenantId, actor, leadId, version(request.version()), origin);
+  }
+
+  private static LeadOrigin manual(OriginRequest request) {
+    LeadOrigin.Type type = optional(LeadOrigin.Type.class, request.type(), "type");
+    if (type == null) throw new InvalidInputException("type");
+    return LeadOrigin.manual(type, request.code(), request.title());
   }
 
   public LeadView moveStage(UUID tenantId, UUID actor, UUID leadId, StageChangeRequest request) {
@@ -129,7 +147,8 @@ public class LeadRequestService {
         lead.temperature() == null ? null : lead.temperature().name(),
         lead.responsibleId(),
         lead.openedAt(),
-        lead.version());
+        lead.version(),
+        LeadService.origin(lead.origin()));
   }
 
   private static LeadNoteView note(LeadNote note) {

@@ -14,9 +14,15 @@ public record Lead(
     UUID lossReasonId,
     Instant openedAt,
     Instant closedAt,
-    long version) {
+    long version,
+    LeadOrigin origin) {
   public Lead {
-    if (id == null || contactId == null || stageId == null || status == null || openedAt == null) {
+    if (id == null
+        || contactId == null
+        || stageId == null
+        || status == null
+        || openedAt == null
+        || origin == null) {
       throw new IllegalArgumentException("Incomplete lead");
     }
   }

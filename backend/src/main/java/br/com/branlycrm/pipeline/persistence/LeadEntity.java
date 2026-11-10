@@ -1,6 +1,7 @@
 package br.com.branlycrm.pipeline.persistence;
 
 import br.com.branlycrm.pipeline.domain.Lead;
+import br.com.branlycrm.pipeline.domain.LeadOrigin;
 import br.com.branlycrm.pipeline.domain.LeadStatus;
 import br.com.branlycrm.pipeline.domain.Temperature;
 import jakarta.persistence.Column;
@@ -65,6 +66,26 @@ public class LeadEntity {
   @Column(name = "updated_by")
   private UUID updatedBy;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "origin_type", nullable = false, length = 20)
+  private LeadOrigin.Type originType;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "origin_source", nullable = false, length = 8)
+  private LeadOrigin.Source originSource;
+
+  @Column(name = "origin_ad_id", length = 64)
+  private String originAdId;
+
+  @Column(name = "origin_code", length = 32)
+  private String originCode;
+
+  @Column(name = "origin_title", length = 200)
+  private String originTitle;
+
+  @Column(name = "origin_ctwa_clid", length = 512)
+  private String originCtwaClid;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -126,6 +147,21 @@ public class LeadEntity {
     touch(actor, now);
   }
 
+  public LeadOrigin origin() {
+    return new LeadOrigin(
+        originType, originSource, originAdId, originCode, originTitle, originCtwaClid);
+  }
+
+  public void changeOrigin(LeadOrigin origin, UUID actor, Instant now) {
+    this.originType = origin.type();
+    this.originSource = origin.source();
+    this.originAdId = origin.adId();
+    this.originCode = origin.code();
+    this.originTitle = origin.title();
+    this.originCtwaClid = origin.ctwaClid();
+    touch(actor, now);
+  }
+
   public Lead toDomain() {
     return new Lead(
         id,
@@ -137,7 +173,8 @@ public class LeadEntity {
         lossReasonId,
         openedAt,
         closedAt,
-        version);
+        version,
+        origin());
   }
 
   private void touch(UUID actor, Instant now) {

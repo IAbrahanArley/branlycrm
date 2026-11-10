@@ -691,3 +691,31 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - **Cobrança das conversas:** a Meta cobra por modelo de mensagem; quem paga (a clínica com o próprio meio de pagamento ou o Branly CRM) entra na decisão de cobrança pendente.
 - **CRM-005** deixa de comparar fornecedores e passa a provar a Cloud API: `referral` real, Embedded Signup, coexistência com o app WhatsApp Business e latências.
 - **Tokens** de cada clínica seguem o desenho de segredos da CRM-080, sem dar à API o gravador genérico de segredos.
+
+## ADR-035 — Origem no lead, toques do contato e correção manual
+
+**Data:** 10/11/2026. **Status:** Aceita pelo usuário (plano da CRM-090). **Complementa:** ADR-027 e ADR-034.
+
+**Decisão:**
+- **A origem é do lead** (RN-03), em colunas do próprio `leads`:
+  - tipo: Tráfego pago, Instagram orgânico, Indicação, Google, Outro ou Não identificada (padrão);
+  - fonte: anúncio, código, manual ou nenhuma;
+  - ID e título do anúncio, ou o código do link.
+  A venda herda a origem pela relação com o lead, sem cópia.
+- **Primeiro toque fica (RN-02):** nada automático sobrescreve a origem do lead. Cada chegada seguinte do contato vira uma linha de `origin_touches`, ligada ao lead aberto naquele momento, se houver.
+- **Correção manual:**
+  - `LEAD_ORIGIN_EDIT`, que inclui o Atendente;
+  - vale em lead aberto ou fechado, para os relatórios ficarem certos;
+  - troca tipo, código e título, e mantém o ID do anúncio e o `ctwa_clid` como evidência do que foi detectado;
+  - gera o evento `ORIGIN_CHANGED` na linha do tempo.
+- **Minimização:** o `ctwa_clid` (identificador do clique, da Meta) fica só no banco e nunca é devolvido pela API.
+- **Campanhas** (cadastro de nome e código, ORI-06) continuam na F2: os relatórios agrupam pelo código ou pelo anúncio bruto.
+
+**Alternativas:** Tabela de origem separada do lead (mais junções em toda lista e relatório); copiar a origem na venda (duas fontes da verdade); sobrescrever com a última origem (contraria RN-02).
+
+**Consequências:**
+- A CRM-091 (worker) grava a origem do lead novo e chama `recordTouch` nas chegadas seguintes.
+- A CRM-092 acrescenta o selo e os filtros por origem; o índice `leads_by_origin` já existe.
+- Leads anteriores à V10 ficam como Não identificada.
+- O evento guarda só o tipo anterior e o novo; um evento com o mesmo tipo dos dois lados significa que o código ou o título foi corrigido.
+- O worker da CRM-091 precisa de um acesso próprio para gravar toques, sem reaproveitar o acesso de leitura de um usuário.

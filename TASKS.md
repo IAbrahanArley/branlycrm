@@ -725,11 +725,31 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 ## Fase 5 — Origem, tarefas e notificações
 
-### [ ] CRM-090 — Modelo de origem do lead (P0)
+### [x] CRM-090 — Modelo de origem do lead (P0)
 **Depende de:** CRM-031.
 **Atende:** ORI-01, ORI-04, RN-02, RN-03.
 **Entregas:** origem no lead (tipo, anúncio ou código, título, `ctwa_clid`); `lead_origin_events` para contatos seguintes; correção manual com evento.
 **Aceite:** a origem inicial não é sobrescrita automaticamente; a correção manual fica na linha do tempo; a venda mantém a origem do lead.
+**Estado (10/11/2026):** concluída na branch `feat/crm-090-origem`, no modo MVP (ADR-035).
+- **Migração de clínica V10:**
+  - colunas de origem em `leads` (tipo, padrão Não identificada; fonte; anúncio, código e título; `ctwa_clid`);
+  - evento `ORIGIN_CHANGED` na linha do tempo;
+  - tabela `origin_touches`;
+  - runtime com `UPDATE` só nas colunas de origem e sem alterar toques.
+- **Rotas:**
+  - `POST /v1/clinic/leads` aceita `origin` opcional (manual);
+  - `PUT /v1/clinic/leads/{id}/origin` (`LEAD_ORIGIN_EDIT`, inclui o Atendente; também em lead fechado);
+  - `GET /v1/clinic/contacts/{id}/origin-touches` (100 mais recentes);
+  - lead e lista trazem `origin`, sem o `ctwa_clid`.
+- **Para a CRM-091:** `LeadRepository.open(..., origin)` para o lead novo e `recordTouch` para as chegadas seguintes.
+- **Testes:** `LeadOriginIT`:
+  - lead sem origem e com origem manual, código inválido;
+  - toque que não muda o lead e não expõe o `ctwa_clid`;
+  - correção em lead aberto e perdido, com os eventos;
+  - versão desatualizada, Somente leitura 403 e isolamento A/B;
+  - grants da V10.
+- **Revisão (`reviewer`):** sem críticos, altos nem médios. Os baixos ficaram registrados na ADR-035 (evento com o mesmo tipo dos dois lados quando só o código ou o título muda; acesso próprio do worker na CRM-091).
+- **Pendente:** selo e filtros por origem (CRM-092).
 
 ### [ ] CRM-091 — Detecção automática da origem (P0)
 **Depende de:** CRM-082, CRM-090.

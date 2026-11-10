@@ -6,14 +6,17 @@ import br.com.branlycrm.pipeline.domain.Lead;
 import br.com.branlycrm.pipeline.domain.LeadEvent;
 import br.com.branlycrm.pipeline.domain.LeadEventType;
 import br.com.branlycrm.pipeline.domain.LeadNote;
+import br.com.branlycrm.pipeline.domain.LeadOrigin;
 import br.com.branlycrm.pipeline.domain.LeadSearch;
 import br.com.branlycrm.pipeline.domain.LeadStatus;
 import br.com.branlycrm.pipeline.domain.LeadSummary;
+import br.com.branlycrm.pipeline.domain.OriginTouch;
 import br.com.branlycrm.pipeline.domain.Temperature;
 import br.com.branlycrm.pipeline.exceptions.LeadException;
 import br.com.branlycrm.pipeline.persistence.LeadEntity;
 import br.com.branlycrm.pipeline.persistence.LeadEventEntity;
 import br.com.branlycrm.pipeline.persistence.LeadNoteEntity;
+import br.com.branlycrm.pipeline.persistence.OriginTouchEntity;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.exceptions.ClinicDataException;
 import br.com.branlycrm.tenant.persistence.ClinicPersistence;
@@ -56,6 +59,17 @@ public class LeadRepository {
    */
   public Lead open(
       ClinicAccess access, UUID contactId, Temperature temperature, UUID responsibleId) {
+    return open(access, contactId, temperature, responsibleId, LeadOrigin.unidentified());
+  }
+
+  /** As {@link #open(ClinicAccess, UUID, Temperature, UUID)}, with the lead's first origin. */
+  public Lead open(
+      ClinicAccess access,
+      UUID contactId,
+      Temperature temperature,
+      UUID responsibleId,
+      LeadOrigin origin) {
+    Objects.requireNonNull(origin, "origin");
     UUID id = UUID.randomUUID();
     Instant at = now.get();
     UUID actor = access.subjectId();
@@ -79,9 +93,12 @@ public class LeadRepository {
                       """
                       INSERT INTO leads (id, contact_id, pipeline_id, stage_id, status,
                                          temperature, responsible_id, opened_at, created_by,
-                                         updated_at, updated_by)
+                                         updated_at, updated_by, origin_type, origin_source,
+                                         origin_ad_id, origin_code, origin_title,
+                                         origin_ctwa_clid)
                       VALUES (:id, :contact, :pipeline, :stage, 'OPEN', :temperature,
-                              :responsible, :at, :actor, :at, :actor)
+                              :responsible, :at, :actor, :at, :actor, :originType,
+                              :originSource, :adId, :code, :title, :clid)
                       ON CONFLICT (contact_id) WHERE status = 'OPEN' DO NOTHING
                       RETURNING id
                       """,
@@ -93,6 +110,12 @@ public class LeadRepository {
                   .setParameter(
                       "temperature", temperature == null ? null : temperature.name(), String.class)
                   .setParameter("responsible", responsibleId, UUID.class)
+                  .setParameter("originType", origin.type().name())
+                  .setParameter("originSource", origin.source().name())
+                  .setParameter("adId", origin.adId(), String.class)
+                  .setParameter("code", origin.code(), String.class)
+                  .setParameter("title", origin.title(), String.class)
+                  .setParameter("clid", origin.ctwaClid(), String.class)
                   .setParameter("at", at)
                   .setParameter("actor", actor)
                   .getResultList()
@@ -363,6 +386,90 @@ public class LeadRepository {
     event(session, row, LeadEventType.WON, from, won.toString(), null, actor, at);
     return row;
   }
+
+  /**
+   * Corrects the origin of the lead read at {@code expectedVersion}, open or closed, so reports
+   * stay right after the sale (RN-03). The detected ad id and click id stay as evidence. The same
+   * type, code and title change nothing and write no event.
+   *
+   * @throws LeadException NOT_FOUND or STALE
+   */
+  public Lead correctOrigin(ClinicAccess access, UUID id, long expectedVersion, LeadOrigin manual) {
+    Objects.requireNonNull(manual, "manual");
+    Instant at = now.get();
+    UUID actor = access.subjectId();
+    try {
+      return persistence.inTransaction(
+          ClinicTenant.of(access),
+          session -> {
+            LeadEntity row = require(session, id);
+            if (row.version() != expectedVersion) {
+              throw new LeadException(LeadException.Reason.STALE);
+            }
+            LeadOrigin current = row.origin();
+            LeadOrigin corrected = current.correctedTo(manual);
+            if (corrected.equals(current)) return row.toDomain();
+            row.changeOrigin(corrected, actor, at);
+            event(
+                session,
+                row,
+                LeadEventType.ORIGIN_CHANGED,
+                current.type().name(),
+                corrected.type().name(),
+                null,
+                actor,
+                at);
+            session.flush();
+            return row.toDomain();
+          });
+    } catch (ClinicDataException failure) {
+      if (failure.reason() == ClinicDataException.Reason.STALE) {
+        throw new LeadException(LeadException.Reason.STALE);
+      }
+      throw failure;
+    }
+  }
+
+  /**
+   * Records a later arrival of the contact with a detected origin, linked to its open lead if any;
+   * never changes the lead (RN-02). Called by the WhatsApp worker (CRM-091).
+   *
+   * @throws LeadException CONTACT_UNAVAILABLE
+   */
+  public OriginTouch recordTouch(ClinicAccess access, UUID contactId, LeadOrigin origin) {
+    Objects.requireNonNull(origin, "origin");
+    Instant at = now.get();
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          requireActiveContact(session, contactId);
+          UUID lead = openLeadOf(session, contactId).orElse(null);
+          OriginTouchEntity touch = new OriginTouchEntity(contactId, lead, origin, at);
+          session.persist(touch);
+          session.flush();
+          return touch.toDomain();
+        });
+  }
+
+  /** The contact's latest origin touches, newest first; empty for another clinic's contact. */
+  public List<OriginTouch> touches(ClinicAccess access, UUID contactId) {
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session ->
+            session
+                .createSelectionQuery(
+                    "from OriginTouchEntity t where t.contactId = :contact order by t.seq desc",
+                    OriginTouchEntity.class)
+                .setParameter("contact", contactId)
+                .setMaxResults(MAX_TOUCHES)
+                .getResultList()
+                .stream()
+                .map(OriginTouchEntity::toDomain)
+                .toList());
+  }
+
+  /** The touch list is returned without pagination, so it is capped. */
+  public static final int MAX_TOUCHES = 100;
 
   @FunctionalInterface
   private interface Change {

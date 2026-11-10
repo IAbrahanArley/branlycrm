@@ -22,7 +22,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  * HTTP translation for lead and sale endpoints; clinic database failures go to
  * ClinicDataErrorHandler.
  */
-@RestControllerAdvice(assignableTypes = {LeadController.class, SaleController.class})
+@RestControllerAdvice(
+    assignableTypes = {LeadController.class, SaleController.class, OriginTouchController.class})
 @Order(GlobalErrorHandler.MODULE_ORDER)
 public final class LeadErrorHandler {
   @ExceptionHandler(LeadException.class)
