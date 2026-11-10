@@ -23,6 +23,17 @@ public class BranlyCrmApplication {
           .run(args);
       return;
     }
+    // Schema rollout for existing clinics (ADR-031): provisioner credentials, but neither the
+    // provisioning queue, the secret writer nor the scheduler. Runs once and exits with a code.
+    if ("tenant-migrate".equals(System.getenv("APP_MODE"))) {
+      var context =
+          new SpringApplicationBuilder(BranlyCrmApplication.class)
+              .web(WebApplicationType.NONE)
+              .properties("app.provisioning.rollout.enabled=true")
+              .run(args);
+      System.exit(SpringApplication.exit(context));
+      return;
+    }
     // Platform command (ADR-028): runs once with its own credential and exits; no HTTP server.
     if ("platform".equals(System.getenv("APP_MODE"))) {
       var context =

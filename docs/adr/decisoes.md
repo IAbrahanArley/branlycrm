@@ -242,7 +242,7 @@ Data de todos os registros: 04/11/2026.
 
 **Alternativas:** Papel `migrator_<id>` com login (segunda senha por clínica sem ganho de isolamento); superusuário no provisionador; executar o provisionamento no processo HTTP; um pool sem limite por clínica.
 
-**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Entregue na CRM-015 (ADR-030). O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.
+**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Entregue na CRM-015 (ADR-030). O cadastro público ainda não cria tarefas. As migrações de clínica novas chegam às clínicas existentes pelo modo `tenant-migrate` (ADR-031). Detalhes em ../provisionamento-clinicas.md.
 
 ## ADR-019 — Planejamento do produto e escopo do MVP
 
@@ -554,7 +554,7 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - **Registro de entidades por módulo:** cada módulo mantém as entidades no próprio pacote `persistence` e declara um bean `ClinicEntityRegistration` com a lista explícita, sem varredura e sem ciclo entre módulos.
 - **JPA central vazia:** `ControlJpaConfiguration` declara `PersistenceManagedTypes` vazio, substituindo a varredura de pacotes do Spring Boot.
 - **Sem caches compartilhados:** cache de segundo nível, cache de consultas e estatísticas ficam desligados.
-- **Erros:** recusas de acesso continuam `TenantAccessException`; falhas de banco viram `ClinicDataException` com código estável (`SCHEMA_OUTDATED`, `INVALID_DATA`, `IDENTITY_MISMATCH`, `UNAVAILABLE`). O log do Hibernate com a mensagem do PostgreSQL fica desligado; a unidade registra só código, SQLState e clínica, e o banco que declara outra clínica sai como incidente de segurança.
+- **Erros:** recusas de acesso continuam `TenantAccessException`; falhas de banco viram `ClinicDataException` com código estável (`SCHEMA_OUTDATED`, `INVALID_DATA`, `IDENTITY_MISMATCH`, `UNAVAILABLE`, e, desde a CRM-020, `CONFLICT` e `STALE`, registrados só em DEBUG por serem desfechos de negócio). O log do Hibernate com a mensagem do PostgreSQL fica desligado; a unidade registra só código, SQLState e clínica, e o banco que declara outra clínica sai como incidente de segurança.
 - **Limites:** `inTransaction` aninhado falha na hora (uma flag por thread, sem tenant). As conexões de clínica usam `statement_timeout` de 10 s e `lock_timeout` de 3 s, para que uma transação travada não segure uma das poucas conexões do pool.
 - **ArchUnit:** `@Entity` só em pacotes `persistence`, sem `@Cache`/`@Cacheable`; JPA e Hibernate só em `persistence` e `repositories`; identity, provisioning, platform, config, agency e onboarding não alcançam a unidade nem transitivamente; `ClinicTenant` só por `of(ClinicAccess)` e `ClinicAccess` só pelo registro e pelo `TeamService`.
 - **Primeira entidade:** `clinic_settings` (fuso IANA, linha única), migração de clínica V3, com `SELECT` e `UPDATE (time_zone)` para o runtime.
@@ -567,7 +567,80 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 **Consequências:**
 - Banco central e banco da clínica não compartilham transação; nenhum caso de uso pode depender de commit conjunto.
 - `inTransaction` não pode ser aninhado: o pool de cada clínica tem poucas conexões.
-- Conflitos de integridade (único, check) ainda saem como `UNAVAILABLE`; o motivo próprio entra com a primeira tabela que precisar dele (CRM-020).
+- Violação de unicidade sai como `CONFLICT` e versão otimista como `STALE` (ADR-032); a chave estrangeira violada ainda sai como `UNAVAILABLE`.
 - O callback recebe a `Session` inteira: comandos de sessão (`SET`, `doWork`) persistem na conexão do pool da mesma clínica. A revisão de código barra esse uso.
 - O schema da clínica não é validado no boot, porque não há tenant; o `ClinicPersistenceIT` valida as entidades contra uma clínica provisionada, como runtime.
-- Migrações novas de clínica só chegam a clínicas já existentes quando houver o comando de rollout (pendência). Até lá, tabela ausente falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+- Migrações novas de clínica chegam às clínicas já existentes pelo comando de rollout (ADR-031). Clínica não migrada continua falhando fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+
+## ADR-031 — Rollout das migrações de clínica
+
+**Data:** 09/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. **Complementa:** ADR-014, ADR-018 e ADR-030.
+
+**Decisão:**
+- **Processo próprio:** `APP_MODE=tenant-migrate`, sem HTTP, executado uma vez e encerrado com código de saída (0 sucesso, 1 alguma clínica falhou ou banco central indisponível, 2 uso inválido). Liga só `app.provisioning.rollout.enabled`.
+  - **Credenciais:** as do provisionador (`crm_provisioning_worker` e `crm_tenant_provisioner`) e o volume de segredos só para leitura.
+  - **Fora do processo:** `TenantProvisioningService`, `FileTenantSecretWriter`, a fila e o scheduler. O ArchUnit garante que, no módulo, só o worker usa essas classes e chama `ensureRoles`/`ensureDatabase`; testes de contexto provam os beans de cada modo.
+- **Alcance:** clínicas `ACTIVE`, `AWAITING_OWNER` e `SUSPENDED`. A suspensa é incluída para a reativação, que é só um UPDATE, não cair em schema antigo. `PROVISIONING` e `FAILED` seguem pela fila, que migra.
+  - `--tenant-id UUID` restringe a uma clínica elegível; uma inelegível sai como falha (`TENANT_NOT_ELIGIBLE`).
+- **Por clínica, uma por vez:**
+  1. **Pré-checagem só de leitura:** banco existente com dono `owner_<id>`, papéis criados por este provisionador sem atributos elevados e `tenant_identity` da clínica. Não cria, concede nem altera nada.
+  2. **Migração:** o mesmo `migrate` do provisionamento, como `owner_<id>`, com os mesmos placeholders e a checagem de ownership.
+  3. **Verificação:** o mesmo login real do runtime.
+  - **Falha isolada:** a falha vira código estável, e a próxima clínica roda.
+  - **Retomada:** é a reexecução. O Flyway pula o aplicado e trava cada banco, então execuções simultâneas, ou junto com o provisionador, aplicam cada migração uma vez.
+- **Relatório:** uma linha por clínica em stdout com UUID, resultado, etapa, migrações aplicadas e código, sem SQL, segredo ou dado pessoal; o log só leva UUID, etapa e código.
+- **Provisionador:** a etapa VERIFICATION migra de novo (idempotente) antes da verificação. Assim, uma tarefa que passou da MIGRATION com uma imagem antiga, ou foi retomada por `retryFailed`, não ativa uma clínica com schema antigo.
+- **`lock_timeout` de 10 s** na sessão de migração: um DDL que espera transações da API desiste em vez de enfileirar as consultas seguintes da clínica atrás do pedido de lock.
+- **Ordem de deploy:** parar o provisionador antigo → `migrate` (central) → provisionador novo → `tenant-migrate` → API nova. O provisionador antigo, se continuasse rodando, ativaria clínicas com o schema antigo depois de o rollout listar as clínicas. As migrações de clínica são aditivas (expand/contract): a API antiga funciona sobre o schema novo, e uma remoção só entra depois que nenhuma imagem em uso depende do objeto.
+
+**Alternativas:**
+- Subcomando do `APP_MODE=provision`: o daemon tem scheduler e reinício automático, e receberia o gravador de segredos e a fila.
+- Rollout automático no boot do provisionador: uma falha viraria laço de reinício, as falhas ficariam escondidas e o rollout ficaria acoplado à fila.
+- Papel de migração com login por clínica: recusado na ADR-018.
+
+**Consequências:**
+- O rollout precisa rodar a cada deploy que traga migração de clínica e exige aprovação humana em produção. A clínica não migrada falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+- A verificação confere identidade, privilégios gerais e bancos proibidos, mas não os GRANTs específicos de cada migração nova. Isso continua sendo papel dos ITs da migração, como o `ClinicPersistenceIT`.
+- O probe usa uma conexão do runtime (CONNECTION LIMIT 20). Com a API saturando o limite, sai `VERIFICATION_FAILED` com a migração aplicada; basta reexecutar.
+- `applied` conta só a chamada concluída: se uma migração falha depois de outras aplicadas na mesma execução, o relatório mostra `applied=0` e a próxima execução aplica o restante.
+- `CREATE INDEX CONCURRENTLY` exige migração não transacional, que conflita com o lock do Flyway. Fica para quando uma tabela grande precisar.
+- **Risco residual aceito (revisão de `security`):** o processo usa as credenciais completas do worker (que também altera status, fila e vínculos) e do provisionador (CREATEDB/CREATEROLE), embora só leia `tenants` e use `SET` em `owner_<id>`. O código e o ArchUnit restringem o uso, mas não o banco. Um papel central só de leitura e um papel migrador sem CREATEDB/CREATEROLE são a evolução; exigem decisão humana e mudança no bootstrap.
+- `lock_timeout` limita só a espera por lock: uma migração que reescreve uma tabela segura o lock pelo tempo que levar. A revisão de migrações de clínica barra rewrite de tabela grande.
+
+## ADR-032 — Contatos, telefone canônico e consentimento
+
+**Data:** 09/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. Implementação em CRM-020. **Complementa:** ADR-030. **Numeração:** a ADR-031 é a do rollout de migrações de clínica (`tenant-migrate`), em branch própria.
+
+**Decisão:**
+- **Módulo `contact`** com domínio, persistência, repositórios e exceções; API e RBAC ficam na CRM-021. Os repositórios recebem `ClinicAccess`, e o autor vem sempre do sujeito autenticado.
+- **Telefone:** obrigatório, em E.164 canônico e único por clínica, **inclusive para contatos arquivados**. A normalização é própria (`PhoneNumber.parse`), sem libphonenumber, e vale para cadastro, importação e webhook:
+  - Brasil como região padrão: DDD sem zero, celular de 9 dígitos começando com 9 ou fixo de 8 dígitos começando com 2 a 5;
+  - **celular antigo de 8 dígitos (6 a 9) ganha o 9**, porque o WhatsApp ainda pode informar o número sem ele;
+  - prefixo `0` + DDD aceito; prefixo de operadora recusado como ambíguo; outros países só na forma E.164 genérica;
+  - o banco repete a regra num CHECK.
+- **Criação sem erro de duplicidade:** `INSERT … ON CONFLICT (phone_e164) DO NOTHING` devolve o contato novo ou o existente, de forma estável sob concorrência e sem levar o número ao log do servidor.
+- **Busca:** nome sem acento e sem caixa, calculado pela aplicação (`name_search`), mais parte dos dígitos do telefone e início do e-mail, com índices `pg_trgm` (extensão trusted, criada pelo dono do banco da clínica). Observações nunca entram em busca nem em índice.
+- **Consentimento:** histórico só com inserção, por canal (`WHATSAPP`, `EMAIL`):
+  - vale o registro mais recente; no mesmo instante, opt-out vence;
+  - sem registro, o estado é `NONE`, nunca opt-in implícito;
+  - importação não reverte opt-out; mensagem recebida não é opt-in;
+  - a escrita trava a linha do contato antes de aplicar a regra, e o horário gravado é sempre posterior ao último registro do contato: a ordem do histórico é a ordem das escritas, mesmo com relógios defasados entre processos.
+- **Origem:** o contato guarda só por onde foi criado (`created_via`); a origem de marketing pertence ao lead (CRM-090, RN-03).
+- **Autoria:** contato e consentimento sem autor só quando vierem do WhatsApp (worker da CRM-082), garantido por CHECK.
+- **Minimização:** a listagem devolve `ContactSummary`, sem observações nem data de nascimento; esses campos só saem no detalhe.
+- **Dado gravado fora das regras** (nome com caractere invisível, por exemplo) sai como `INVALID_DATA`, nunca como erro de entrada do cliente.
+- **Conflitos:** `ClinicDataException` ganhou `CONFLICT` (SQLState 23505, sem ler o nome da constraint) e `STALE` (versão otimista). O repositório traduz para `ContactException` (`DUPLICATE_PHONE`, `DUPLICATE_TAG`, `STALE`).
+
+**Alternativas:**
+- libphonenumber (dependência nova, e a regra do 9º dígito continuaria própria).
+- Liberar o número ao arquivar (duplicaria a pessoa quando ela voltasse a escrever).
+- `unaccent` no banco (não é imutável e divergiria do Java).
+- Estado de consentimento em coluna denormalizada (mais um lugar para divergir do histórico).
+
+**Consequências:**
+- A troca de telefone para um número já usado é recusada antes de gravar, com o id do contato que já o tem. Só uma corrida ainda chega ao erro 23505, cujo DETAIL no log do servidor PostgreSQL traz o número; `log_error_verbosity=terse` no servidor resolveria (pendente de aprovação, CRM-072), e o caso vai para o inventário da CRM-073.
+- A CRM-021 precisa fixar a origem do consentimento pelo canal (`MANUAL` na API humana; `IMPORT` e `WHATSAPP` só nos seus fluxos) e aplicar a política de leitura antes de expor o id de `ContactCreation.Existing`.
+- Clínicas fora do Brasil só têm a validação genérica.
+- A V4 só chega a clínicas existentes pelo rollout (ADR-031).
+- Data de nascimento e observações são dados pessoais com finalidade a registrar na CRM-073; observações podem receber dado de saúde e devem ter aviso na tela (CRM-022).
+

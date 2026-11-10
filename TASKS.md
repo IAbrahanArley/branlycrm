@@ -312,15 +312,32 @@ O frontend acompanha cada API aprovada.
   - `TenantIsolationIT` passou a contar as migrações de clínica pelo classpath.
 - **Revisões:** `security` sem críticos nem altos. Corrigidos os médios (aninhamento, timeout de lock e fronteira de módulos no ArchUnit) e os baixos de construtores, log SQL, identidade, CHECK do fuso, cache e rollback em `Error`. `reviewer` sem bloqueantes; sugestões aplicadas.
 - **Pendências:**
-  - **comando para aplicar migrações de clínica novas a clínicas já existentes** (hoje só o provisionamento aplica); até lá, clínica antiga responde `CLINIC_DATA_SCHEMA_OUTDATED`, inclusive no Docker local;
-  - motivo de conflito de integridade junto da CRM-020;
+  - ~~comando para aplicar migrações de clínica novas a clínicas já existentes~~: resolvido em 09/11/2026 pelo modo `tenant-migrate` (ADR-031), na branch `feat/tenant-migration-rollout`, a partir desta. Detalhes abaixo;
+  - ~~motivo de conflito de integridade junto da CRM-020~~ (feito: `CONFLICT` e `STALE`);
   - `MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes` falhou uma vez numa execução completa (todas as respostas 429) e passou nas seguintes: instabilidade anterior a esta tarefa.
+
+**Rollout das migrações de clínica (09/11/2026, ADR-031):** complemento da CRM-015, desenho revisado pelo `architect` e aprovado pelo usuário.
+- **Comando:** `APP_MODE=tenant-migrate` e serviço `tenant-migrate` no profile `tools` do Compose (`docker compose --profile tools run --rm tenant-migrate [--tenant-id UUID]`).
+  - Usa as credenciais do provisionador, com os segredos só para leitura, sem gravador de segredos, fila ou scheduler.
+  - Alcança clínicas `ACTIVE`, `AWAITING_OWNER` e `SUSPENDED`, uma por vez.
+  - Cada clínica passa por pré-checagem só de leitura, migração como `owner_<id>` e verificação de login do runtime.
+  - Falha isolada com código estável, relatório por clínica em stdout, códigos de saída 0, 1 e 2; retomada por reexecução.
+- **Provisionador:** a etapa VERIFICATION migra de novo antes de verificar, e a sessão de migração usa `lock_timeout` de 10 s.
+- **Testes:**
+  - `TenantMigrationRolloutIT`: clínica sem a V3 e a V4 volta a funcionar por `ClinicSettingsRepository` e pelo `ContactService` das rotas de contato; falha isolada entre duas clínicas e retomada; `SUSPENDED` sim, `PROVISIONING`/`FAILED` não; sem banco recusada sem criar banco; `--tenant-id`; duas execuções simultâneas aplicam uma vez;
+  - `TenantMigrationRolloutTest`: uso inválido, ordem das etapas, códigos sem texto de causa, banco central indisponível e beans separados entre os modos;
+  - `TenantMigrateModeIT`: o contexto completo do modo sobe sem worker, scheduler nem MFA;
+  - `TenantProvisioningServiceTest` e a regra ArchUnit `onlyTheProvisioningWorkerHoldsWorkerCapabilities`.
+- **Execução (10/11/2026, sobre a `main` com CRM-020 e CRM-021):** `./mvnw -B -ntp clean verify` → 236 unitários (2 ignorados no Windows) e 131 de integração, tudo verde.
+  - Em execuções anteriores, sobre a CRM-015, `MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes` falhou três vezes (todas as respostas 429). É a instabilidade já registrada: o teste roda antes dos ITs novos e passa isolado.
+- **Revisão `security`:** sem críticos nem altos. Corrigidos: ArchUnit por chamada e por pacote, Flyway sem detalhe de erro do servidor, logs verificados no IT, boot real do modo testado e ordem de deploy com o provisionador antigo parado. Riscos aceitos na ADR-031: credenciais completas do worker e do provisionador no processo (papéis próprios exigem decisão) e `lock_timeout` sem limite de duração do DDL.
+- **Pendências:** runbook de produção na CRM-072; aprovação humana a cada execução em produção.
 
 ## Fase 2 — Contatos e histórico
 
 Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-migration`), com `GRANT` explícito a `${runtimeRole}` em cada migração.
 
-### [ ] CRM-020 — Modelar contatos, tags e consentimento (P1)
+### [x] CRM-020 — Modelar contatos, tags e consentimento (P1)
 **Depende de:** CRM-015, CRM-017.
 **Atende:** PAC-01, PAC-03, PAC-06, PAC-08.
 **Entregas:**
@@ -333,12 +350,92 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - Telefone duplicado na mesma clínica é recusado, inclusive sob concorrência.
 - Formatos diferentes do mesmo número são normalizados igual.
 - Opt-out mais recente prevalece.
+**Estado (09/11/2026):** concluída na branch `feat/crm-020-contacts` (ADR-032). Desenho revisado pelo `architect`; as 12 decisões foram aprovadas pelo usuário.
+- **Módulo `contact`:** domínio, entidades na persistência da clínica, `ContactRepository`, `TagRepository`, `ConsentRepository` e `ContactException`. Sem API nem RBAC (CRM-021).
+- **Migração de clínica V4:** `contacts`, `tags`, `contact_tags` e `contact_consents`, com `pg_trgm`, CHECK do telefone canônico e da autoria, UNIQUE de telefone inclusive para arquivados e grants por coluna (consentimento só com inserção).
+- **Telefone:** normalizador próprio, com o 9º dígito inserido em celular brasileiro antigo; a criação devolve o contato existente pelo `ON CONFLICT`, sem erro.
+- **Consentimento:** o mais recente prevalece, opt-out vence empate, importação não reverte opt-out, e a ordem do histórico segue as escritas, não o relógio.
+- **Persistência da clínica:** motivos `CONFLICT` e `STALE`, registrados só em DEBUG.
+- **Testes:** `./mvnw -B -ntp clean verify` → 220 unitários (2 ignorados no Windows) e 113 de 114 de integração; a falha é o `MfaLockoutIT` instável (passa isolado). Entre os novos:
+  - `ContactPersistenceIT` (15), com clínicas provisionadas:
+    - mesmo número em formatos diferentes;
+    - 8 criações concorrentes resultam num contato só;
+    - arquivado mantém o número;
+    - versão e duplicidade com o id do contato existente;
+    - busca por nome sem acento, dígitos, número inteiro em formato antigo e e-mail, com curingas literais;
+    - tags e cascata;
+    - consentimento com relógio parado e recuado;
+    - consentimento concorrente;
+    - dado gravado fora das regras como `INVALID_DATA`;
+    - isolamento A/B em leitura, lista, busca, filtro, alteração, vínculo e consentimento;
+    - grants do runtime;
+    - CHECKs como dono;
+    - mapeamento validado como runtime.
+  - `PhoneNumberTest` (38), `ContactDomainTest` (12), `ClinicPersistenceTest` e `ArchitectureTest`.
+- **Revisões:**
+  - `security`: sem críticos nem altos. Médios corrigidos: ordem do consentimento independente do relógio, e-mail validado com Unicode, duplicidade verificada antes do UPDATE e listagem sem observações nem nascimento.
+  - `reviewer`: sem bloqueadores. Corrigidos: dado inválido gravado vira `INVALID_DATA`, arquivamento concorrente idempotente, corrida na criação, busca pelo número inteiro, caracteres invisíveis, limite do `name_search` e código morto.
+- **Pendências:**
+  - a V4 só chega a clínicas existentes pelo rollout `tenant-migrate` (ADR-031, branch `feat/tenant-migration-rollout`, sem merge); mergear antes da CRM-021;
+  - `log_error_verbosity=terse` no PostgreSQL, para o DETAIL de erros não levar dados pessoais ao log do servidor (decisão de infraestrutura, CRM-072);
+  - para a CRM-021: origem do consentimento fixada pelo canal, política de leitura antes de expor o contato existente, termo de busca de 2 caracteres sem índice;
+  - para a CRM-082: o webhook prefixa `+` no `wa_id` de números estrangeiros;
+  - para a CRM-073: finalidade de nascimento e observações no inventário.
 
-### [ ] CRM-021 — API de contatos (P1)
+### [x] CRM-021 — API de contatos (P1)
 **Depende de:** CRM-020, CRM-004.
 **Atende:** PAC-01, PAC-03, PAC-06, PAC-08.
 **Entregas:** criar, editar, listar, detalhar, buscar, filtrar, paginar, arquivar, tags e consentimento; aviso de duplicidade antes de criar.
 **Aceite:** permissões da matriz testadas; filtros e buscas não vazam entre clínicas (A/B); dados inválidos recusados com `INVALID_INPUT`.
+**Estado (09/11/2026):** concluída na branch `feat/crm-021-contacts-api`. Desenho revisado pelo `architect`; as 9 decisões foram aprovadas pelo usuário.
+- **Rotas** (`/v1/clinic`, clínica da sessão):
+  - `GET /contacts` com `q`, `tagId`, `includeArchived` e paginação;
+  - `POST /contacts/phone-check` (aviso de duplicidade antes de criar);
+  - `POST /contacts` (201 com `Location`);
+  - `GET` e `PUT /contacts/{id}`, com `version` no corpo;
+  - `PUT /contacts/{id}/archived` (arquivar e desarquivar);
+  - `GET` e `POST /contacts/{id}/consents`;
+  - `PUT` e `DELETE /contacts/{id}/tags/{tagId}`;
+  - `GET` e `POST /tags`, `PUT` e `DELETE /tags/{id}`.
+- **Regras:**
+  - validação do formato, depois a permissão, depois a leitura por id: 403 não revela se o id existe, e id de outra clínica responde 404;
+  - lista e phone-check sem observações nem nascimento;
+  - consentimento sempre gravado como `MANUAL`;
+  - contato arquivado recusa edição e novas tags (409 `CONTACT_ARCHIVED`), mas aceita consentimento e remoção de tag;
+  - 409 `CONTACT_DUPLICATE_PHONE` traz o `contactId` (esquema `ContactConflictError`);
+  - teto de 500 tags por clínica (`TAG_LIMIT`).
+- **Permissão nova:** `TAG_MANAGE` (Proprietário e Gestor) para renomear e excluir tags, em `ClinicRole`, `permissoes.md` e `ClinicRoleTest`.
+- **Erros do banco da clínica:** `ClinicDataErrorHandler` global. Indisponível ou migração pendente → 503 com `Retry-After`; dado inválido → 500; credencial ausente → 503 e credencial inválida → 500, ambas registradas só com o motivo.
+- **Contrato:** `docs/api/openapi.json` regenerado. Só ganhou rotas e esquemas; nenhuma operação existente mudou, e as novas têm `operationId` explícito. O customizador do OpenAPI preserva esquemas de erro próprios (`*Error`).
+- **Testes:** `./mvnw -B -ntp clean verify` → 225 unitários (2 ignorados no Windows) e 125 de integração, BUILD SUCCESS. Entre os novos:
+  - `ContactApiIT` (9, HTTP com cookies, CSRF e segundo fator reais):
+    - criação, detalhe, lista e aviso de duplicidade;
+    - matriz de papéis rota por rota, com o código `CLINIC_ACCESS_DENIED`;
+    - edição, versão, arquivamento e desarquivamento;
+    - consentimento forçado a `MANUAL`;
+    - isolamento A/B em todas as rotas, na busca, no filtro e no phone-check;
+    - `INVALID_INPUT` em 16 campos, sem eco do valor;
+    - catálogo de tags;
+    - paginação;
+    - sessão sem clínica, sem CSRF e sem segundo fator.
+  - `ContactServiceTest` (5): validação antes da autorização, papel recusado sem tocar o banco da clínica, origem `MANUAL` e `TAG_MANAGE`.
+  - `ContactPersistenceIT` (17): teto de tags e contato arquivado.
+- **Revisões:**
+  - `security`: sem críticos nem altos. Corrigidos: log da credencial da clínica, `toString` mascarado nos DTOs, `Location` sem query string e teto de tags.
+  - `reviewer`: sem bloqueadores. Corrigidos: esquema do 409 no contrato, teste dependente da ordem, `operationId` explícitos, paginação testada, código do 403 conferido, consultas do detalhe reaproveitadas e ordem das chaves de consentimento.
+- **Pendências:**
+  - **CRM-072:**
+    - `log_format` do Nginx sem a query string em `/api/`, porque o termo `q` pode trazer nome ou telefone;
+    - `proxy_set_header X-Forwarded-Host $host`;
+    - conferir os logs da Vercel.
+  - **CRM-073:**
+    - finalidade das observações e do nascimento, e se o `VIEWER` deve vê-los;
+    - se a reversão de opt-out exige evidência ou motivo.
+  - **Auditoria (CRM-070):** leitura e extração em massa de contatos não são auditadas nem limitadas por taxa.
+  - **Rollout:** o `tenant-migrate` ainda não está na `main`; no Compose local, clínicas criadas antes da V4 respondem 503.
+  - **Riscos aceitos:**
+    - renomear tag não tem versão (a última escrita vence);
+    - vincular tag e arquivar ao mesmo tempo pode deixar uma tag num contato arquivado (só estética).
 
 ### [ ] CRM-022 — Telas de contatos e perfil (P1)
 **Depende de:** CRM-021.
@@ -628,6 +725,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Segurança:** proxy confiável para o IP real; variáveis e segredos.
 - **Arquivos:** armazenamento de objetos.
 - **Backup:** diário, criptografado e fora da VM; procedimento de restauração (central e por clínica).
+- **Migrações:** ordem parar o provisionador antigo → `migrate` → provisionador novo → `tenant-migrate` → API nova, com tratamento do código de saída 1 (ADR-031, [provisionamento-clinicas.md](docs/provisionamento-clinicas.md)).
 **Aceite:** restauração realizada em ambiente isolado; monitoramento e recuperação documentados.
 
 ### [ ] CRM-073 — Revisão de privacidade e LGPD (P0)

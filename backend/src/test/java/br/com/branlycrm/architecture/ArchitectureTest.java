@@ -1,9 +1,14 @@
 package br.com.branlycrm.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import br.com.branlycrm.provisioning.repositories.TenantInfrastructureRepository;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicRole;
 import br.com.branlycrm.tenant.domain.TenantDatabase;
@@ -90,6 +95,41 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("br.com.branlycrm.provisioning..")
+        .check(CODE);
+  }
+
+  /**
+   * ADR-031: inside provisioning, only the worker (its service and its configuration) writes
+   * secrets, touches the queue or the registry, and creates or alters roles and databases. The
+   * schema rollout, and any class added to the module later, only prechecks, migrates and verifies.
+   */
+  @Test
+  void onlyTheProvisioningWorkerHoldsWorkerCapabilities() {
+    noClasses()
+        .that()
+        .resideInAPackage("br.com.branlycrm.provisioning..")
+        .and()
+        .doNotHaveSimpleName("TenantProvisioningService")
+        .and()
+        .doNotHaveSimpleName("ProvisioningConfiguration")
+        .and()
+        .doNotHaveSimpleName("ProvisioningSchedule")
+        .should()
+        .dependOnClassesThat()
+        .haveSimpleName("FileTenantSecretWriter")
+        .orShould()
+        .dependOnClassesThat()
+        .haveSimpleName("ProvisioningTaskRepository")
+        .orShould()
+        .dependOnClassesThat()
+        .haveSimpleName("ProvisioningRegistryRepository")
+        .orShould()
+        .dependOnClassesThat()
+        .haveSimpleName("TenantProvisioningService")
+        .orShould()
+        .callMethodWhere(
+            target(nameMatching("ensureRoles|ensureDatabase"))
+                .and(target(owner(name(TenantInfrastructureRepository.class.getName())))))
         .check(CODE);
   }
 
@@ -202,6 +242,7 @@ class ArchitectureTest {
         .resideInAnyPackage(
             "br.com.branlycrm.identity..",
             "br.com.branlycrm.tenant..",
+            "br.com.branlycrm.contact..",
             "br.com.branlycrm.agency..",
             "br.com.branlycrm.onboarding..",
             "br.com.branlycrm.platform..",
