@@ -3,13 +3,18 @@ package br.com.branlycrm.contact.repositories;
 import br.com.branlycrm.common.domain.PageQuery;
 import br.com.branlycrm.common.domain.PageResult;
 import br.com.branlycrm.common.exceptions.InvalidInputException;
+import br.com.branlycrm.contact.domain.ConsentPolicy;
+import br.com.branlycrm.contact.domain.ConsentRecord;
 import br.com.branlycrm.contact.domain.Contact;
 import br.com.branlycrm.contact.domain.ContactCreatedVia;
 import br.com.branlycrm.contact.domain.ContactCreation;
+import br.com.branlycrm.contact.domain.ContactDetail;
 import br.com.branlycrm.contact.domain.ContactFields;
 import br.com.branlycrm.contact.domain.ContactSearch;
 import br.com.branlycrm.contact.domain.ContactSummary;
+import br.com.branlycrm.contact.domain.PhoneNumber;
 import br.com.branlycrm.contact.domain.SearchText;
+import br.com.branlycrm.contact.domain.Tag;
 import br.com.branlycrm.contact.exceptions.ContactException;
 import br.com.branlycrm.contact.persistence.ContactEntity;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
@@ -93,6 +98,7 @@ public class ContactRepository {
           ClinicTenant.of(access),
           session -> {
             ContactEntity row = require(session, id);
+            if (row.archived()) throw new ContactException(ContactException.Reason.ARCHIVED);
             if (row.version() != expectedVersion) {
               throw new ContactException(ContactException.Reason.STALE);
             }
@@ -109,18 +115,24 @@ public class ContactRepository {
     }
   }
 
-  /**
-   * Archives the contact; it keeps its number. Archiving is idempotent, also when two requests
-   * race: the first date is kept and both see the archived contact.
-   */
+  /** Archives the contact; it keeps its number. */
   public Contact archive(ClinicAccess access, UUID id) {
+    return setArchived(access, id, true);
+  }
+
+  /**
+   * Archives or unarchives the contact. Idempotent, also when two requests race: the first archive
+   * date is kept and both see the same final state.
+   */
+  public Contact setArchived(ClinicAccess access, UUID id, boolean archived) {
     Instant at = now.get();
     try {
       return persistence.inTransaction(
           ClinicTenant.of(access),
           session -> {
             ContactEntity row = require(session, id);
-            row.archive(access.subjectId(), at);
+            if (archived) row.archive(access.subjectId(), at);
+            else row.unarchive(access.subjectId(), at);
             session.flush();
             return stored(row, ContactEntity::toDomain);
           });
@@ -129,9 +141,42 @@ public class ContactRepository {
       Contact current =
           find(access, id)
               .orElseThrow(() -> new ContactException(ContactException.Reason.NOT_FOUND));
-      if (current.archived()) return current;
+      if (current.archived() == archived) return current;
       throw new ContactException(ContactException.Reason.STALE);
     }
+  }
+
+  /**
+   * The contact with its tags and current consent, read in one transaction so the three parts
+   * agree. Empty for a missing id and for another clinic's id alike.
+   */
+  public Optional<ContactDetail> detail(ClinicAccess access, UUID id) {
+    if (id == null) return Optional.empty();
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          ContactEntity row = session.find(ContactEntity.class, id);
+          if (row == null) return Optional.<ContactDetail>empty();
+          Contact contact = stored(row, ContactEntity::toDomain);
+          List<Tag> tags = TagRepository.tagsOf(session, id);
+          List<ConsentRecord> history = ConsentRepository.history(session, id);
+          return Optional.of(new ContactDetail(contact, tags, ConsentPolicy.current(history)));
+        });
+  }
+
+  /** The contact holding the number in this clinic, archived ones included. */
+  public Optional<ContactSummary> findByPhone(ClinicAccess access, PhoneNumber phone) {
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session ->
+            session
+                .createSelectionQuery(
+                    "from ContactEntity c where c.phoneE164 = :phone", ContactEntity.class)
+                .setParameter("phone", phone.e164())
+                .getResultList()
+                .stream()
+                .findFirst()
+                .map(row -> stored(row, ContactEntity::toSummary)));
   }
 
   /**

@@ -72,6 +72,14 @@
         },
         "type" : "object"
       },
+      "ArchiveRequest" : {
+        "properties" : {
+          "archived" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ClinicSelectionView" : {
         "properties" : {
           "tenantId" : {
@@ -92,6 +100,182 @@
           "tenantId" : {
             "format" : "uuid",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsentRecordView" : {
+        "properties" : {
+          "channel" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "recordedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "recordedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsentRequest" : {
+        "properties" : {
+          "channel" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContactConflictError" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "contactId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "fields" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContactConsentsView" : {
+        "properties" : {
+          "current" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "history" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConsentRecordView"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ContactRequest" : {
+        "properties" : {
+          "birthDate" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "notes" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ContactSummaryView" : {
+        "properties" : {
+          "archivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdVia" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContactView" : {
+        "properties" : {
+          "archivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "consent" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdVia" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "notes" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          },
+          "tags" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TagView"
+            },
+            "type" : "array"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -275,6 +459,29 @@
         },
         "type" : "object"
       },
+      "PageViewContactSummaryView" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ContactSummaryView"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageSize" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageViewPortfolioClinicView" : {
         "properties" : {
           "items" : {
@@ -344,6 +551,25 @@
         },
         "type" : "object"
       },
+      "PhoneCheckRequest" : {
+        "properties" : {
+          "phone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PhoneCheckView" : {
+        "properties" : {
+          "contact" : {
+            "$ref" : "#/components/schemas/ContactSummaryView"
+          },
+          "phone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "PortfolioClinicView" : {
         "properties" : {
           "clinicName" : {
@@ -380,6 +606,26 @@
       "RoleChangeRequest" : {
         "properties" : {
           "role" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TagRequest" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TagView" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
             "type" : "string"
           }
         },
@@ -1892,6 +2138,1437 @@
         "tags" : [ "Second factor" ]
       }
     },
+    "/v1/clinic/contacts" : {
+      "get" : {
+        "description" : "q matches the name without accents or case, part of the phone digits, the whole number in any accepted format or the start of the e-mail; notes are never searched. Archived contacts are left out unless includeArchived=true.",
+        "operationId" : "listContacts",
+        "parameters" : [ {
+          "description" : "Search term, 2 to 100 characters",
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only contacts with this tag",
+          "in" : "query",
+          "name" : "tagId",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "true includes archived contacts; default false",
+          "in" : "query",
+          "name" : "includeArchived",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "1-based page, default 1",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Items per page, 1 to 100, default 25",
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewContactSummaryView"
+                }
+              }
+            },
+            "description" : "Page of contacts without notes nor birth date"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: q, tagId, includeArchived, page or pageSize"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "List contacts (all roles), paginated and ordered by name",
+        "tags" : [ "Contacts" ]
+      },
+      "post" : {
+        "operationId" : "createContact",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ContactRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactView"
+                }
+              }
+            },
+            "description" : "Contact created; Location points to it"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: name, phone, email, birthDate, notes or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactConflictError"
+                }
+              }
+            },
+            "description" : "CONTACT_DUPLICATE_PHONE (contactId is the contact holding the number) or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Create a contact (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/contacts/phone-check" : {
+      "post" : {
+        "description" : "Returns the normalized number and the contact already holding it in this clinic, archived ones included, or null. The number travels in the body so it never reaches access logs.",
+        "operationId" : "checkContactPhone",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PhoneCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PhoneCheckView"
+                }
+              }
+            },
+            "description" : "Normalized number and existing contact"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: phone or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Check a number before creating a contact (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/contacts/{contactId}" : {
+      "get" : {
+        "operationId" : "getContact",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactView"
+                }
+              }
+            },
+            "description" : "Contact"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Contact detail with tags and current consent (all roles)",
+        "tags" : [ "Contacts" ]
+      },
+      "put" : {
+        "description" : "Absent optional fields are cleared. Archived contacts cannot be edited.",
+        "operationId" : "updateContact",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ContactRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactView"
+                }
+              }
+            },
+            "description" : "Updated contact"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId, name, phone, email, birthDate, notes, version or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactConflictError"
+                }
+              }
+            },
+            "description" : "CONTACT_STALE (reload and reapply), CONTACT_ARCHIVED, CONTACT_DUPLICATE_PHONE (contactId is the contact holding the number) or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Replace a contact's data at the version read (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/contacts/{contactId}/archived" : {
+      "put" : {
+        "description" : "Idempotent. An archived contact keeps its number and leaves the default list.",
+        "operationId" : "setContactArchived",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ArchiveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactView"
+                }
+              }
+            },
+            "description" : "Contact in the requested state"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId, archived or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_STALE or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Archive or unarchive a contact (OWNER, MANAGER)",
+        "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/contacts/{contactId}/consents" : {
+      "get" : {
+        "operationId" : "listContactConsents",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactConsentsView"
+                }
+              }
+            },
+            "description" : "Current consent and history"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Consent per channel and its history (all roles)",
+        "tags" : [ "Contacts" ]
+      },
+      "post" : {
+        "description" : "Recorded with source MANUAL; also allowed on archived contacts, so an opt-out can always be written down.",
+        "operationId" : "recordContactConsent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConsentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContactConsentsView"
+                }
+              }
+            },
+            "description" : "Consent after the change"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId, channel, status or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONSENT_REFUSED or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Record a consent change said by the person (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/contacts/{contactId}/tags/{tagId}" : {
+      "delete" : {
+        "operationId" : "untagContact",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "tagId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TagView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "The contact's tags"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId or tagId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Remove a tag from a contact (OWNER, MANAGER, ATTENDANT); idempotent",
+        "tags" : [ "Contacts" ]
+      },
+      "put" : {
+        "operationId" : "tagContact",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "tagId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TagView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "The contact's tags"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId or tagId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND or TAG_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_ARCHIVED or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Add a tag to a contact (OWNER, MANAGER, ATTENDANT); idempotent",
+        "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/tags" : {
+      "get" : {
+        "operationId" : "listTags",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TagView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Every tag of the clinic"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "List the clinic's tags (all roles), ordered by name",
+        "tags" : [ "Tags" ]
+      },
+      "post" : {
+        "operationId" : "createTag",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TagRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TagView"
+                }
+              }
+            },
+            "description" : "Tag created; Location points to it"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: name or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "TAG_DUPLICATE (same name, whatever the case), TAG_LIMIT (500 tags) or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Create a tag (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Tags" ]
+      }
+    },
+    "/v1/clinic/tags/{tagId}" : {
+      "delete" : {
+        "operationId" : "deleteTag",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tagId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Tag deleted"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: tagId"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "TAG_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Delete a tag and remove it from every contact (OWNER, MANAGER)",
+        "tags" : [ "Tags" ]
+      },
+      "put" : {
+        "operationId" : "renameTag",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tagId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TagRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TagView"
+                }
+              }
+            },
+            "description" : "Renamed tag"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: tagId, name or body"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "TAG_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "TAG_DUPLICATE or CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Rename a tag (OWNER, MANAGER)",
+        "tags" : [ "Tags" ]
+      }
+    },
     "/v1/clinic/team" : {
       "get" : {
         "operationId" : "list_1",
@@ -2800,6 +4477,12 @@
   }, {
     "description" : "Invite, resend and revoke for the selected clinic",
     "name" : "Team invitations"
+  }, {
+    "description" : "Contacts, their tags and consent in the selected clinic",
+    "name" : "Contacts"
+  }, {
+    "description" : "Manual tags of the selected clinic",
+    "name" : "Tags"
   }, {
     "description" : "Authenticated identity and clinic selection",
     "name" : "Session"

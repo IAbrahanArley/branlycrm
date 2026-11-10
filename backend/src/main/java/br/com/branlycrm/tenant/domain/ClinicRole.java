@@ -37,6 +37,7 @@ public enum ClinicRole {
     row(ClinicPermission.CONTACT_READ, ALL, ALL, ALL, ALL);
     row(ClinicPermission.CONTACT_WRITE, ALL, ALL, ALL, NONE);
     row(ClinicPermission.CONTACT_ARCHIVE, ALL, ALL, NONE, NONE);
+    row(ClinicPermission.TAG_MANAGE, ALL, ALL, NONE, NONE);
     row(ClinicPermission.CONTACT_IMPORT, ALL, ALL, NONE, NONE);
     row(ClinicPermission.LEAD_READ, ALL, ALL, ALL, ALL);
     row(ClinicPermission.LEAD_WRITE, ALL, ALL, ALL, NONE);

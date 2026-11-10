@@ -101,7 +101,8 @@ public class ConsentRepository {
     return at;
   }
 
-  private static List<ConsentRecord> history(Session session, UUID contactId) {
+  /** Unordered history; also used by the contact detail, in its own transaction. */
+  static List<ConsentRecord> history(Session session, UUID contactId) {
     return session
         .createSelectionQuery(
             "from ContactConsentEntity c where c.contactId = :contact", ContactConsentEntity.class)

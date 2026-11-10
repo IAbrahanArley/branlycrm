@@ -14,6 +14,8 @@ public enum ClinicPermission {
   /** Create, edit, tags and consent. */
   CONTACT_WRITE,
   CONTACT_ARCHIVE,
+  /** Rename or delete a tag of the clinic catalog (deleting removes it from every contact). */
+  TAG_MANAGE,
   CONTACT_IMPORT,
   /** Kanban, list and timeline. */
   LEAD_READ,

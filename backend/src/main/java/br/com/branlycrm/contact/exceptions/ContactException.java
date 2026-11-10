@@ -17,7 +17,13 @@ public final class ContactException extends RuntimeException {
     /** The consent rules refuse the change (an import cannot undo an opt-out). */
     CONSENT_REFUSED,
     /** A tag with the same name already exists in this clinic. */
-    DUPLICATE_TAG
+    DUPLICATE_TAG,
+    /** The tag is missing in this clinic (the contact exists). */
+    TAG_NOT_FOUND,
+    /** The clinic already has the maximum number of tags. */
+    TAG_LIMIT,
+    /** The contact is archived: unarchive it before editing it or changing its tags. */
+    ARCHIVED
   }
 
   private final Reason reason;
