@@ -531,7 +531,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - na CRM-036, traduzir o `BRL03` (etapa arquivada em paralelo com o movimento) para um 409 em vez de 503;
   - a participação do responsável é conferida no banco central antes da transação da clínica: uma desativação simultânea pode deixar um responsável inativo.
 
-### [ ] CRM-032 — API de leads e transições (P1)
+### [x] CRM-032 — API de leads e transições (P1)
 **Depende de:** CRM-031, CRM-004.
 **Atende:** CRM-03, CRM-04, CRM-06, CRM-08, RN-08, RN-09.
 **Entregas:** criar, listar, filtrar, mover etapa, temperatura, responsável, notas e perda com motivo obrigatório; publicação dos eventos para notificações.
@@ -540,6 +540,27 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Permissões:** testadas por papel.
 - **Isolamento:** A/B em leitura, filtros e alterações.
 - **Concorrência:** movimentos concorrentes não perdem eventos.
+**Estado (10/11/2026):** concluída na branch `feat/crm-032-leads-api`, no modo MVP (testes essenciais, OpenAPI mínima e só o `reviewer`).
+- **Rotas** (`/v1/clinic/leads`):
+  - `GET` com filtros `status` (padrão: abertos), `stageId`, `responsibleId`, `temperature` e `contactId`, paginado e com o nome e o telefone do contato, para o Kanban;
+  - `POST` (201; contato com lead aberto → 409 `LEAD_ALREADY_OPEN` com o `leadId`);
+  - `GET /{id}`;
+  - `PUT /{id}/stage`, `/temperature` e `/responsible`, com `version`;
+  - `POST /{id}/loss`, com motivo obrigatório (sem motivo → 400 no campo `lossReasonId`);
+  - `GET /{id}/events`;
+  - `GET` e `POST /{id}/notes`.
+- **Notas:** migração de clínica V7 com `lead_notes`, só com inserção, até 2000 caracteres, fora da busca.
+- **Contrato e documentação:** `openapi.json` regenerado (só rotas novas) e códigos `LEAD_*` no catálogo de `api-convencoes.md`.
+- **Testes:** `LeadApiIT`:
+  - fluxo completo e histórico em ordem;
+  - perda sem motivo;
+  - papéis (o Somente leitura lê e não altera);
+  - isolamento A/B em leitura, filtros e todas as alterações;
+  - dois movimentos concorrentes na mesma versão: um vence, o outro recebe `LEAD_STALE`, e nenhum evento se perde.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos: A/B nas alterações e nos filtros, catálogo de erros e 201 da nota sem `Location`.
+- **Pendências:**
+  - publicação dos eventos para notificações, na CRM-093 (ainda não há quem os consuma);
+  - a busca junta a entidade de contatos pelo nome na HQL: renomear campos de `ContactEntity` quebra só em tempo de execução, o que o `LeadApiIT` cobre.
 
 ### [ ] CRM-033 — Kanban e lista do funil (P1)
 **Depende de:** CRM-032, CRM-022.
