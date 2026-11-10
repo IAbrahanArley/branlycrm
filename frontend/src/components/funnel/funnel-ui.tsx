@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useClinic } from "@/components/panel/clinic-context";
+import { clinicApiError, clinicContextChanged } from "@/components/panel/clinic-resource";
 import { PanelState } from "@/components/panel/panel-state";
-import { ApiError } from "@/lib/api/client";
+import type { ApiError } from "@/lib/api/client";
 import { withSelectedClinic } from "@/lib/api/auth";
 import { funnelErrorMessage } from "@/lib/api/funnel-view";
 import type { LeadStatus, Temperature } from "@/lib/api/leads";
+
+export { useClinicResource as useFunnelResource } from "@/components/panel/clinic-resource";
 
 export const fieldClass = "mt-1 min-h-11 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-base text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 export const temperatureLabel: Record<Temperature, string> = { COLD: "Frio", WARM: "Morno", HOT: "Quente", QUALIFIED: "Qualificado" };
@@ -31,38 +34,9 @@ export function FunnelHeading({ title, description, children }: { title: string;
   );
 }
 
-function errorFor(cause: unknown) {
-  return cause instanceof ApiError ? cause : new ApiError(0, "UNKNOWN", "Não foi possível concluir a operação.");
-}
-
-function contextChanged(error: ApiError) {
-  return ["CLINIC_NOT_SELECTED", "CLINIC_ACCESS_DENIED", "SESSION_CONTEXT_CHANGED"].includes(error.code);
-}
-
 export function FunnelProblem({ error, retry }: { error: ApiError; retry: () => void }) {
   return <PanelState kind={error.status === 403 ? "forbidden" : "error"} title={error.status === 404 ? "Lead não encontrado" : "Não foi possível carregar o funil"}
     message={funnelErrorMessage(error.code, error.message)} onRetry={error.status === 404 || error.status === 403 ? undefined : retry} />;
-}
-
-export function useFunnelResource<T>(load: (signal: AbortSignal) => Promise<T>) {
-  const { clinic, subjectId, refresh } = useClinic();
-  const [revision, setRevision] = useState(0);
-  const [loaded, setLoaded] = useState<{ load: typeof load; revision: number; data?: T; error?: ApiError }>();
-  const reload = useCallback(() => setRevision((value) => value + 1), []);
-  useEffect(() => {
-    const controller = new AbortController();
-    void withSelectedClinic(clinic.tenantId, () => load(controller.signal), controller.signal, subjectId).then(
-      (data) => { if (!controller.signal.aborted) setLoaded({ load, revision, data }); },
-      (cause: unknown) => {
-        if (controller.signal.aborted) return;
-        const error = errorFor(cause);
-        if (contextChanged(error)) refresh();
-        else setLoaded({ load, revision, error });
-      },
-    );
-    return () => controller.abort();
-  }, [clinic.tenantId, load, refresh, revision, subjectId]);
-  return { result: loaded?.load === load && loaded.revision === revision ? loaded : undefined, reload };
 }
 
 export function useLeadMutation() {
@@ -87,8 +61,8 @@ export function useLeadMutation() {
       if (alive.current) onSuccess();
     } catch (cause) {
       if (!alive.current) return;
-      const error = errorFor(cause);
-      if (contextChanged(error)) {
+      const error = clinicApiError(cause);
+      if (clinicContextChanged(error)) {
         refresh();
       } else {
         const uncertain = error.status === 0 || error.status >= 500 || (error.status >= 200 && error.status < 300);

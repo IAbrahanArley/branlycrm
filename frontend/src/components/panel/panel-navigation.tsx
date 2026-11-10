@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
-  Activity, BriefcaseBusiness, Building2, ChevronDown, Columns3, LayoutDashboard, LogOut,
+  Activity, BriefcaseBusiness, Building2, ChevronDown, ClipboardList, Columns3, LayoutDashboard, LogOut,
   Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ShieldCheck, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ type NavigationProps = {
   hasAgencies: boolean;
   hasClinicArea: boolean;
   canViewContacts: boolean;
-  canViewFunnel: boolean;
+  canReadCommercial: boolean;
   canViewTeam: boolean;
   currentPath: string;
   choosingClinic: boolean;
@@ -44,14 +44,14 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function NavigationLinks({
-  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canViewFunnel, canViewTeam, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
+  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
 }: {
   compact?: boolean;
   ready: boolean;
   hasAgencies: boolean;
   hasClinicArea: boolean;
   canViewContacts: boolean;
-  canViewFunnel: boolean;
+  canReadCommercial: boolean;
   canViewTeam: boolean;
   currentPath: string;
   canSwitchClinic: boolean;
@@ -67,6 +67,7 @@ function NavigationLinks({
   const agency = currentPath === "/agencia";
   const contacts = currentPath === "/app/contatos" || currentPath.startsWith("/app/contatos/");
   const funnel = currentPath === "/app/funil" || currentPath.startsWith("/app/funil/");
+  const catalog = currentPath === "/app/catalogo";
   const team = currentPath === "/app/equipe";
   const active = "bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/18 hover:text-cyan-50";
   return (
@@ -88,11 +89,18 @@ function NavigationLinks({
             <span className={label}>Contatos</span>
           </Link>
         )}
-        {canViewFunnel && (
+        {canReadCommercial && (
           <Link href="/app/funil" aria-current={funnel ? "page" : undefined} title={compact ? "Funil de vendas" : undefined}
             onNavigate={onNavigate} className={cn(item, funnel && active)}>
             <Columns3 className="size-[18px] shrink-0" aria-hidden="true" />
             <span className={label}>Funil de vendas</span>
+          </Link>
+        )}
+        {canReadCommercial && (
+          <Link href="/app/catalogo" aria-current={catalog ? "page" : undefined} title={compact ? "Catálogo" : undefined}
+            onNavigate={onNavigate} className={cn(item, catalog && active)}>
+            <ClipboardList className="size-[18px] shrink-0" aria-hidden="true" />
+            <span className={label}>Catálogo</span>
           </Link>
         )}
         {canViewTeam && (
@@ -167,7 +175,7 @@ function AccountMenu({ email, onSignOut }: { email: string; onSignOut: () => voi
 }
 
 export function PanelNavigation({
-  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canViewFunnel, canViewTeam, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
+  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
 }: NavigationProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -182,7 +190,7 @@ export function PanelNavigation({
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
-  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canViewFunnel, canViewTeam, currentPath, choosingClinic, onChooseClinic, onOverview };
+  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, currentPath, choosingClinic, onChooseClinic, onOverview };
 
   return (
     <div className="flex min-h-dvh bg-[#f3f6fa] text-[#10233b]">

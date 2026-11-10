@@ -81,6 +81,13 @@ A listagem de convites informa o vencimento. O resultado da entrega do e-mail ap
 
 O contrato atual não expõe a origem do lead. O fechamento como ganho passa pelo registro de vendas, previsto na CRM-035.
 
+## Teste local do catálogo (CRM-034)
+
+1. Em [Catálogo](http://localhost:3000/app/catalogo), use uma conta sintética de gestor para cadastrar um procedimento. Informe o valor de referência em reais, como `250,75`, e confira o valor mostrado na lista.
+2. Edite o procedimento e desative-o. Confira os filtros **Ativos**, **Inativos** e **Todos**. Reative o item e repita o fluxo em **Profissionais**.
+3. Tente cadastrar um nome já utilizado, inclusive por um item inativo. Em duas abas, abra a edição do mesmo item e confira que a versão antiga pede recarga após a primeira edição salvar.
+4. Com uma conta de atendente, consulte o catálogo. As ações de cadastro, edição e mudança de situação ficam disponíveis para quem tem permissão de gestão. Repita usando Tab e Enter em uma janela estreita.
+
 ## Verificação
 
 ```sh
