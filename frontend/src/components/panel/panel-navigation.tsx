@@ -16,6 +16,7 @@ type NavigationProps = {
   clinic?: { name: string; role: string };
   canSwitchClinic: boolean;
   hasAgencies: boolean;
+  hasClinicArea: boolean;
   canViewContacts: boolean;
   canViewTeam: boolean;
   currentPath: string;
@@ -42,11 +43,12 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function NavigationLinks({
-  compact = false, ready, hasAgencies, canViewContacts, canViewTeam, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
+  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canViewTeam, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
 }: {
   compact?: boolean;
   ready: boolean;
   hasAgencies: boolean;
+  hasClinicArea: boolean;
   canViewContacts: boolean;
   canViewTeam: boolean;
   currentPath: string;
@@ -60,6 +62,7 @@ function NavigationLinks({
   const item = cn(sidebarItem, compact && "justify-center px-0");
   const label = compact ? "sr-only" : undefined;
   const overview = currentPath === "/app" && !choosingClinic;
+  const agency = currentPath === "/agencia";
   const contacts = currentPath === "/app/contatos" || currentPath.startsWith("/app/contatos/");
   const team = currentPath === "/app/equipe";
   const active = "bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/18 hover:text-cyan-50";
@@ -67,14 +70,14 @@ function NavigationLinks({
     <nav aria-label="Navegação do painel" className="space-y-6">
       <div className="space-y-1">
         <p className={cn("mb-2 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase", compact && "sr-only")}>Área de trabalho</p>
-        <Link
+        {hasClinicArea && <Link
           href="/app" aria-current={overview ? "page" : undefined} title={compact ? "Visão geral" : undefined}
           onNavigate={() => { onOverview(); onNavigate?.(); }}
           className={cn(item, overview && active)}
         >
           <LayoutDashboard className="size-[18px] shrink-0" aria-hidden="true" />
-          <span className={label}>Visão geral</span>
-        </Link>
+          <span className={label}>{agency ? "Área da clínica" : "Visão geral"}</span>
+        </Link>}
         {canViewContacts && (
           <Link href="/app/contatos" aria-current={contacts ? "page" : undefined} title={compact ? "Contatos" : undefined}
             onNavigate={onNavigate} className={cn(item, contacts && active)}>
@@ -99,9 +102,9 @@ function NavigationLinks({
           </button>
         )}
         {hasAgencies && (
-          <Link href="/app#suas-agencias" title={compact ? "Minhas agências" : undefined} onNavigate={onNavigate} className={item}>
+          <Link href="/agencia" aria-current={agency ? "page" : undefined} title={compact ? "Carteira da agência" : undefined} onNavigate={onNavigate} className={cn(item, agency && active)}>
             <BriefcaseBusiness className="size-[18px] shrink-0" aria-hidden="true" />
-            <span className={label}>Minhas agências</span>
+            <span className={label}>Carteira da agência</span>
           </Link>
         )}
       </div>
@@ -154,7 +157,7 @@ function AccountMenu({ email, onSignOut }: { email: string; onSignOut: () => voi
 }
 
 export function PanelNavigation({
-  email, clinic, canSwitchClinic, hasAgencies, canViewContacts, canViewTeam, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
+  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canViewTeam, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
 }: NavigationProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -169,7 +172,7 @@ export function PanelNavigation({
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
-  const nav = { ready, canSwitchClinic, hasAgencies, canViewContacts, canViewTeam, currentPath, choosingClinic, onChooseClinic, onOverview };
+  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canViewTeam, currentPath, choosingClinic, onChooseClinic, onOverview };
 
   return (
     <div className="flex min-h-dvh bg-[#f3f6fa] text-[#10233b]">
@@ -232,7 +235,7 @@ export function PanelNavigation({
                   </div>
                   {canSwitchClinic && <Button type="button" variant="outline" onClick={onChooseClinic} className="hidden min-h-11 transition-colors md:inline-flex">Trocar clínica</Button>}
                 </>
-              ) : <span className="truncate text-sm font-semibold">Área de trabalho</span>}
+              ) : <span className="truncate text-sm font-semibold">{currentPath === "/agencia" ? "Área da agência" : "Área de trabalho"}</span>}
             </div>
             <div className="shrink-0">
               {ready && email && <AccountMenu email={email} onSignOut={onSignOut} />}

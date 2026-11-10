@@ -55,6 +55,14 @@ Os testes abaixo exercitam a renovação do CSRF, a recusa de mutações e a rev
 
 O termo da busca fica em memória na página e segue no parâmetro `q` da API. Use apenas dados sintéticos até que a configuração de logs do proxy oculte esse parâmetro (CRM-072).
 
+## Teste local da carteira da agência (FE-005)
+
+1. Abra [Carteira da agência](http://localhost:3001/agencia) com uma conta sintética de agência e conclua o segundo fator. Com acesso somente à agência, confira se o login leva à carteira. Com acesso também a uma clínica, alterne pelo menu.
+2. Em uma conta com mais de uma agência, selecione cada uma e confira as respectivas clínicas e situações. Teste também uma conta sem acesso à agência.
+3. Em **Nova clínica**, informe um nome fictício e um e-mail `@example.test`. Confira a situação da clínica e o resultado do convite. Se a resposta se perder, use **Retomar cadastro** na mesma aba. Após recarregar, preencha o mesmo nome e e-mail. A aba guarda apenas o identificador da solicitação até a confirmação.
+4. Reemita o convite de uma clínica em preparação ou aguardando gestor. Informe o e-mail de destino. A carteira não informa o endereço anterior e não apresenta dados de pacientes.
+5. Repita o fluxo em uma janela estreita usando Tab, Shift+Tab, Enter e Esc.
+
 ## Teste local de equipe e convites (FE-003)
 
 1. Abra [Equipe](http://localhost:3000/app/equipe) com um gestor sintético. Alterne os filtros de papel e situação e confira a paginação.
@@ -82,4 +90,4 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/*.test.mjs
 - `src/lib/api`: cliente de mesma origem, erros da API e operações de sessão. O CSRF vive em memória e a sessão usa o cookie HttpOnly emitido pelo backend.
 - `src/components/panel`: layout protegido e estados reutilizáveis. Qualquer leitura protegida futura deve consultar a API, que verifica a sessão e as permissões.
 
-Após validar o segundo fator, o painel consulta as áreas disponíveis e confirma a clínica ativa com a API. A rota e a navegação da carteira da agência serão entregues na FE-005.
+Após validar o segundo fator, o painel consulta as áreas disponíveis e confirma a clínica ativa para a área da clínica. A carteira da agência usa o vínculo da agência e os dados cadastrais disponíveis na API.
