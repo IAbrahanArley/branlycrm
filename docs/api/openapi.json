@@ -403,6 +403,21 @@
         },
         "type" : "object"
       },
+      "LossReasonView" : {
+        "properties" : {
+          "archived" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "MfaCodeRequest" : {
         "properties" : {
           "code" : {
@@ -570,6 +585,28 @@
         },
         "type" : "object"
       },
+      "PipelineView" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "stages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StageView"
+            },
+            "type" : "array"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PortfolioClinicView" : {
         "properties" : {
           "clinicName" : {
@@ -607,6 +644,28 @@
         "properties" : {
           "role" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StageView" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "position" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -3201,6 +3260,173 @@
         "tags" : [ "Contacts" ]
       }
     },
+    "/v1/clinic/loss-reasons" : {
+      "get" : {
+        "operationId" : "listLossReasons",
+        "parameters" : [ {
+          "description" : "true includes archived reasons; default false",
+          "in" : "query",
+          "name" : "includeArchived",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/LossReasonView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Loss reasons"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: includeArchived"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Loss reasons of the clinic ordered by name (all roles)",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/pipeline" : {
+      "get" : {
+        "description" : "Open stages by position, then the won stage, then the lost one. Default stages carry a stable key (NEW is where every lead starts) whatever their name.",
+        "operationId" : "getPipeline",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description" : "Funnel and stages"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_NOT_SELECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "The clinic's sales funnel with its active stages in display order (all roles)",
+        "tags" : [ "Pipeline" ]
+      }
+    },
     "/v1/clinic/tags" : {
       "get" : {
         "operationId" : "listTags",
@@ -4492,6 +4718,9 @@
   }, {
     "description" : "Members and roles of the selected clinic",
     "name" : "Team"
+  }, {
+    "description" : "Sales funnel stages and loss reasons of the selected clinic",
+    "name" : "Pipeline"
   }, {
     "description" : "Partner agencies and their clinic portfolio",
     "name" : "Agencies"

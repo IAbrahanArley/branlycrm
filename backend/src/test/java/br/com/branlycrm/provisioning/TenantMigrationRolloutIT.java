@@ -10,6 +10,7 @@ import br.com.branlycrm.common.dto.response.PageView;
 import br.com.branlycrm.contact.dto.request.ContactRequest;
 import br.com.branlycrm.contact.dto.response.ContactSummaryView;
 import br.com.branlycrm.contact.services.ContactService;
+import br.com.branlycrm.pipeline.repositories.PipelineRepository;
 import br.com.branlycrm.provisioning.repositories.TenantInfrastructureRepository;
 import br.com.branlycrm.provisioning.repositories.TenantRolloutRepository;
 import br.com.branlycrm.provisioning.repositories.TenantRuntimeProbeRepository;
@@ -55,9 +56,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Schema rollout for existing clinics (ADR-031) against clinics created by the real provisioner,
- * with deployment roles without superuser. A clinic created before CRM-015 and CRM-020 is simulated
- * by removing, as its owner, what V3 (clinic settings) and V4 (contacts) created and their history
- * rows: the rollout must bring both back, and the clinic routes work again.
+ * with deployment roles without superuser. A clinic created before CRM-015 is simulated by
+ * removing, as its owner, what V3 (clinic settings), V4 (contacts) and V5 (funnel) created and
+ * their history rows: the rollout must bring them back, and the clinic routes work again.
  */
 @Testcontainers
 @ExtendWith(OutputCaptureExtension.class)
@@ -81,6 +82,7 @@ class TenantMigrationRolloutIT {
   @Autowired TenantAccessService access;
   @Autowired ClinicSettingsRepository settings;
   @Autowired ContactService contacts;
+  @Autowired PipelineRepository pipelines;
   @Autowired TenantSecretReader secrets;
   @Autowired JdbcTemplate worker;
 
@@ -163,6 +165,9 @@ class TenantMigrationRolloutIT {
     assertThat(contacts.get(a.tenantId(), a.owner(), created.id()).name())
         .isEqualTo("Contato Sintético");
     assertThat(listContacts(a).total()).isEqualTo(1);
+    // V5: the default funnel and reasons, read as the runtime with the migration's grants.
+    assertThat(pipelines.get(a.access()).stages()).hasSize(6);
+    assertThat(pipelines.lossReasons(a.access(), false)).hasSize(7);
 
     Run again = rollout("--tenant-id", a.tenantId().toString());
 
@@ -353,21 +358,25 @@ class TenantMigrationRolloutIT {
         command.getExitCode(), output.toString(StandardCharsets.UTF_8).replace("\r\n", "\n"));
   }
 
-  /** As the clinic owner, back to a clinic created before V3 and V4: objects and history. */
+  /** As the clinic owner, back to a clinic created with V1 and V2 only: objects and history. */
   private void downgradeToV2(TenantDatabase database) throws SQLException {
     dropNewerObjects(database);
     forgetNewerHistory(database);
   }
 
-  /** Everything V3 and V4 created. */
+  /** Everything V3, V4 and V5 created. */
   private void dropNewerObjects(TenantDatabase database) throws SQLException {
+    asOwner(database, "DROP TABLE loss_reasons, pipeline_stages, pipelines");
     asOwner(database, "DROP TABLE contact_consents, contact_tags, tags, contacts");
     asOwner(database, "DROP EXTENSION pg_trgm");
     asOwner(database, "DROP TABLE clinic_settings");
   }
 
   private void forgetNewerHistory(TenantDatabase database) throws SQLException {
-    asOwner(database, "DELETE FROM flyway_schema_history WHERE version IN ('3', '4')");
+    // Every row after V2. dropNewerObjects must remove the objects of each new migration.
+    asOwner(
+        database,
+        "DELETE FROM flyway_schema_history WHERE version IS NOT NULL AND version::int > 2");
   }
 
   private PageView<ContactSummaryView> listContacts(Clinic clinic) {

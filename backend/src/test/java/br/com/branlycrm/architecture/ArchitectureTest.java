@@ -243,6 +243,7 @@ class ArchitectureTest {
             "br.com.branlycrm.identity..",
             "br.com.branlycrm.tenant..",
             "br.com.branlycrm.contact..",
+            "br.com.branlycrm.pipeline..",
             "br.com.branlycrm.agency..",
             "br.com.branlycrm.onboarding..",
             "br.com.branlycrm.platform..",
