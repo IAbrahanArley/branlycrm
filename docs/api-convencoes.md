@@ -121,6 +121,10 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `LEAD_STAGE_NOT_ALLOWED` | 409 | Etapa inexistente, arquivada, ganha (só pela venda) ou perdida (só com motivo) | Leads |
 | `LEAD_LOSS_REASON_NOT_FOUND` | 409 | Motivo de perda inexistente ou arquivado | Leads |
 | `LEAD_RESPONSIBLE_INVALID` | 409 | O responsável não é membro ativo que trabalha leads | Leads |
+| `PROCEDURE_NOT_FOUND` / `PROFESSIONAL_NOT_FOUND` | 404 | Item inexistente nesta clínica (mesma resposta para o de outra clínica) | Catálogo |
+| `PROCEDURE_DUPLICATE` / `PROFESSIONAL_DUPLICATE` | 409 | Já existe item com o mesmo nome, sem diferenciar maiúsculas, inclusive inativo | Catálogo |
+| `PROCEDURE_STALE` / `PROFESSIONAL_STALE` | 409 | O item mudou desde a leitura (`version`) | Catálogo |
+| `PROCEDURE_LIMIT` / `PROFESSIONAL_LIMIT` | 409 | Limite de 300 procedimentos ou 100 profissionais por clínica | Catálogo |
 | `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02), ou uma escrita concorrente no banco da clínica | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |

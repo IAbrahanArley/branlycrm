@@ -29,6 +29,7 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Equipe: ver | ✓ | ✓ | — | — |
 | Equipe: convidar, mudar papel, desativar | ✓ | Só `ATTENDANT` e `VIEWER` | — | — |
 | Configuração comercial (funil, etapas, motivos de perda, procedimentos, profissionais, respostas rápidas) | ✓ | ✓ | — | — |
+| Procedimentos e profissionais: ver (`LEAD_READ`, para registrar vendas) | ✓ | ✓ | ✓ | ✓ |
 | Canal WhatsApp: ver estado | ✓ | ✓ | — | — |
 | Contatos: ver e buscar | ✓ | ✓ | ✓ | ✓ |
 | Contatos: criar, editar, criar e vincular tags, consentimento | ✓ | ✓ | ✓ | — |

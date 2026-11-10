@@ -93,13 +93,13 @@ O frontend acompanha cada API aprovada.
 - Relatório com:
   - campos recebidos;
   - latências medidas;
-  - limites encontrados (WhatsApp Web, coexistência com o app Business, como conectar números de clientes como Tech Provider);
-  - comparação com um provedor parceiro candidato.
+  - limites encontrados (WhatsApp Web, coexistência com o app Business, como conectar números de clientes como Tech Provider pelo Embedded Signup).
 **Aceite:**
 - Evidência (payload com dados pessoais mascarados) de que o `referral` chega.
-- Recomendação de fornecedor documentada para decisão do responsável.
+- Limites e prazos da Meta (verificação do negócio, Tech Provider, revisão do app) registrados neste arquivo.
 - Nenhum token ou número real versionado.
 **Observação:** usa conta e anúncio reais da Meta; exige aprovação e credenciais fornecidas pelo responsável fora do chat.
+**Decisão (10/11/2026):** Cloud API oficial da Meta, direta, sem provedor intermediário (ADR-034). A prova deixa de comparar fornecedores.
 
 ## Fase 1 — Identidade, agências, clínicas e isolamento
 
@@ -568,11 +568,22 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Entregas:** colunas, cartões com selo de origem e temperatura, arrastar, visão em lista, filtros e detalhe do lead.
 **Aceite:** movimento persiste; falha do servidor desfaz o cartão com mensagem clara; funciona no celular.
 
-### [ ] CRM-034 — Catálogo de procedimentos e profissionais (P1)
+### [x] CRM-034 — Catálogo de procedimentos e profissionais (P1)
 **Depende de:** CRM-015.
 **Atende:** CRM-05, PAC-04.
 **Entregas:** procedimentos (nome, valor de referência em centavos, categoria, intervalo de retorno opcional, ativo); profissionais da clínica sem login (nome, ativo). Sem informação clínica.
 **Aceite:** exclusivos por clínica; inativos não aparecem para novas vendas, mas continuam nas antigas.
+**Estado (10/11/2026):** concluída na branch `feat/crm-034-catalogo`, no modo MVP.
+- **Módulo `catalog`** e migração de clínica V8 (`procedures`, `professionals`): nome único sem diferenciar maiúsculas, inclusive os inativos; valor em centavos (`BIGINT`, de 0 a R$ 10 milhões); runtime sem `DELETE` e com `UPDATE` só nas colunas editáveis.
+- **Rotas:**
+  - `GET /v1/clinic/procedures` e `/professionals`: listas inteiras, por nome, só os ativos salvo `?includeInactive=true`; todos os papéis leem (`LEAD_READ`), porque a venda precisa;
+  - `POST`, `PUT /{id}` (com `version`) e `PUT /{id}/active` (idempotente), só com `COMMERCIAL_SETTINGS_EDIT` (Proprietário e Gestor);
+  - limites de 300 procedimentos e 100 profissionais.
+- **Testes:** `CatalogApiIT` (criar, editar, versão desatualizada, duplicado, inativar e filtro, papéis, isolamento A/B em leitura e escrita, e grants da V8 sem `DELETE` nem `UPDATE` de id e autoria); `TenantMigrationRolloutIT` ajustado.
+- **Mudança global:** o teste revelou que o Jackson truncava `1.5` para `1` em campos inteiros (centavos e `version` em toda a API). Agora `spring.jackson.deserialization.accept-float-as-int=false`, e esse valor responde 400.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos: mensagem do limite (inativar não libera vaga), teste dos grants, número fracionário e javadocs.
+- **Para a CRM-035:** a venda referencia o id e recusa item inativo em venda nova; o histórico continua lendo os inativos.
+- **Pendente:** tela de configuração do catálogo (frontend, junto com a CRM-036).
 
 ### [ ] CRM-035 — Registro de vendas (P1)
 **Depende de:** CRM-032, CRM-034.
@@ -1010,7 +1021,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 
 ## Decisões pendentes para o responsável pelo produto
 
-- [ ] Fornecedor do WhatsApp (depois de CRM-005).
+- [x] Fornecedor do WhatsApp: Cloud API oficial da Meta, direta (ADR-034).
 - [ ] Cobrança de agências e clínicas: modelo, preços, limites e se fica dentro ou fora do sistema.
 - [ ] Participação da agência nas clínicas que cria; suspensão de agência; saída de clínica da agência.
 - [ ] Custo das notificações ao gestor por WhatsApp.
