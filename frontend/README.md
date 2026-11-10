@@ -79,7 +79,14 @@ A listagem de convites informa o vencimento. O resultado da entrega do e-mail ap
 3. Alterne para **Lista** e filtre por situação, etapa e temperatura. Abra um lead, confira os dados e registre perda com um motivo.
 4. Abra o mesmo quadro em duas abas, mova o lead na primeira e tente mover a cópia antiga na segunda. A segunda deve desfazer a prévia e pedir que você atualize o funil.
 
-O contrato atual não expõe a origem do lead. O fechamento como ganho passa pelo registro de vendas, previsto na CRM-035.
+O contrato atual não expõe a origem do lead.
+
+## Teste local do registro de venda (CRM-035)
+
+1. Com a migração de clínica V9 aplicada, abra um lead em aberto com uma conta sintética de atendente e clique em **Registrar venda**.
+2. Selecione um procedimento ativo e informe o valor em reais. Use, por exemplo, `250,75`. Profissional, forma de pagamento e data são opcionais. A data em branco usa o dia atual no fuso da clínica.
+3. Confirme a venda e verifique a etapa **Venda fechada** no funil e o selo **Paciente** no perfil e na lista de contatos.
+4. Abra o formulário para o mesmo lead em duas abas antes de confirmar. Confira que só a primeira gravação fecha a oportunidade. A segunda deve exibir o conflito e oferecer atualização dos dados.
 
 ## Verificação
 

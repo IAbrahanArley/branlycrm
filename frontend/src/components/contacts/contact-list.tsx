@@ -8,13 +8,18 @@ import { PanelState } from "@/components/panel/panel-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CONTACT_PAGE_SIZE, contactPath, listContacts, listTags, type ContactFilters, type ContactSummary } from "@/lib/api/contacts";
-import { ContactHeading, ContactLink, ContactProblem, contactInput, useContactResource } from "@/components/contacts/contact-ui";
+import { ContactHeading, ContactLink, ContactProblem, contactInput, PatientBadge, useContactResource } from "@/components/contacts/contact-ui";
 
 const initialFilters: ContactFilters = { query: "", tagId: "", includeArchived: false, page: 1 };
 const rowLink = "inline-flex min-h-11 items-center rounded-sm font-semibold text-[#174578] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 wrap-anywhere";
 
-function ContactStatus({ archived }: { archived: boolean }) {
-  return <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{archived ? "Arquivado" : "Ativo"}</span>;
+function ContactStatus({ archivedAt, patient }: Pick<ContactSummary, "archivedAt" | "patient">) {
+  return (
+    <div className="flex shrink-0 flex-wrap gap-1">
+      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{archivedAt ? "Arquivado" : "Ativo"}</span>
+      {patient && <PatientBadge />}
+    </div>
+  );
 }
 
 function ContactRows({ contacts }: { contacts: ContactSummary[] }) {
@@ -37,7 +42,7 @@ function ContactRows({ contacts }: { contacts: ContactSummary[] }) {
                 <th scope="row" className="px-4 py-1"><Link href={contactPath(contact.id)} prefetch={false} className={rowLink}>{contact.name}</Link></th>
                 <td className="px-4 py-1 wrap-anywhere">{contact.phone}</td>
                 <td className="px-4 py-1 wrap-anywhere">{contact.email ?? "—"}</td>
-                <td className="px-4 py-1"><ContactStatus archived={Boolean(contact.archivedAt)} /></td>
+                <td className="px-4 py-1"><ContactStatus archivedAt={contact.archivedAt} patient={contact.patient} /></td>
               </tr>
             ))}
           </tbody>
@@ -51,7 +56,7 @@ function ContactRows({ contacts }: { contacts: ContactSummary[] }) {
               <p className="text-sm text-slate-600 wrap-anywhere">{contact.phone}</p>
               {contact.email && <p className="mt-1 text-sm text-slate-600 wrap-anywhere">{contact.email}</p>}
             </div>
-            <ContactStatus archived={Boolean(contact.archivedAt)} />
+            <ContactStatus archivedAt={contact.archivedAt} patient={contact.patient} />
           </li>
         ))}
       </ul>

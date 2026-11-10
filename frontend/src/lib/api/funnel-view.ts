@@ -14,6 +14,8 @@ const errorMessages: Record<string, string> = {
   LEAD_STAGE_NOT_ALLOWED: "Esta etapa não está disponível para o movimento. Atualize o funil.",
   LEAD_LOSS_REASON_NOT_FOUND: "Este motivo de perda não está disponível. Atualize o funil.",
   LEAD_NOT_FOUND: "Este lead não está disponível nesta clínica.",
+  SALE_PROCEDURE_UNAVAILABLE: "O procedimento selecionado não está mais disponível. Atualize os dados antes de escolher novamente.",
+  SALE_PROFESSIONAL_UNAVAILABLE: "O profissional selecionado não está mais disponível. Atualize os dados antes de escolher novamente.",
 };
 
 export function funnelErrorMessage(code: string, fallback: string) {
