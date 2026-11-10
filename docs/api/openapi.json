@@ -500,6 +500,26 @@
         },
         "type" : "object"
       },
+      "LeadOriginView" : {
+        "properties" : {
+          "adId" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LeadSummaryView" : {
         "properties" : {
           "contactId" : {
@@ -519,6 +539,9 @@
           "openedAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "origin" : {
+            "$ref" : "#/components/schemas/LeadOriginView"
           },
           "responsibleId" : {
             "format" : "uuid",
@@ -562,6 +585,9 @@
           "openedAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "origin" : {
+            "$ref" : "#/components/schemas/LeadOriginView"
           },
           "responsibleId" : {
             "format" : "uuid",
@@ -672,10 +698,51 @@
           "contactId" : {
             "type" : "string"
           },
+          "origin" : {
+            "$ref" : "#/components/schemas/OriginRequest"
+          },
           "responsibleId" : {
             "type" : "string"
           },
           "temperature" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "OriginRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OriginTouchView" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "leadId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "origin" : {
+            "$ref" : "#/components/schemas/LeadOriginView"
+          },
+          "receivedAt" : {
+            "format" : "date-time",
             "type" : "string"
           }
         },
@@ -3566,6 +3633,80 @@
         "tags" : [ "Contacts" ]
       }
     },
+    "/v1/clinic/contacts/{contactId}/origin-touches" : {
+      "get" : {
+        "operationId" : "listOriginTouches",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/OriginTouchView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Origin touches"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "The contact's last 100 arrivals with a detected origin, newest first",
+        "tags" : [ "Leads" ]
+      }
+    },
     "/v1/clinic/contacts/{contactId}/tags/{tagId}" : {
       "delete" : {
         "operationId" : "untagContact",
@@ -4406,6 +4547,107 @@
           "session" : [ ]
         } ],
         "summary" : "Add a note to the lead",
+        "tags" : [ "Leads" ]
+      }
+    },
+    "/v1/clinic/leads/{leadId}/origin" : {
+      "put" : {
+        "operationId" : "correctLeadOrigin",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "leadId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OriginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LeadView"
+                }
+              }
+            },
+            "description" : "Lead"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: type, code, title, version"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LEAD_STALE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Correct the origin of an open or closed lead by hand (OWNER, MANAGER, ATTENDANT)",
         "tags" : [ "Leads" ]
       }
     },

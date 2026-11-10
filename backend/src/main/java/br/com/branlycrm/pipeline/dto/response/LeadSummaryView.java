@@ -14,7 +14,8 @@ public record LeadSummaryView(
     String temperature,
     UUID responsibleId,
     Instant openedAt,
-    long version) {
+    long version,
+    LeadOriginView origin) {
   @Override
   public String toString() {
     return "LeadSummaryView[id=" + id + "]";
