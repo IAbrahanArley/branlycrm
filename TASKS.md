@@ -495,7 +495,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - a ordenação e a unicidade por `lower(name)` dependem da collation do banco da clínica, herdada do `template1` (en_US.utf8 na imagem atual; igual às tags);
   - nomes de etapa e motivo digitados pela clínica vão para o inventário da CRM-073.
 
-### [ ] CRM-031 — Modelar leads, temperatura e eventos (P1)
+### [x] CRM-031 — Modelar leads, temperatura e eventos (P1)
 **Depende de:** CRM-020, CRM-030.
 **Desenho já decidido (ADR-033):** leads e eventos entram no módulo `pipeline`; o lead referencia a etapa pela chave composta `(pipeline_id, id)`; a etapa de entrada é a de chave `NEW`; o movimento trava a etapa com `FOR SHARE` e recusa etapa arquivada.
 **Atende:** CRM-03, CRM-04, CRM-08, CRM-09, RN-01, RN-08.
@@ -507,6 +507,29 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - Segundo lead aberto para o mesmo contato é recusado, inclusive sob concorrência.
 - Lead novo só depois do encerramento do anterior.
 - Responsável validado contra participação ativa.
+**Estado (10/11/2026):** concluída na branch `feat/crm-031-leads`, no modo MVP (testes essenciais e só a revisão do `reviewer`).
+- **Banco:** migração de clínica V6 com `leads` e `lead_events`.
+  - Um lead aberto por contato, por índice parcial; a abertura usa `ON CONFLICT ... DO NOTHING` e devolve o lead aberto existente.
+  - A etapa pertence ao funil do lead (chave estrangeira composta), e um trigger (`BRL03`) exige etapa ativa e do tipo da situação.
+  - Perda sempre com motivo, e só a perda tem motivo (CHECK).
+  - Eventos só com inserção, ordenados por uma sequência de escrita.
+  - Grants por coluna ao runtime.
+- **Módulo `pipeline`:** `LeadRepository` (abrir, mover, temperatura, responsável, perder, ganhar), cada mudança com versão otimista e evento na mesma transação. Ganhar só pela venda (CRM-035).
+- **`LeadService`:**
+  - permissões: `LEAD_WRITE` para abrir, mover e mudar temperatura; `SALE_REGISTER` para perder; `LEAD_TAKE` para assumir o lead para si e `LEAD_ASSIGN` para os demais casos, inclusive soltar o próprio lead;
+  - o responsável precisa ter participação ativa com `LEAD_WRITE`.
+- **Testes:** `LeadPersistenceIT` (5):
+  - um lead aberto por contato com 6 aberturas concorrentes;
+  - transições com histórico em ordem e lead novo depois do encerramento;
+  - validação do responsável e das permissões;
+  - isolamento A/B;
+  - regras no banco.
+  - `TenantMigrationRolloutIT` passou a remover e reaplicar também a V6.
+- **Revisão (`reviewer`):** sem críticos, altos nem médios. Corrigidos: evento da temperatura inicial, permissão antes da validação na perda e `FOR SHARE` no contato ao abrir.
+- **Pendências:**
+  - rotas HTTP na CRM-032;
+  - na CRM-036, traduzir o `BRL03` (etapa arquivada em paralelo com o movimento) para um 409 em vez de 503;
+  - a participação do responsável é conferida no banco central antes da transação da clínica: uma desativação simultânea pode deixar um responsável inativo.
 
 ### [ ] CRM-032 — API de leads e transições (P1)
 **Depende de:** CRM-031, CRM-004.

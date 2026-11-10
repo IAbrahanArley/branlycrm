@@ -57,8 +57,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 /**
  * Schema rollout for existing clinics (ADR-031) against clinics created by the real provisioner,
  * with deployment roles without superuser. A clinic created before CRM-015 is simulated by
- * removing, as its owner, what V3 (clinic settings), V4 (contacts) and V5 (funnel) created and
- * their history rows: the rollout must bring them back, and the clinic routes work again.
+ * removing, as its owner, what V3 (clinic settings), V4 (contacts), V5 (funnel) and V6 (leads)
+ * created and their history rows: the rollout must bring them back, and the clinic routes work
+ * again.
  */
 @Testcontainers
 @ExtendWith(OutputCaptureExtension.class)
@@ -364,8 +365,10 @@ class TenantMigrationRolloutIT {
     forgetNewerHistory(database);
   }
 
-  /** Everything V3, V4 and V5 created. */
+  /** Everything V3, V4, V5 and V6 created. */
   private void dropNewerObjects(TenantDatabase database) throws SQLException {
+    asOwner(database, "DROP TABLE lead_events, leads");
+    asOwner(database, "DROP FUNCTION leads_stage_matches_status()");
     asOwner(database, "DROP TABLE loss_reasons, pipeline_stages, pipelines");
     asOwner(database, "DROP TABLE contact_consents, contact_tags, tags, contacts");
     asOwner(database, "DROP EXTENSION pg_trgm");

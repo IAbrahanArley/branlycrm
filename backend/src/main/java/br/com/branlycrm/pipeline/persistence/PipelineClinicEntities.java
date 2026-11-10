@@ -9,6 +9,11 @@ import org.springframework.stereotype.Component;
 class PipelineClinicEntities implements ClinicEntityRegistration {
   @Override
   public List<Class<?>> entities() {
-    return List.of(PipelineEntity.class, PipelineStageEntity.class, LossReasonEntity.class);
+    return List.of(
+        PipelineEntity.class,
+        PipelineStageEntity.class,
+        LossReasonEntity.class,
+        LeadEntity.class,
+        LeadEventEntity.class);
   }
 }
