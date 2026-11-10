@@ -3,21 +3,22 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { BriefcaseBusiness, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { getCurrentClinic, getIdentity, getPanelAccess, logout, type CurrentClinic } from "@/lib/api/auth";
 import { ApiError, onMfaGate, onSessionEnd, sessionEndMessage } from "@/lib/api/client";
 import { getMfaStatus } from "@/lib/api/mfa";
 import { onClinicChange } from "@/lib/api/clinic-session";
 import { clinicRoleLabel } from "@/lib/clinic-role";
 import { PanelState } from "@/components/panel/panel-state";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClinicPicker } from "@/components/panel/clinic-picker";
 import { PanelNavigation } from "@/components/panel/panel-navigation";
 import { ClinicContext } from "@/components/panel/clinic-context";
+import { AgencyContext } from "@/components/agency/agency-context";
 
 type SessionCheck =
   | { kind: "checking" }
-  | { kind: "confirmed"; email: string; access: Awaited<ReturnType<typeof getPanelAccess>>; clinic: (CurrentClinic & { name: string }) | null }
+  | { kind: "confirmed"; email: string; subjectId: string; access: Awaited<ReturnType<typeof getPanelAccess>>; clinic: (CurrentClinic & { name: string }) | null }
   | { kind: "redirecting" | "forbidden" | "error" | "conflict"; message: string };
 
 export function PanelShell({ children }: { children: ReactNode }) {
@@ -50,12 +51,13 @@ export function PanelShell({ children }: { children: ReactNode }) {
     }
     const unsubscribeMfa = onMfaGate(openSecurity);
     const unsubscribeClinic = onClinicChange(() => {
+      if (window.location.pathname === "/agencia") return;
       controller.abort();
       if (window.location.pathname.startsWith("/app/contatos/")) router.replace("/app/contatos");
       retry();
     });
     function suspend(event: PageTransitionEvent) {
-      if (!event.persisted || !window.location.pathname.startsWith("/app/contatos")) return;
+      if (!event.persisted) return;
       controller.abort();
       flushSync(() => setCheck({ kind: "checking" }));
     }
@@ -72,13 +74,13 @@ export function PanelShell({ children }: { children: ReactNode }) {
         return;
       }
       const [identity, access] = await Promise.all([getIdentity(controller.signal), getPanelAccess(controller.signal)]);
-      const current = access.clinics.length > 0 ? await getCurrentClinic(controller.signal) : null;
+      const current = access.clinics.length > 0 && window.location.pathname !== "/agencia" ? await getCurrentClinic(controller.signal) : null;
       const membership = access.clinics.find((clinic) => clinic.tenantId === current?.tenantId);
       if (current && !membership) {
         throw new ApiError(409, "STATE_CONFLICT", "A lista de clínicas mudou. Recarregue os dados para continuar.");
       }
       if (!controller.signal.aborted) {
-        setCheck({ kind: "confirmed", email: identity.email, access, clinic: current && membership ? { ...current, name: membership.clinicName } : null });
+        setCheck({ kind: "confirmed", ...identity, access, clinic: current && membership ? { ...current, name: membership.clinicName } : null });
       }
     }
 
@@ -127,16 +129,23 @@ export function PanelShell({ children }: { children: ReactNode }) {
 
   const confirmed = check.kind === "confirmed" ? check : null;
   const clinic = confirmed?.clinic;
-  const selecting = Boolean(confirmed?.access.clinics.length && (!clinic || choosingClinic));
+  const agencyArea = pathname === "/agencia";
+  const selecting = !agencyArea && Boolean(confirmed?.access.clinics.length && (!clinic || choosingClinic));
   const overview = pathname === "/app";
+  const redirectToAgency = overview && confirmed?.access.kind === "agency";
   const contacts = pathname === "/app/contatos" || pathname.startsWith("/app/contatos/");
   const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
+
+  useEffect(() => {
+    if (redirectToAgency) router.replace("/agencia");
+  }, [redirectToAgency, router]);
 
   return (
     <PanelNavigation
       email={confirmed?.email}
       clinic={clinic ? { name: clinic.name, role: clinicRoleLabel(clinic.role) } : undefined}
-      canSwitchClinic={Boolean(confirmed && (confirmed.access.clinics.length > 1 || (!clinic && selecting)))}
+      canSwitchClinic={!agencyArea && Boolean(confirmed && (confirmed.access.clinics.length > 1 || (!clinic && selecting)))}
+      hasClinicArea={Boolean(confirmed?.access.clinics.length)}
       hasAgencies={Boolean(confirmed?.access.agencies.length)}
       canViewContacts={canViewContacts && !selecting}
       currentPath={pathname}
@@ -147,7 +156,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       onSignOut={signOut}
     >
       <main id="conteudo-painel" tabIndex={-1} className="mx-auto max-w-7xl scroll-mt-20 space-y-6 px-4 py-7 sm:px-7 sm:py-9">
-        {(overview || selecting || !clinic || signingOut) && <div className="space-y-2">
+        {!agencyArea && !redirectToAgency && (overview || selecting || !clinic || signingOut) && <div className="space-y-2">
           <p className="text-xs font-bold tracking-widest text-[#315683] uppercase">Área de trabalho</p>
           <h1 className="font-[family-name:var(--font-branly)] text-3xl font-extrabold tracking-tight text-balance sm:text-4xl">
             {selecting && !signingOut ? "Selecionar clínica" : "Visão geral"}
@@ -172,10 +181,18 @@ export function PanelShell({ children }: { children: ReactNode }) {
                   onRetry={logoutError.conflict ? () => { setLogoutError(undefined); retry(); } : undefined}
                 />
               )}
-              {check.access.kind === "none" && (
+              {redirectToAgency && <PanelState kind="loading" title="Abrindo a carteira da agência…" />}
+              {agencyArea && (
+                check.access.agencies.length ? (
+                  <AgencyContext.Provider value={{ agencies: check.access.agencies, subjectId: check.subjectId, refresh: retry }}>
+                    {children}
+                  </AgencyContext.Provider>
+                ) : <PanelState kind="forbidden" title="Sem acesso à carteira da agência" message="Sua conta não administra uma agência ativa." />
+              )}
+              {!agencyArea && check.access.kind === "none" && (
                 <PanelState kind="empty" title="Sem acesso a clínicas ou agências" message="Sua conta está ativa. Se você esperava ter acesso, peça a um gestor para verificar seu vínculo." />
               )}
-              {check.access.clinics.length > 0 && (
+              {!agencyArea && check.access.clinics.length > 0 && (
                 selecting ? (
                   <Card aria-label="Clínicas disponíveis" className="p-4 sm:p-6">
                     <ClinicPicker
@@ -212,24 +229,6 @@ export function PanelShell({ children }: { children: ReactNode }) {
               )}
               {contacts && check.access.kind === "agency" && (
                 <PanelState kind="forbidden" title="Selecione uma clínica para acessar contatos" message="Sua conta não tem vínculo ativo com uma clínica." />
-              )}
-              {overview && check.access.agencies.length > 0 && (
-                <Card id="suas-agencias" tabIndex={-1} className="scroll-mt-22 focus-visible:outline-2" aria-labelledby="agency-access">
-                  <CardHeader>
-                    <span className="grid size-10 place-items-center rounded-lg bg-[#e9f0fd] text-[#244d8c]">
-                      <BriefcaseBusiness size={19} aria-hidden="true" />
-                    </span>
-                    <CardTitle id="agency-access" className="pt-1">Minhas agências</CardTitle>
-                    <CardDescription>Agências vinculadas à sua conta.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="divide-y divide-border rounded-lg border border-border">
-                      {check.access.agencies.map((agency) => (
-                        <li className="wrap-anywhere px-4 py-3 text-sm font-medium" key={agency.agencyId}>{agency.name}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
               )}
             </>
           )

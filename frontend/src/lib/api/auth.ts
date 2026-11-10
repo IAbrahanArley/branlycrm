@@ -1,6 +1,7 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { accessKind } from "@/lib/api/access-kind";
 import { notifyClinicChange, withClinicSession } from "@/lib/api/clinic-session";
+import { listAgencies } from "@/lib/api/agencies";
 
 type Identity = {
   subjectId: string;
@@ -8,13 +9,12 @@ type Identity = {
 };
 
 export type ClinicMembership = { tenantId: string; clinicName: string; role: string };
-type AgencyMembership = { agencyId: string; name: string };
 export type CurrentClinic = { tenantId: string; role: string; permissions: Record<string, string> };
 
 export async function getPanelAccess(signal: AbortSignal) {
   const [clinics, agencies] = await Promise.all([
     apiRequest<ClinicMembership[]>("/v1/auth/clinics", { signal }),
-    apiRequest<AgencyMembership[]>("/v1/agencies", { signal }),
+    listAgencies(signal),
   ]);
   if (!Array.isArray(clinics) || !Array.isArray(agencies) ||
       !clinics.every((clinic) => typeof clinic?.tenantId === "string" &&
@@ -52,7 +52,7 @@ export async function selectClinic(tenantId: string) {
   });
 }
 
-export async function getIdentity(signal: AbortSignal) {
+export async function getIdentity(signal?: AbortSignal) {
   const identity = await apiRequest<Identity | null>("/v1/auth/me", { signal });
   if (typeof identity?.subjectId !== "string" || !identity.subjectId ||
       typeof identity.email !== "string" || !identity.email) {
