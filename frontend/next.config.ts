@@ -15,6 +15,12 @@ const apiProxyTarget =
 const nextConfig: NextConfig = {
   output: "standalone",
   turbopack: { root: process.cwd() },
+  async headers() {
+    return [{
+      source: "/convite",
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    }];
+  },
   async rewrites() {
     if (!apiProxyTarget) return [];
     return [{ source: "/api/:path*", destination: `${apiProxyTarget}/api/:path*` }];
