@@ -7,11 +7,12 @@ import { ApiError, isMfaGate } from "@/lib/api/client";
 import { clinicRoleLabel } from "@/lib/clinic-role";
 
 export function ClinicPicker({
-  clinics, currentId, onRefresh,
+  clinics, currentId, onRefresh, onSelected = onRefresh,
 }: {
   clinics: ClinicMembership[];
   currentId?: string;
   onRefresh: () => void;
+  onSelected?: () => void;
 }) {
   const busy = useRef(false);
   const [pending, setPending] = useState(false);
@@ -26,7 +27,7 @@ export function ClinicPicker({
     setError(undefined);
     try {
       await selectClinic(id);
-      onRefresh();
+      onSelected();
     } catch (cause) {
       if (isMfaGate(cause) || (cause instanceof ApiError && cause.status === 401)) return;
       setError(cause instanceof ApiError ? cause : new ApiError(0, "UNKNOWN", "Não foi possível selecionar a clínica."));

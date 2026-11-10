@@ -24,6 +24,7 @@ export class ApiError extends Error {
   readonly code: string;
   readonly fields: readonly string[];
   readonly retryAfter: string | null;
+  readonly contactId: string | null;
 
   constructor(
     status: number,
@@ -31,6 +32,7 @@ export class ApiError extends Error {
     message: string,
     fields: readonly string[] = [],
     retryAfter: string | null = null,
+    contactId: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -38,6 +40,7 @@ export class ApiError extends Error {
     this.code = code;
     this.fields = fields;
     this.retryAfter = retryAfter;
+    this.contactId = contactId;
   }
 }
 
@@ -67,7 +70,7 @@ export function sessionEndMessage(reason: SessionEnd) {
 }
 
 async function readError(response: Response) {
-  const body: Partial<{ code: unknown; message: unknown; fields: unknown }> | null =
+  const body: Partial<{ code: unknown; message: unknown; fields: unknown; contactId: unknown }> | null =
     await response.json().catch(() => null);
   const code = typeof body?.code === "string" && body.code
     ? body.code
@@ -84,7 +87,8 @@ async function readError(response: Response) {
     ? body.message
     : fallback;
 
-  return new ApiError(response.status, code, message, fields, response.headers.get("Retry-After"));
+  const contactId = code === "CONTACT_DUPLICATE_PHONE" && typeof body?.contactId === "string" ? body.contactId : null;
+  return new ApiError(response.status, code, message, fields, response.headers.get("Retry-After"), contactId);
 }
 
 async function send(path: string, options: RequestOptions) {

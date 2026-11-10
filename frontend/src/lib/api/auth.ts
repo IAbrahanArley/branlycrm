@@ -1,5 +1,6 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
 import { accessKind } from "@/lib/api/access-kind";
+import { notifyClinicChange, withClinicSession } from "@/lib/api/clinic-session";
 
 type Identity = {
   subjectId: string;
@@ -39,10 +40,16 @@ export async function getCurrentClinic(signal?: AbortSignal): Promise<CurrentCli
 }
 
 export async function selectClinic(tenantId: string) {
-  const selection = await apiRequest<{ tenantId: string } | null>(`/v1/auth/clinic/${tenantId}`, { method: "PUT" });
-  if (selection?.tenantId !== tenantId) {
-    throw new ApiError(200, "UNEXPECTED_RESPONSE", "Não foi possível confirmar a seleção da clínica.");
-  }
+  await withClinicSession("exclusive", async () => {
+    try {
+      const selection = await apiRequest<{ tenantId: string } | null>(`/v1/auth/clinic/${tenantId}`, { method: "PUT" });
+      if (selection?.tenantId !== tenantId) {
+        throw new ApiError(200, "UNEXPECTED_RESPONSE", "Não foi possível confirmar a seleção da clínica.");
+      }
+    } finally {
+      notifyClinicChange();
+    }
+  });
 }
 
 export async function getIdentity(signal: AbortSignal) {
