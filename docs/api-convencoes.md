@@ -113,6 +113,14 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `TAG_NOT_FOUND` | 404 | Tag inexistente na clínica selecionada, inclusive de outra clínica | Tags |
 | `TAG_DUPLICATE` | 409 | Já existe tag com o mesmo nome, sem diferenciar maiúsculas | Tags |
 | `TAG_LIMIT` | 409 | A clínica já tem 500 tags; o catálogo é devolvido inteiro, sem paginação | Tags |
+| `LEAD_NOT_FOUND` | 404 | Lead inexistente na clínica selecionada, inclusive de outra clínica | Leads |
+| `LEAD_ALREADY_OPEN` | 409 | O contato já tem um lead aberto; o corpo traz também `leadId` | Leads |
+| `LEAD_STALE` | 409 | O lead mudou desde a leitura (`version`); recarregar e reaplicar | Leads |
+| `LEAD_CLOSED` | 409 | O lead já foi ganho ou perdido; abrir um lead novo | Leads |
+| `LEAD_CONTACT_UNAVAILABLE` | 409 | O contato não existe nesta clínica ou está arquivado (mesma resposta nos dois casos) | Leads |
+| `LEAD_STAGE_NOT_ALLOWED` | 409 | Etapa inexistente, arquivada, ganha (só pela venda) ou perdida (só com motivo) | Leads |
+| `LEAD_LOSS_REASON_NOT_FOUND` | 409 | Motivo de perda inexistente ou arquivado | Leads |
+| `LEAD_RESPONSIBLE_INVALID` | 409 | O responsável não é membro ativo que trabalha leads | Leads |
 | `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02), ou uma escrita concorrente no banco da clínica | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |

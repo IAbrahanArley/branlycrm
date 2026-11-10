@@ -1,13 +1,19 @@
 package br.com.branlycrm.pipeline.repositories;
 
+import br.com.branlycrm.common.domain.PageQuery;
+import br.com.branlycrm.common.domain.PageResult;
 import br.com.branlycrm.pipeline.domain.Lead;
 import br.com.branlycrm.pipeline.domain.LeadEvent;
 import br.com.branlycrm.pipeline.domain.LeadEventType;
+import br.com.branlycrm.pipeline.domain.LeadNote;
+import br.com.branlycrm.pipeline.domain.LeadSearch;
 import br.com.branlycrm.pipeline.domain.LeadStatus;
+import br.com.branlycrm.pipeline.domain.LeadSummary;
 import br.com.branlycrm.pipeline.domain.Temperature;
 import br.com.branlycrm.pipeline.exceptions.LeadException;
 import br.com.branlycrm.pipeline.persistence.LeadEntity;
 import br.com.branlycrm.pipeline.persistence.LeadEventEntity;
+import br.com.branlycrm.pipeline.persistence.LeadNoteEntity;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.exceptions.ClinicDataException;
 import br.com.branlycrm.tenant.persistence.ClinicPersistence;
@@ -15,7 +21,9 @@ import br.com.branlycrm.tenant.persistence.ClinicTenant;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -156,6 +164,90 @@ public class LeadRepository {
               .stream()
               .map(LeadEventEntity::toDomain)
               .toList();
+        });
+  }
+
+  /** Adds a note to the lead, open or closed. */
+  public LeadNote addNote(ClinicAccess access, UUID id, String body) {
+    Instant at = now.get();
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          require(session, id);
+          LeadNoteEntity note = new LeadNoteEntity(id, body, access.subjectId(), at);
+          session.persist(note);
+          session.flush();
+          return note.toDomain();
+        });
+  }
+
+  /** The lead's notes, oldest first. */
+  public List<LeadNote> notes(ClinicAccess access, UUID id) {
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          require(session, id);
+          return session
+              .createSelectionQuery(
+                  "from LeadNoteEntity n where n.leadId = :lead order by n.seq",
+                  LeadNoteEntity.class)
+              .setParameter("lead", id)
+              .getResultList()
+              .stream()
+              .map(LeadNoteEntity::toDomain)
+              .toList();
+        });
+  }
+
+  /**
+   * One page of leads with their contact's name and phone, newest first, plus the total matching
+   * the filters. Only constant fragments are concatenated; every value is a bound parameter.
+   */
+  public PageResult<LeadSummary> search(ClinicAccess access, LeadSearch search, PageQuery page) {
+    Map<String, Object> parameters = new HashMap<>();
+    StringBuilder where = new StringBuilder(" where l.status = :status");
+    parameters.put("status", search.effectiveStatus());
+    if (search.stageId() != null) {
+      where.append(" and l.stageId = :stage");
+      parameters.put("stage", search.stageId());
+    }
+    if (search.responsibleId() != null) {
+      where.append(" and l.responsibleId = :responsible");
+      parameters.put("responsible", search.responsibleId());
+    }
+    if (search.temperature() != null) {
+      where.append(" and l.temperature = :temperature");
+      parameters.put("temperature", search.temperature());
+    }
+    if (search.contactId() != null) {
+      where.append(" and l.contactId = :contact");
+      parameters.put("contact", search.contactId());
+    }
+    // Joins the contact module's entity by name (no Java dependency): renaming ContactEntity, its
+    // name or phoneE164 breaks this query at run time, which LeadApiIT covers.
+    String from = " from LeadEntity l join ContactEntity c on c.id = l.contactId" + where;
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          var rows =
+              session.createSelectionQuery(
+                  "select l, c.name, c.phoneE164" + from + " order by l.openedAt desc, l.id",
+                  Object[].class);
+          var count = session.createSelectionQuery("select count(l)" + from, Long.class);
+          parameters.forEach(rows::setParameter);
+          parameters.forEach(count::setParameter);
+          List<LeadSummary> items =
+              rows
+                  .setFirstResult(page.offset())
+                  .setMaxResults(page.pageSize())
+                  .getResultList()
+                  .stream()
+                  .map(
+                      row ->
+                          new LeadSummary(
+                              ((LeadEntity) row[0]).toDomain(), (String) row[1], (String) row[2]))
+                  .toList();
+          return new PageResult<>(items, count.getSingleResult());
         });
   }
 
