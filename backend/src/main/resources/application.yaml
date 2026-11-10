@@ -9,6 +9,10 @@ spring:
     clean-disabled: true
     validate-on-migrate: true
     baseline-on-migrate: false
+  jackson:
+    deserialization:
+      # 1.5 in an integer field (cents, version) is refused instead of silently truncated.
+      accept-float-as-int: false
   jpa:
     open-in-view: false
     show-sql: false

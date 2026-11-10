@@ -673,3 +673,21 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - A reordenação da CRM-036 trava o funil, compara a `version` e regrava as posições num único `UPDATE`.
 - O movimento de lead (CRM-031/032) precisa travar a etapa com `FOR SHARE` e recusar etapa arquivada, para não correr com o arquivamento.
 - A V5 chega a clínicas existentes pelo `tenant-migrate` (ADR-031); até lá elas respondem 503.
+
+## ADR-034 — WhatsApp pela Cloud API oficial da Meta, sem provedor intermediário
+
+**Data:** 10/11/2026. **Status:** Aceita pelo usuário. **Complementa:** ADR-005 e ADR-027. **Resolve:** a decisão pendente do fornecedor do WhatsApp.
+
+**Decisão:**
+- **Integração direta** com a WhatsApp Business Platform da Meta (Cloud API), sem BSP ou provedor parceiro no meio. A ADR-005 deixava aberto "diretamente ou por provedor"; fica escolhido o caminho direto.
+- **Conexão dos números:** o Branly CRM atua como Tech Provider da Meta e cada clínica conecta a própria conta do WhatsApp Business pelo Embedded Signup. O número e a conta continuam da clínica.
+- **Entrada:** webhooks assinados da Meta, validados pela assinatura do app, na rota pública do Nginx prevista na ADR-022 e detalhada na CRM-080.
+- **Origem do lead:** o `referral` dos anúncios "Clique para WhatsApp" chega no próprio webhook da Cloud API, sem depender de provedor.
+
+**Alternativas:** Provedor parceiro (BSP) com API própria; WhatsApp não oficial (proibido pelo `AGENTS.md`).
+
+**Consequências:**
+- **Sem custo de intermediário,** mas a verificação do negócio na Meta, o cadastro como Tech Provider e a revisão do app ficam sob nossa responsabilidade e precisam começar cedo, porque têm prazo da Meta.
+- **Cobrança das conversas:** a Meta cobra por modelo de mensagem; quem paga (a clínica com o próprio meio de pagamento ou o Branly CRM) entra na decisão de cobrança pendente.
+- **CRM-005** deixa de comparar fornecedores e passa a provar a Cloud API: `referral` real, Embedded Signup, coexistência com o app WhatsApp Business e latências.
+- **Tokens** de cada clínica seguem o desenho de segredos da CRM-080, sem dar à API o gravador genérico de segredos.

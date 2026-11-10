@@ -365,8 +365,9 @@ class TenantMigrationRolloutIT {
     forgetNewerHistory(database);
   }
 
-  /** Everything V3, V4, V5 and V6 created. */
+  /** Everything V3 to V8 created. */
   private void dropNewerObjects(TenantDatabase database) throws SQLException {
+    asOwner(database, "DROP TABLE procedures, professionals");
     asOwner(database, "DROP TABLE lead_notes, lead_events, leads");
     asOwner(database, "DROP FUNCTION leads_stage_matches_status()");
     asOwner(database, "DROP TABLE loss_reasons, pipeline_stages, pipelines");
