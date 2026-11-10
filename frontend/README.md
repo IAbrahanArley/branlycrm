@@ -63,6 +63,15 @@ O termo da busca fica em memória na página e segue no parâmetro `q` da API. U
 4. Reemita o convite de uma clínica em preparação ou aguardando gestor. Informe o e-mail de destino. A carteira não informa o endereço anterior e não apresenta dados de pacientes.
 5. Repita o fluxo em uma janela estreita usando Tab, Shift+Tab, Enter e Esc.
 
+## Teste local de equipe e convites (FE-003)
+
+1. Abra [Equipe](http://localhost:3000/app/equipe) com um gestor sintético. Alterne os filtros de papel e situação e confira a paginação.
+2. Convide uma pessoa com e-mail `@example.test`. Confira o resultado do envio e o convite na lista. Reenvie e confirme que o link anterior deixa de funcionar. Revogue e confira que a lista é atualizada.
+3. Altere o papel e desative um membro de teste. Confira o filtro **Inativos**. Repita com um gestor operacional e uma conta somente leitura para verificar as diferenças de acesso.
+4. Em duas abas, troque para uma segunda clínica de teste. Confirme que a lista e qualquer diálogo da clínica anterior desaparecem. Repita usando Tab e Enter em uma janela estreita.
+
+A listagem de convites informa o vencimento. O resultado da entrega do e-mail aparece depois de enviar ou reenviar, conforme a resposta da API.
+
 ## Verificação
 
 ```sh

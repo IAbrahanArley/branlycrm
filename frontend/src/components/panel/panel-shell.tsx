@@ -134,7 +134,9 @@ export function PanelShell({ children }: { children: ReactNode }) {
   const overview = pathname === "/app";
   const redirectToAgency = overview && confirmed?.access.kind === "agency";
   const contacts = pathname === "/app/contatos" || pathname.startsWith("/app/contatos/");
+  const team = pathname === "/app/equipe";
   const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
+  const canViewTeam = clinic?.permissions.TEAM_VIEW === "ALL";
 
   useEffect(() => {
     if (redirectToAgency) router.replace("/agencia");
@@ -148,6 +150,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       hasClinicArea={Boolean(confirmed?.access.clinics.length)}
       hasAgencies={Boolean(confirmed?.access.agencies.length)}
       canViewContacts={canViewContacts && !selecting}
+      canViewTeam={canViewTeam && !selecting}
       currentPath={pathname}
       choosingClinic={selecting}
       signingOut={signingOut}
@@ -220,15 +223,15 @@ export function PanelShell({ children }: { children: ReactNode }) {
                     {children}
                   </div>
                 ) : check.clinic && (
-                  (!contacts || canViewContacts) ? (
-                    <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, refresh: retry }}>
+                  ((!contacts || canViewContacts) && (!team || canViewTeam)) ? (
+                    <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
                       {children}
                     </ClinicContext.Provider>
-                  ) : <PanelState kind="forbidden" title="Sem permissão para acessar contatos" message="Confira as permissões do seu vínculo com esta clínica." />
+                  ) : <PanelState kind="forbidden" title={team ? "Sem permissão para acessar a equipe" : "Sem permissão para acessar contatos"} message="Confira as permissões do seu vínculo com esta clínica." />
                 )
               )}
-              {contacts && check.access.kind === "agency" && (
-                <PanelState kind="forbidden" title="Selecione uma clínica para acessar contatos" message="Sua conta não tem vínculo ativo com uma clínica." />
+              {(contacts || team) && check.access.kind === "agency" && (
+                <PanelState kind="forbidden" title={team ? "Selecione uma clínica para acessar a equipe" : "Selecione uma clínica para acessar contatos"} message="Sua conta não tem vínculo ativo com uma clínica." />
               )}
             </>
           )
