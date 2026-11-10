@@ -1,6 +1,6 @@
-import { getCurrentClinic } from "@/lib/api/auth";
-import { ApiError, apiRequest } from "@/lib/api/client";
-import { withClinicSession } from "@/lib/api/clinic-session";
+import { apiRequest } from "@/lib/api/client";
+
+export { withSelectedClinic as withContactClinic } from "@/lib/api/auth";
 
 export type ContactSummary = {
   id: string;
@@ -42,27 +42,6 @@ export function isContactId(value: unknown): value is string {
 
 export function contactPath(id: string) {
   return `/app/contatos/${id}` as const;
-}
-
-export function withContactClinic<T>(tenantId: string, action: () => Promise<T>, signal?: AbortSignal) {
-  return withClinicSession("shared", async () => {
-    const confirm = async () => {
-      const clinic = await getCurrentClinic(signal);
-      if (!clinic || clinic.tenantId !== tenantId) {
-        throw new ApiError(409, "CLINIC_NOT_SELECTED", "A clínica da sessão mudou. Confira a clínica atual.");
-      }
-    };
-    await confirm();
-    let result: T;
-    try {
-      result = await action();
-    } catch (error) {
-      if (error instanceof ApiError && error.code === "CONTACT_DUPLICATE_PHONE") await confirm();
-      throw error;
-    }
-    await confirm();
-    return result;
-  }, signal);
 }
 
 export function listContacts(filters: ContactFilters, signal: AbortSignal) {

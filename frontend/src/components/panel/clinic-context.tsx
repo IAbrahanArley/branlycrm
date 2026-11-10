@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react";
 import type { CurrentClinic } from "@/lib/api/auth";
 
-export const ClinicContext = createContext<{ clinic: CurrentClinic; refresh: () => void } | null>(null);
+export const ClinicContext = createContext<{ clinic: CurrentClinic; subjectId: string; refresh: () => void } | null>(null);
 
 export function useClinic() {
   const context = useContext(ClinicContext);
