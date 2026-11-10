@@ -19,7 +19,7 @@ A JPA central não gerencia nenhuma entidade (`ControlJpaConfiguration`). Entida
 ## Migrações e integridade
 
 - db/migration: migrações do banco central, executadas pelo Flyway da aplicação.
-- db/tenant-migration: migrações de clínicas, aplicadas pelo provisionador como dono; NÃO são executadas no banco central. Ainda não há comando que aplique migrações novas a clínicas já existentes: até ele existir, tabela ausente falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+- db/tenant-migration: migrações de clínicas, aplicadas pelo provisionador como dono; NÃO são executadas no banco central. Migrações novas chegam às clínicas já existentes pelo comando `tenant-migrate` (ADR-031), rodado a cada deploy depois do `migrate` e antes da API nova. Clínica não migrada falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`. Migrações de clínica são aditivas (expand/contract), porque a API antiga roda sobre o schema novo durante o deploy.
 - V2 central garante UUID, nomes vinculados, unicidade, campos obrigatórios, estados válidos, participação sem duplicação e imutabilidade do vínculo banco/tenant.
 - V1 tenant cria vector e tenant_identity com no máximo uma linha. Provisionamento insere a identidade antes de ativar e concede somente SELECT dessa tabela ao papel runtime.
 - V3 tenant cria `clinic_settings` (fuso, linha única), com `SELECT` e `UPDATE (time_zone)` para o runtime.

@@ -113,7 +113,12 @@ public class TenantProvisioningService {
       case ROLES -> infrastructure.ensureRoles(database, secret(database).password());
       case DATABASE -> infrastructure.ensureDatabase(database);
       case MIGRATION -> infrastructure.migrate(database);
-      case VERIFICATION -> probe.verify(database, secret(database).password(), forbiddenDatabases);
+      case VERIFICATION -> {
+        // Migrates again (idempotent): a task that passed MIGRATION under an older image, or is
+        // resumed by retryFailed after it, must not become ACTIVE on an outdated schema (ADR-031).
+        infrastructure.migrate(database);
+        probe.verify(database, secret(database).password(), forbiddenDatabases);
+      }
       default -> throw new IllegalStateException("Unexpected step " + step);
     }
   }

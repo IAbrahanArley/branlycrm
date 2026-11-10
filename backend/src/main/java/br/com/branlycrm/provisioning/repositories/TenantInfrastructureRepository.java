@@ -27,6 +27,7 @@ public class TenantInfrastructureRepository {
   private static final Pattern NAME = Pattern.compile("(owner|tenant|clinic)_[a-f0-9]{32}");
   private static final Pattern PASSWORD = Pattern.compile("[\\x21-\\x7E]{16,256}");
   private static final int RUNTIME_CONNECTION_LIMIT = 20;
+  private static final String LOCK_TIMEOUT = "10s";
 
   private final String host;
   private final int port;
@@ -124,23 +125,69 @@ public class TenantInfrastructureRepository {
     }
   }
 
-  /** Applies db/tenant-migration as the owner role; the runtime role never migrates. */
-  public void migrate(TenantDatabase database) {
+  /**
+   * Read-only proof that an existing clinic is the one this provisioner created, before the rollout
+   * migrates it (ADR-031): the database exists and belongs to {@code owner_<id>}, both roles pass
+   * the same checks as {@link #ensureRoles}, and the database declares this clinic. Nothing is
+   * created, granted or altered here.
+   */
+  public void requireProvisioned(TenantDatabase database) {
     String clinic = name(database.databaseName());
     String owner = name(ownerRole(database));
+    String runtime = name(database.databaseUser());
+    try (Connection connection = connect(maintenanceDatabase)) {
+      String currentOwner = databaseOwner(connection, clinic);
+      if (currentOwner == null) throw new ProvisioningException("DATABASE_MISSING");
+      if (!owner.equals(currentOwner)) throw new ProvisioningException("DATABASE_CONFLICT");
+      requireOwnRole(connection, owner, false);
+      requireOwnRole(connection, runtime, true);
+    } catch (SQLException exception) {
+      throw new ProvisioningException("PRECHECK_FAILED", exception);
+    }
+    try (Connection connection = connect(clinic);
+        Statement statement = connection.createStatement()) {
+      statement.execute("SET ROLE " + quote(owner));
+      try (var check =
+          connection.prepareStatement(
+              "SELECT count(*) = 1 AND bool_and(tenant_id = ?::uuid) FROM tenant_identity")) {
+        check.setString(1, database.tenantId().toString());
+        try (var rows = check.executeQuery()) {
+          if (!rows.next() || !rows.getBoolean(1)) {
+            throw new ProvisioningException("IDENTITY_MISMATCH");
+          }
+        }
+      }
+    } catch (SQLException exception) {
+      throw new ProvisioningException("PRECHECK_FAILED", exception);
+    }
+  }
+
+  /**
+   * Applies db/tenant-migration as the owner role; the runtime role never migrates. Returns how
+   * many migrations were applied now (0 when the clinic was already up to date).
+   */
+  public int migrate(TenantDatabase database) {
+    String clinic = name(database.databaseName());
+    String owner = name(ownerRole(database));
+    int applied;
     try {
-      Flyway.configure()
-          .dataSource(url(clinic), username, password)
-          .initSql("SET ROLE " + quote(owner))
-          .locations("classpath:db/tenant-migration")
-          .placeholders(
-              Map.of(
-                  "tenantId", database.tenantId().toString(),
-                  "runtimeRole", name(database.databaseUser())))
-          .cleanDisabled(true)
-          .validateMigrationNaming(true)
-          .load()
-          .migrate();
+      applied =
+          Flyway.configure()
+              // Same as connect(): no server error detail (row values) in the cause.
+              .dataSource(url(clinic) + "?logServerErrorDetail=false", username, password)
+              // lock_timeout: a DDL waiting behind API transactions gives up instead of queueing
+              // every later query of the clinic behind its lock request.
+              .initSql("SET ROLE " + quote(owner) + "; SET lock_timeout = '" + LOCK_TIMEOUT + "'")
+              .locations("classpath:db/tenant-migration")
+              .placeholders(
+                  Map.of(
+                      "tenantId", database.tenantId().toString(),
+                      "runtimeRole", name(database.databaseUser())))
+              .cleanDisabled(true)
+              .validateMigrationNaming(true)
+              .load()
+              .migrate()
+              .migrationsExecuted;
     } catch (FlywayException exception) {
       throw new ProvisioningException("MIGRATION_FAILED", exception);
     }
@@ -161,6 +208,7 @@ public class TenantInfrastructureRepository {
     } catch (SQLException exception) {
       throw new ProvisioningException("MIGRATION_FAILED", exception);
     }
+    return applied;
   }
 
   private void requireOwnRole(Connection connection, String role, boolean login)
