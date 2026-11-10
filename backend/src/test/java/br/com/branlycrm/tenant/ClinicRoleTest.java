@@ -54,6 +54,8 @@ class ClinicRoleTest {
     documented(ClinicPermission.CONTACT_WRITE, ALL, ALL, ALL, NONE);
     // Contatos: arquivar: ✓ | ✓ | — | —
     documented(ClinicPermission.CONTACT_ARCHIVE, ALL, ALL, NONE, NONE);
+    // Tags: renomear e excluir do catálogo: ✓ | ✓ | — | —
+    documented(ClinicPermission.TAG_MANAGE, ALL, ALL, NONE, NONE);
     // Contatos: importar planilha: ✓ | ✓ | — | —
     documented(ClinicPermission.CONTACT_IMPORT, ALL, ALL, NONE, NONE);
     // Leads: ver, Kanban e linha do tempo: ✓ | ✓ | ✓ | ✓

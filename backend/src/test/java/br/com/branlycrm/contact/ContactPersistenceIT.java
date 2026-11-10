@@ -285,6 +285,44 @@ class ContactPersistenceIT {
   }
 
   @Test
+  void tagCatalogStopsAtItsLimit() throws Exception {
+    Clinic a = provision();
+    try (Connection owner = TestPostgres.admin(POSTGRES, a.database().databaseName())) {
+      owner
+          .createStatement()
+          .execute(
+              "INSERT INTO tags (id, name, created_at, created_by) SELECT gen_random_uuid(),"
+                  + " 'Tag ' || n, now(), gen_random_uuid() FROM generate_series(1, "
+                  + (TagRepository.MAX_TAGS - 1)
+                  + ") AS n");
+    }
+    tags.create(a.access(), new TagName("Última"));
+    expectReason(
+        () -> tags.create(a.access(), new TagName("Uma a mais")),
+        ContactException.Reason.TAG_LIMIT);
+  }
+
+  @Test
+  void archivedContactRefusesEditionAndNewTagsButNotRemovals() throws Exception {
+    Clinic a = provision();
+    UUID id = create(a, "Arquivo Sintético", "(91) 98100-0001");
+    Tag tag = tags.create(a.access(), new TagName("Arquivo"));
+    tags.tag(a.access(), id, tag.id());
+    contacts.setArchived(a.access(), id, true);
+
+    expectReason(
+        () -> contacts.update(a.access(), id, 1, fields("Novo", "(91) 98100-0001")),
+        ContactException.Reason.ARCHIVED);
+    expectReason(() -> tags.tag(a.access(), id, tag.id()), ContactException.Reason.ARCHIVED);
+    assertThat(tags.untag(a.access(), id, tag.id())).isEmpty();
+    Contact back = contacts.setArchived(a.access(), id, false);
+    assertThat(back.archived()).isFalse();
+    assertThat(contacts.update(a.access(), id, back.version(), fields("Novo", "91981000001")))
+        .extracting(contact -> contact.fields().name())
+        .isEqualTo("Novo");
+  }
+
+  @Test
   void tagsAreUniquePerClinicAndFilterTheList() throws Exception {
     Clinic a = provision();
     Clinic b = provision();
@@ -310,7 +348,7 @@ class ContactPersistenceIT {
     tags.delete(a.access(), vip.id());
     assertThat(tags.tagsOf(a.access(), tagged)).isEmpty();
     assertThat(owner(a, "SELECT count(*)::text FROM contact_tags")).containsExactly("0");
-    expectReason(() -> tags.delete(a.access(), vip.id()), ContactException.Reason.NOT_FOUND);
+    expectReason(() -> tags.delete(a.access(), vip.id()), ContactException.Reason.TAG_NOT_FOUND);
   }
 
   @Test
@@ -487,11 +525,8 @@ class ContactPersistenceIT {
             () -> contacts.update(a.access(), theirs, 0, fields("Invasor", "(11) 97000-0003")),
             () -> contacts.archive(a.access(), theirs),
             () -> tags.tag(a.access(), theirs, tagA.id()),
-            () -> tags.tag(a.access(), mine, tagB.id()),
             () -> tags.untag(a.access(), theirs, tagB.id()),
             () -> tags.tagsOf(a.access(), theirs),
-            () -> tags.rename(a.access(), tagB.id(), new TagName("Invasor")),
-            () -> tags.delete(a.access(), tagB.id()),
             () -> consents.current(a.access(), theirs),
             () -> consents.history(a.access(), theirs),
             () ->
@@ -502,6 +537,14 @@ class ContactPersistenceIT {
                     ConsentStatus.OPT_IN,
                     ConsentSource.MANUAL))) {
       expectReason(call, ContactException.Reason.NOT_FOUND);
+    }
+    // Clinic B's tag is missing in A, whatever the contact.
+    for (ThrowingCallable call :
+        List.<ThrowingCallable>of(
+            () -> tags.tag(a.access(), mine, tagB.id()),
+            () -> tags.rename(a.access(), tagB.id(), new TagName("Invasor")),
+            () -> tags.delete(a.access(), tagB.id()))) {
+      expectReason(call, ContactException.Reason.TAG_NOT_FOUND);
     }
 
     // A forged access pairing A's subject with B's clinic is refused by the registry.

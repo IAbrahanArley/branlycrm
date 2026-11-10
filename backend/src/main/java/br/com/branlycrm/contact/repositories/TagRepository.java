@@ -22,6 +22,9 @@ import org.springframework.stereotype.Repository;
 /** Manual tags of the clinic authorized by a {@link ClinicAccess} (PAC-06). */
 @Repository
 public class TagRepository {
+  /** The catalog is returned whole, so it is kept small. */
+  public static final int MAX_TAGS = 500;
+
   private final ClinicPersistence persistence;
   private final Supplier<Instant> now;
 
@@ -41,6 +44,11 @@ public class TagRepository {
       return persistence.inTransaction(
           ClinicTenant.of(access),
           session -> {
+            long existing =
+                session
+                    .createSelectionQuery("select count(t) from TagEntity t", Long.class)
+                    .getSingleResult();
+            if (existing >= MAX_TAGS) throw new ContactException(ContactException.Reason.TAG_LIMIT);
             TagEntity row = new TagEntity(name, access.subjectId(), at);
             session.persist(row);
             session.flush();
@@ -89,17 +97,22 @@ public class TagRepository {
                   .createNativeMutationQuery("DELETE FROM tags WHERE id = :id")
                   .setParameter("id", id)
                   .executeUpdate();
-          if (deleted == 0) throw new ContactException(ContactException.Reason.NOT_FOUND);
+          if (deleted == 0) throw new ContactException(ContactException.Reason.TAG_NOT_FOUND);
           return null;
         });
   }
 
-  /** Links the tag to the contact; linking twice is a no-op. */
-  public void tag(ClinicAccess access, UUID contactId, UUID tagId) {
-    persistence.inTransaction(
+  /**
+   * Links the tag to the contact; linking twice is a no-op. Returns the contact's tags.
+   *
+   * @throws ContactException NOT_FOUND (contact), TAG_NOT_FOUND or ARCHIVED
+   */
+  public List<Tag> tag(ClinicAccess access, UUID contactId, UUID tagId) {
+    return persistence.inTransaction(
         ClinicTenant.of(access),
         session -> {
-          requireContact(session, contactId);
+          ContactEntity contact = requireContact(session, contactId);
+          if (contact.archived()) throw new ContactException(ContactException.Reason.ARCHIVED);
           requireTag(session, tagId);
           session
               .createNativeMutationQuery(
@@ -113,13 +126,16 @@ public class TagRepository {
               .setParameter("at", now.get())
               .setParameter("actor", access.subjectId())
               .executeUpdate();
-          return null;
+          return tagsOf(session, contactId);
         });
   }
 
-  /** Removes the link; removing a missing link is a no-op. */
-  public void untag(ClinicAccess access, UUID contactId, UUID tagId) {
-    persistence.inTransaction(
+  /**
+   * Removes the link; removing a missing link is a no-op, also on an archived contact, so a tag can
+   * always be taken off. Returns the contact's tags.
+   */
+  public List<Tag> untag(ClinicAccess access, UUID contactId, UUID tagId) {
+    return persistence.inTransaction(
         ClinicTenant.of(access),
         session -> {
           requireContact(session, contactId);
@@ -129,7 +145,7 @@ public class TagRepository {
               .setParameter("contact", contactId)
               .setParameter("tag", tagId)
               .executeUpdate();
-          return null;
+          return tagsOf(session, contactId);
         });
   }
 
@@ -138,32 +154,37 @@ public class TagRepository {
         ClinicTenant.of(access),
         session -> {
           requireContact(session, contactId);
-          return session
-              .createSelectionQuery(
-                  """
-                  from TagEntity t
-                  where t.id in (select ct.tagId from ContactTagEntity ct where ct.contactId = :c)
-                  order by lower(t.name), t.id
-                  """,
-                  TagEntity.class)
-              .setParameter("c", contactId)
-              .getResultList()
-              .stream()
-              .map(TagEntity::toDomain)
-              .toList();
+          return tagsOf(session, contactId);
         });
+  }
+
+  /** The contact's tags by name; also used by the contact detail, in its own transaction. */
+  static List<Tag> tagsOf(Session session, UUID contactId) {
+    return session
+        .createSelectionQuery(
+            """
+            from TagEntity t
+            where t.id in (select ct.tagId from ContactTagEntity ct where ct.contactId = :c)
+            order by lower(t.name), t.id
+            """,
+            TagEntity.class)
+        .setParameter("c", contactId)
+        .getResultList()
+        .stream()
+        .map(TagEntity::toDomain)
+        .toList();
   }
 
   private static TagEntity requireTag(Session session, UUID id) {
     TagEntity row = id == null ? null : session.find(TagEntity.class, id);
-    if (row == null) throw new ContactException(ContactException.Reason.NOT_FOUND);
+    if (row == null) throw new ContactException(ContactException.Reason.TAG_NOT_FOUND);
     return row;
   }
 
-  private static void requireContact(Session session, UUID id) {
-    if (id == null || session.find(ContactEntity.class, id) == null) {
-      throw new ContactException(ContactException.Reason.NOT_FOUND);
-    }
+  private static ContactEntity requireContact(Session session, UUID id) {
+    ContactEntity row = id == null ? null : session.find(ContactEntity.class, id);
+    if (row == null) throw new ContactException(ContactException.Reason.NOT_FOUND);
+    return row;
   }
 
   private static RuntimeException duplicate(ClinicDataException failure) {

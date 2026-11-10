@@ -99,7 +99,10 @@ public class OpenApiConfiguration {
                             merge(responses, "503", "SERVICE_UNAVAILABLE; honor Retry-After");
                             responses.forEach(
                                 (status, response) -> {
-                                  if (status.startsWith("4") || status.startsWith("5")) {
+                                  // An operation may declare a richer error body (a superset of
+                                  // ApiError, such as ContactConflictError); keep it.
+                                  if ((status.startsWith("4") || status.startsWith("5"))
+                                      && !declaresOwnErrorBody(response)) {
                                     response.setContent(
                                         new Content()
                                             .addMediaType(
@@ -117,6 +120,29 @@ public class OpenApiConfiguration {
 
   private static final Set<String> PUBLIC_PATHS =
       Set.of("/v1/auth/csrf", SecurityConfiguration.LOGIN_PATH);
+
+  /**
+   * True when the operation declared its own error schema, an {@code *Error} type other than
+   * ApiError (a superset of it); it is then normalized to application/json instead of being
+   * replaced. Springdoc fills undeclared error bodies with the operation's return type, which is
+   * never kept.
+   */
+  private static boolean declaresOwnErrorBody(ApiResponse response) {
+    if (response.getContent() == null) return false;
+    String own =
+        response.getContent().values().stream()
+            .map(MediaType::getSchema)
+            .filter(schema -> schema != null && schema.get$ref() != null)
+            .map(Schema::get$ref)
+            .filter(ref -> ref.endsWith("Error") && !ref.endsWith("/ApiError"))
+            .findFirst()
+            .orElse(null);
+    if (own == null) return false;
+    response.setContent(
+        new Content()
+            .addMediaType("application/json", new MediaType().schema(new Schema<>().$ref(own))));
+    return true;
+  }
 
   private static void merge(ApiResponses responses, String status, String code) {
     ApiResponse existing = responses.get(status);

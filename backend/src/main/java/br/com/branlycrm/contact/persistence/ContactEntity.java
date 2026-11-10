@@ -111,6 +111,14 @@ public class ContactEntity {
     touch(actor, now);
   }
 
+  /** Brings an archived contact back to the default list and to edition. */
+  public void unarchive(UUID actor, Instant now) {
+    if (archivedAt == null) return;
+    this.archivedAt = null;
+    this.archivedBy = null;
+    touch(actor, now);
+  }
+
   public Contact toDomain() {
     return new Contact(
         id,

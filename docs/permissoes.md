@@ -31,8 +31,9 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Configuração comercial (funil, etapas, motivos de perda, procedimentos, profissionais, respostas rápidas) | ✓ | ✓ | — | — |
 | Canal WhatsApp: ver estado | ✓ | ✓ | — | — |
 | Contatos: ver e buscar | ✓ | ✓ | ✓ | ✓ |
-| Contatos: criar, editar, tags, consentimento | ✓ | ✓ | ✓ | — |
-| Contatos: arquivar | ✓ | ✓ | — | — |
+| Contatos: criar, editar, criar e vincular tags, consentimento | ✓ | ✓ | ✓ | — |
+| Contatos: arquivar e desarquivar | ✓ | ✓ | — | — |
+| Tags: renomear e excluir do catálogo (`TAG_MANAGE`) | ✓ | ✓ | — | — |
 | Contatos: importar planilha | ✓ | ✓ | — | — |
 | Leads: ver, Kanban e linha do tempo | ✓ | ✓ | ✓ | ✓ |
 | Leads: criar, mover etapa, temperatura, notas | ✓ | ✓ | ✓ | — |

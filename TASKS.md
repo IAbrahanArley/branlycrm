@@ -365,11 +365,60 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - para a CRM-082: o webhook prefixa `+` no `wa_id` de números estrangeiros;
   - para a CRM-073: finalidade de nascimento e observações no inventário.
 
-### [ ] CRM-021 — API de contatos (P1)
+### [x] CRM-021 — API de contatos (P1)
 **Depende de:** CRM-020, CRM-004.
 **Atende:** PAC-01, PAC-03, PAC-06, PAC-08.
 **Entregas:** criar, editar, listar, detalhar, buscar, filtrar, paginar, arquivar, tags e consentimento; aviso de duplicidade antes de criar.
 **Aceite:** permissões da matriz testadas; filtros e buscas não vazam entre clínicas (A/B); dados inválidos recusados com `INVALID_INPUT`.
+**Estado (09/11/2026):** concluída na branch `feat/crm-021-contacts-api`. Desenho revisado pelo `architect`; as 9 decisões foram aprovadas pelo usuário.
+- **Rotas** (`/v1/clinic`, clínica da sessão):
+  - `GET /contacts` com `q`, `tagId`, `includeArchived` e paginação;
+  - `POST /contacts/phone-check` (aviso de duplicidade antes de criar);
+  - `POST /contacts` (201 com `Location`);
+  - `GET` e `PUT /contacts/{id}`, com `version` no corpo;
+  - `PUT /contacts/{id}/archived` (arquivar e desarquivar);
+  - `GET` e `POST /contacts/{id}/consents`;
+  - `PUT` e `DELETE /contacts/{id}/tags/{tagId}`;
+  - `GET` e `POST /tags`, `PUT` e `DELETE /tags/{id}`.
+- **Regras:**
+  - validação do formato, depois a permissão, depois a leitura por id: 403 não revela se o id existe, e id de outra clínica responde 404;
+  - lista e phone-check sem observações nem nascimento;
+  - consentimento sempre gravado como `MANUAL`;
+  - contato arquivado recusa edição e novas tags (409 `CONTACT_ARCHIVED`), mas aceita consentimento e remoção de tag;
+  - 409 `CONTACT_DUPLICATE_PHONE` traz o `contactId` (esquema `ContactConflictError`);
+  - teto de 500 tags por clínica (`TAG_LIMIT`).
+- **Permissão nova:** `TAG_MANAGE` (Proprietário e Gestor) para renomear e excluir tags, em `ClinicRole`, `permissoes.md` e `ClinicRoleTest`.
+- **Erros do banco da clínica:** `ClinicDataErrorHandler` global. Indisponível ou migração pendente → 503 com `Retry-After`; dado inválido → 500; credencial ausente → 503 e credencial inválida → 500, ambas registradas só com o motivo.
+- **Contrato:** `docs/api/openapi.json` regenerado. Só ganhou rotas e esquemas; nenhuma operação existente mudou, e as novas têm `operationId` explícito. O customizador do OpenAPI preserva esquemas de erro próprios (`*Error`).
+- **Testes:** `./mvnw -B -ntp clean verify` → 225 unitários (2 ignorados no Windows) e 125 de integração, BUILD SUCCESS. Entre os novos:
+  - `ContactApiIT` (9, HTTP com cookies, CSRF e segundo fator reais):
+    - criação, detalhe, lista e aviso de duplicidade;
+    - matriz de papéis rota por rota, com o código `CLINIC_ACCESS_DENIED`;
+    - edição, versão, arquivamento e desarquivamento;
+    - consentimento forçado a `MANUAL`;
+    - isolamento A/B em todas as rotas, na busca, no filtro e no phone-check;
+    - `INVALID_INPUT` em 16 campos, sem eco do valor;
+    - catálogo de tags;
+    - paginação;
+    - sessão sem clínica, sem CSRF e sem segundo fator.
+  - `ContactServiceTest` (5): validação antes da autorização, papel recusado sem tocar o banco da clínica, origem `MANUAL` e `TAG_MANAGE`.
+  - `ContactPersistenceIT` (17): teto de tags e contato arquivado.
+- **Revisões:**
+  - `security`: sem críticos nem altos. Corrigidos: log da credencial da clínica, `toString` mascarado nos DTOs, `Location` sem query string e teto de tags.
+  - `reviewer`: sem bloqueadores. Corrigidos: esquema do 409 no contrato, teste dependente da ordem, `operationId` explícitos, paginação testada, código do 403 conferido, consultas do detalhe reaproveitadas e ordem das chaves de consentimento.
+- **Pendências:**
+  - **CRM-072:**
+    - `log_format` do Nginx sem a query string em `/api/`, porque o termo `q` pode trazer nome ou telefone;
+    - `proxy_set_header X-Forwarded-Host $host`;
+    - conferir os logs da Vercel.
+  - **CRM-073:**
+    - finalidade das observações e do nascimento, e se o `VIEWER` deve vê-los;
+    - se a reversão de opt-out exige evidência ou motivo.
+  - **Auditoria (CRM-070):** leitura e extração em massa de contatos não são auditadas nem limitadas por taxa.
+  - **Rollout:** o `tenant-migrate` ainda não está na `main`; no Compose local, clínicas criadas antes da V4 respondem 503.
+  - **Riscos aceitos:**
+    - renomear tag não tem versão (a última escrita vence);
+    - vincular tag e arquivar ao mesmo tempo pode deixar uma tag num contato arquivado (só estética).
 
 ### [ ] CRM-022 — Telas de contatos e perfil (P1)
 **Depende de:** CRM-021.
