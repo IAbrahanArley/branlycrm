@@ -72,6 +72,15 @@ O termo da busca fica em memória na página e segue no parâmetro `q` da API. U
 
 A listagem de convites informa o vencimento. O resultado da entrega do e-mail aparece depois de enviar ou reenviar, conforme a resposta da API.
 
+## Teste local do funil (CRM-033)
+
+1. Abra [Funil de vendas](http://localhost:3000/app/funil) com uma clínica de teste provisionada com as migrações de funil e leads. Use contatos e leads sintéticos.
+2. No Kanban, arraste um lead para outra etapa aberta e recarregue a página para conferir a persistência. Repita com **Mover**, usando Tab e Enter, em uma janela estreita.
+3. Alterne para **Lista** e filtre por situação, etapa e temperatura. Abra um lead, confira os dados e registre perda com um motivo.
+4. Abra o mesmo quadro em duas abas, mova o lead na primeira e tente mover a cópia antiga na segunda. A segunda deve desfazer a prévia e pedir que você atualize o funil.
+
+O contrato atual não expõe a origem do lead. O fechamento como ganho passa pelo registro de vendas, previsto na CRM-035.
+
 ## Verificação
 
 ```sh

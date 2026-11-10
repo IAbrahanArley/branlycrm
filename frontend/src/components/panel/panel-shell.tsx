@@ -54,6 +54,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       if (window.location.pathname === "/agencia") return;
       controller.abort();
       if (window.location.pathname.startsWith("/app/contatos/")) router.replace("/app/contatos");
+      if (window.location.pathname.startsWith("/app/funil/")) router.replace("/app/funil");
       retry();
     });
     function suspend(event: PageTransitionEvent) {
@@ -134,9 +135,12 @@ export function PanelShell({ children }: { children: ReactNode }) {
   const overview = pathname === "/app";
   const redirectToAgency = overview && confirmed?.access.kind === "agency";
   const contacts = pathname === "/app/contatos" || pathname.startsWith("/app/contatos/");
+  const funnel = pathname === "/app/funil" || pathname.startsWith("/app/funil/");
   const team = pathname === "/app/equipe";
   const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
   const canViewTeam = clinic?.permissions.TEAM_VIEW === "ALL";
+  const canViewFunnel = clinic?.permissions.LEAD_READ === "ALL";
+  const sectionName = team ? "a equipe" : funnel ? "o funil" : "contatos";
 
   useEffect(() => {
     if (redirectToAgency) router.replace("/agencia");
@@ -151,6 +155,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       hasAgencies={Boolean(confirmed?.access.agencies.length)}
       canViewContacts={canViewContacts && !selecting}
       canViewTeam={canViewTeam && !selecting}
+      canViewFunnel={canViewFunnel && !selecting}
       currentPath={pathname}
       choosingClinic={selecting}
       signingOut={signingOut}
@@ -202,6 +207,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
                       clinics={check.access.clinics} currentId={check.clinic?.tenantId} onRefresh={retry}
                       onSelected={() => {
                         if (contacts) router.replace("/app/contatos");
+                        if (funnel) router.replace("/app/funil");
                         retry();
                       }}
                     />
@@ -223,15 +229,15 @@ export function PanelShell({ children }: { children: ReactNode }) {
                     {children}
                   </div>
                 ) : check.clinic && (
-                  ((!contacts || canViewContacts) && (!team || canViewTeam)) ? (
+                  ((!contacts || canViewContacts) && (!team || canViewTeam) && (!funnel || canViewFunnel)) ? (
                     <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
                       {children}
                     </ClinicContext.Provider>
-                  ) : <PanelState kind="forbidden" title={team ? "Sem permissão para acessar a equipe" : "Sem permissão para acessar contatos"} message="Confira as permissões do seu vínculo com esta clínica." />
+                  ) : <PanelState kind="forbidden" title={`Sem permissão para acessar ${sectionName}`} message="Confira as permissões do seu vínculo com esta clínica." />
                 )
               )}
-              {(contacts || team) && check.access.kind === "agency" && (
-                <PanelState kind="forbidden" title={team ? "Selecione uma clínica para acessar a equipe" : "Selecione uma clínica para acessar contatos"} message="Sua conta não tem vínculo ativo com uma clínica." />
+              {(contacts || team || funnel) && check.access.kind === "agency" && (
+                <PanelState kind="forbidden" title={`Selecione uma clínica para acessar ${sectionName}`} message="Sua conta não tem vínculo ativo com uma clínica." />
               )}
             </>
           )
