@@ -25,6 +25,9 @@ import br.com.branlycrm.contact.exceptions.ContactException;
 import br.com.branlycrm.contact.repositories.ConsentRepository;
 import br.com.branlycrm.contact.repositories.ContactRepository;
 import br.com.branlycrm.contact.repositories.TagRepository;
+import br.com.branlycrm.pipeline.persistence.LossReasonEntity;
+import br.com.branlycrm.pipeline.persistence.PipelineEntity;
+import br.com.branlycrm.pipeline.persistence.PipelineStageEntity;
 import br.com.branlycrm.provisioning.services.TenantProvisioningService;
 import br.com.branlycrm.support.MutableClock;
 import br.com.branlycrm.support.MutableClockConfiguration;
@@ -646,7 +649,8 @@ class ContactPersistenceIT {
     } finally {
       StandardServiceRegistryBuilder.destroy(registry);
     }
-    assertThat(persistence.entities()).hasSizeGreaterThanOrEqualTo(5);
+    assertThat(persistence.entities())
+        .contains(PipelineEntity.class, PipelineStageEntity.class, LossReasonEntity.class);
   }
 
   private record Clinic(TenantDatabase database, ClinicAccess access) {}

@@ -463,14 +463,41 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 ## Fase 3 — Funil, leads e vendas
 
-### [ ] CRM-030 — Modelar funis e etapas configuráveis (P1)
+### [x] CRM-030 — Modelar funis e etapas configuráveis (P1)
 **Depende de:** CRM-015.
 **Atende:** CRM-01.
 **Entregas:** `pipelines` e `pipeline_stages` com ordem e tipo (aberta, ganha, perdida); funil padrão (Novo, Em atendimento, Agendado, Compareceu, Venda fechada, Perdido) criado pela migração de clínica; `loss_reasons` configuráveis com lista inicial.
 **Aceite:** etapas pertencem a um funil da mesma clínica; ordem consistente; todo funil tem exatamente uma etapa ganha e uma perdida; toda clínica nova recebe o funil padrão.
+**Estado (10/11/2026):** concluída na branch `feat/crm-030-pipelines` (ADR-033). Desenho revisado pelo `architect`; as 6 decisões foram aprovadas pelo usuário, inclusive separar as escritas na CRM-036.
+- **Banco:** migração de clínica V5 com `pipelines`, `pipeline_stages` e `loss_reasons`.
+  - Um funil por clínica: o runtime só tem `SELECT`.
+  - Exatamente uma etapa ganha e uma perdida, por índices únicos parciais; nunca arquivadas, com tipo imutável.
+  - Posição 1..n só nas abertas ativas, única e `DEFERRABLE`, para a troca de posições caber num único `UPDATE`.
+  - Chave estável (`NEW`, `IN_SERVICE`, `SCHEDULED`, `ATTENDED`, `WON`, `LOST`) nas etapas padrão; `NEW` nunca é arquivada.
+  - Seed com ids aleatórios: funil padrão e 7 motivos (Preço, Sem resposta, Escolheu outra clínica, Sem horário disponível, Desistiu, Contato inválido, Outro). Só o seed fica sem autor, garantido por CHECK.
+- **Módulo `pipeline`:** domínio que revalida as regras ao ler (funil fora delas → `CLINIC_DATA_INVALID_DATA`), entidades só de leitura e `PipelineRepository`.
+- **Rotas** (todos os papéis, `LEAD_READ`): `GET /v1/clinic/pipeline` e `GET /v1/clinic/loss-reasons?includeArchived`.
+- **Contrato:** `openapi.json` ganhou só as duas rotas.
+- **Testes:** `./mvnw -B -ntp clean verify` → 240 unitários (2 ignorados no Windows) e 137 de integração, BUILD SUCCESS. Entre os novos:
+  - `PipelineDomainTest` (4);
+  - `PipelinePersistenceIT` (5):
+    - funil padrão e motivos com nomes exatos;
+    - ids diferentes por clínica e isolamento A/B, inclusive com acesso forjado;
+    - 17 violações recusadas pelo banco como dono real da clínica;
+    - troca de posições num único `UPDATE`;
+    - inventário de privilégios do runtime (só `SELECT`);
+    - funil inválido sai como `INVALID_DATA`.
+  - `PipelineApiIT`: quatro papéis, sem clínica, participação revogada (403 e depois 409), seleção cruzada recusada, sem sessão.
+  - `TenantMigrationRolloutIT`: agora remove e reaplica também a V5 e lê o funil depois do rollout.
+- **Revisões:** `security` sem críticos, altos nem médios; `reviewer` sem críticos nem altos. Corrigidos: autoria dos motivos, testes como o dono real, inventário de privilégios, rollout lendo o funil, asserções exatas no HTTP e seleção cruzada.
+- **Pendências:**
+  - escritas da configuração na CRM-036;
+  - a ordenação e a unicidade por `lower(name)` dependem da collation do banco da clínica, herdada do `template1` (en_US.utf8 na imagem atual; igual às tags);
+  - nomes de etapa e motivo digitados pela clínica vão para o inventário da CRM-073.
 
 ### [ ] CRM-031 — Modelar leads, temperatura e eventos (P1)
 **Depende de:** CRM-020, CRM-030.
+**Desenho já decidido (ADR-033):** leads e eventos entram no módulo `pipeline`; o lead referencia a etapa pela chave composta `(pipeline_id, id)`; a etapa de entrada é a de chave `NEW`; o movimento trava a etapa com `FOR SHARE` e recusa etapa arquivada.
 **Atende:** CRM-03, CRM-04, CRM-08, CRM-09, RN-01, RN-08.
 **Entregas:**
 - `leads` (oportunidades), com contato, etapa, responsável, temperatura, situação e datas.
@@ -518,6 +545,21 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - A venda herda a origem do lead.
 - Correções ficam no histórico.
 - A/B testado.
+
+### [ ] CRM-036 — Configuração do funil e dos motivos de perda (P1)
+**Depende de:** CRM-031, CRM-030.
+**Atende:** CRM-01, CRM-06 (ADR-033).
+**Entregas:**
+- API com `COMMERCIAL_SETTINGS_EDIT` (Proprietário e Gestor): criar, renomear, reordenar, arquivar e desarquivar etapas abertas; renomear ganha, perdida e `NEW`; criar, renomear, arquivar e desarquivar motivos.
+- Migração de clínica com grants por coluna ao runtime: `INSERT` em etapas e motivos; `UPDATE` só de nome, posição, autoria, arquivamento e versão; nunca de `id`, `pipeline_id`, `kind`, `system_key` nem `created_*`; sem `DELETE`.
+- Tela de configuração (frontend).
+**Aceite:**
+- Reordenação trava o funil, compara a `version` (409 se mudou), recebe a lista completa das abertas e regrava 1..n num único `UPDATE`; duas reordenações concorrentes nunca deixam lacuna nem posição repetida.
+- Arquivar etapa aberta renumera as demais na mesma transação e é recusado com lead aberto nela (`STAGE_HAS_OPEN_LEADS`), inclusive em corrida com o movimento de lead.
+- Desarquivar coloca a etapa no fim das abertas.
+- Pelo menos um motivo ativo sempre; limites de 12 etapas abertas e 50 motivos.
+- Autores validados contra participação ativa; a CRM-036 sempre grava o autor.
+- Matriz de permissões (Atendente e Somente leitura recebem 403) e A/B nas mutações.
 
 ## Fase 4 — WhatsApp e caixa de entrada
 

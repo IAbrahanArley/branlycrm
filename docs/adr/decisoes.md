@@ -644,3 +644,32 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - A V4 só chega a clínicas existentes pelo rollout (ADR-031).
 - Data de nascimento e observações são dados pessoais com finalidade a registrar na CRM-073; observações podem receber dado de saúde e devem ter aviso na tela (CRM-022).
 
+## ADR-033 — Funil, etapas e motivos de perda
+
+**Data:** 10/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. Implementação em CRM-030; escritas em CRM-036. **Complementa:** ADR-030 e ADR-032.
+
+**Decisão:**
+- **Um funil por clínica no MVP.** A tabela `pipelines` existe para permitir mais de um no futuro, mas a V5 cria uma linha só e o runtime não tem `INSERT` nem `DELETE` nela.
+- **Etapas** com tipo `OPEN`, `WON` ou `LOST`:
+  - exatamente uma ganha e uma perdida por funil, por índices únicos parciais, mais o seed, mais a regra de que nunca são arquivadas e de que o tipo não muda;
+  - só as abertas ativas têm posição (1..n, única por funil, `DEFERRABLE INITIALLY IMMEDIATE`, para uma troca de posições caber num único `UPDATE`);
+  - ganha e perdida aparecem sempre depois das abertas, fora do reordenamento.
+- **Chave estável** (`system_key`) nas seis etapas padrão: `NEW`, `IN_SERVICE`, `SCHEDULED`, `ATTENDED`, `WON`, `LOST`. A entrada de todo lead é a etapa `NEW`, qualquer que seja o nome ou a posição dela; etapas criadas pela clínica não têm chave.
+- **Nada é excluído:** etapas e motivos são arquivados. Ganha, perdida e `NEW` podem ser renomeadas, mas não arquivadas.
+- **Motivos de perda iniciais:** Preço, Sem resposta, Escolheu outra clínica, Sem horário disponível, Desistiu, Contato inválido e Outro. Todos editáveis e arquiváveis; nomes únicos sem diferenciar maiúsculas, inclusive os arquivados.
+- **Ids aleatórios** no seed (`gen_random_uuid()`), diferentes em cada clínica.
+- **Leitura revalidada:** o domínio confere de novo as regras ao ler. Um funil gravado fora delas sai como `CLINIC_DATA_INVALID_DATA`, nunca numa ordem errada.
+- **Escopo:** a CRM-030 entrega o modelo e as leituras (`GET /v1/clinic/pipeline` e `GET /v1/clinic/loss-reasons`, com `LEAD_READ`). As escritas, com `COMMERCIAL_SETTINGS_EDIT`, ficam para a CRM-036, porque a regra "etapa com lead aberto não é arquivada" depende da tabela de leads (CRM-031).
+- **Fronteira de módulo:** leads e eventos da CRM-031 entram no módulo `pipeline`, para a proteção do arquivamento não criar ciclo entre módulos.
+
+**Alternativas:**
+- Escritas já na CRM-030, sem o arquivamento de etapa (dívida para a CRM-031).
+- Vários funis por clínica (complica lead, Kanban e relatórios sem pedido do cliente).
+- Módulo `lead` separado, com SQL nativo sobre `leads` na proteção do arquivamento (acoplamento escondido).
+- Ids fixos no seed (um teste de isolamento passaria lendo o próprio dado).
+
+**Consequências:**
+- Limites previstos para a CRM-036: 12 etapas abertas ativas e 50 motivos, porque as listas são devolvidas inteiras.
+- A reordenação da CRM-036 trava o funil, compara a `version` e regrava as posições num único `UPDATE`.
+- O movimento de lead (CRM-031/032) precisa travar a etapa com `FOR SHARE` e recusar etapa arquivada, para não correr com o arquivamento.
+- A V5 chega a clínicas existentes pelo `tenant-migrate` (ADR-031); até lá elas respondem 503.

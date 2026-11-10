@@ -24,7 +24,8 @@ A JPA central não gerencia nenhuma entidade (`ControlJpaConfiguration`). Entida
 - V1 tenant cria vector e tenant_identity com no máximo uma linha. Provisionamento insere a identidade antes de ativar e concede somente SELECT dessa tabela ao papel runtime.
 - V3 tenant cria `clinic_settings` (fuso, linha única), com `SELECT` e `UPDATE (time_zone)` para o runtime.
 - V4 tenant cria `contacts` (telefone E.164 único, inclusive arquivados), `tags`, `contact_tags` e `contact_consents` (só inserção), com a extensão `pg_trgm` e grants por coluna (ADR-032).
-- As demais tabelas de negócio (funil, leads, vendas, conversas) definem as próprias constraints nas migrações correspondentes.
+- V5 tenant cria `pipelines`, `pipeline_stages` e `loss_reasons` com o funil padrão e os motivos iniciais; o runtime só lê (ADR-033).
+- As demais tabelas de negócio (leads, vendas, conversas) definem as próprias constraints nas migrações correspondentes.
 
 ## Requisitos do provisionador
 
