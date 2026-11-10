@@ -52,13 +52,38 @@ export async function selectClinic(tenantId: string) {
   });
 }
 
-export async function getIdentity(signal: AbortSignal) {
+export async function getIdentity(signal?: AbortSignal) {
   const identity = await apiRequest<Identity | null>("/v1/auth/me", { signal });
   if (typeof identity?.subjectId !== "string" || !identity.subjectId ||
       typeof identity.email !== "string" || !identity.email) {
     throw new ApiError(200, "UNEXPECTED_RESPONSE", "Não foi possível confirmar a identidade da sessão.");
   }
   return identity;
+}
+
+export async function withSelectedClinic<T>(tenantId: string, action: () => Promise<T>, signal?: AbortSignal, subjectId?: string) {
+  return withClinicSession("shared", async () => {
+    async function confirm() {
+      const [clinic, identity] = await Promise.all([getCurrentClinic(signal), subjectId ? getIdentity(signal) : undefined]);
+      if (identity && identity.subjectId !== subjectId) {
+        throw new ApiError(409, "SESSION_CONTEXT_CHANGED", "A conta da sessão mudou. Abra a equipe novamente.");
+      }
+      if (clinic?.tenantId !== tenantId) {
+        throw new ApiError(409, "CLINIC_NOT_SELECTED", "A clínica da sessão mudou. Confira a clínica atual.");
+      }
+    }
+
+    await confirm();
+    let result: T;
+    try {
+      result = await action();
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "CONTACT_DUPLICATE_PHONE") await confirm();
+      throw error;
+    }
+    await confirm();
+    return result;
+  }, signal);
 }
 
 export function login(email: string, password: string) {

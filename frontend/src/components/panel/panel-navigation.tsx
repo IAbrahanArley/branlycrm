@@ -6,7 +6,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
   Activity, BriefcaseBusiness, Building2, ChevronDown, LayoutDashboard, LogOut,
-  Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ShieldCheck, UserRound, Users, X,
+  Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ShieldCheck, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ type NavigationProps = {
   canSwitchClinic: boolean;
   hasAgencies: boolean;
   canViewContacts: boolean;
+  canViewTeam: boolean;
   currentPath: string;
   choosingClinic: boolean;
   signingOut: boolean;
@@ -41,12 +42,13 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function NavigationLinks({
-  compact = false, ready, hasAgencies, canViewContacts, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
+  compact = false, ready, hasAgencies, canViewContacts, canViewTeam, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
 }: {
   compact?: boolean;
   ready: boolean;
   hasAgencies: boolean;
   canViewContacts: boolean;
+  canViewTeam: boolean;
   currentPath: string;
   canSwitchClinic: boolean;
   choosingClinic: boolean;
@@ -59,6 +61,7 @@ function NavigationLinks({
   const label = compact ? "sr-only" : undefined;
   const overview = currentPath === "/app" && !choosingClinic;
   const contacts = currentPath === "/app/contatos" || currentPath.startsWith("/app/contatos/");
+  const team = currentPath === "/app/equipe";
   const active = "bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/18 hover:text-cyan-50";
   return (
     <nav aria-label="Navegação do painel" className="space-y-6">
@@ -77,6 +80,13 @@ function NavigationLinks({
             onNavigate={onNavigate} className={cn(item, contacts && active)}>
             <Users className="size-[18px] shrink-0" aria-hidden="true" />
             <span className={label}>Contatos</span>
+          </Link>
+        )}
+        {canViewTeam && (
+          <Link href="/app/equipe" aria-current={team ? "page" : undefined} title={compact ? "Equipe" : undefined}
+            onNavigate={onNavigate} className={cn(item, team && active)}>
+            <UsersRound className="size-[18px] shrink-0" aria-hidden="true" />
+            <span className={label}>Equipe</span>
           </Link>
         )}
         {canSwitchClinic && (
@@ -144,7 +154,7 @@ function AccountMenu({ email, onSignOut }: { email: string; onSignOut: () => voi
 }
 
 export function PanelNavigation({
-  email, clinic, canSwitchClinic, hasAgencies, canViewContacts, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
+  email, clinic, canSwitchClinic, hasAgencies, canViewContacts, canViewTeam, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
 }: NavigationProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -159,7 +169,7 @@ export function PanelNavigation({
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
-  const nav = { ready, canSwitchClinic, hasAgencies, canViewContacts, currentPath, choosingClinic, onChooseClinic, onOverview };
+  const nav = { ready, canSwitchClinic, hasAgencies, canViewContacts, canViewTeam, currentPath, choosingClinic, onChooseClinic, onOverview };
 
   return (
     <div className="flex min-h-dvh bg-[#f3f6fa] text-[#10233b]">

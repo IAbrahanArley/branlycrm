@@ -17,7 +17,7 @@ import { ClinicContext } from "@/components/panel/clinic-context";
 
 type SessionCheck =
   | { kind: "checking" }
-  | { kind: "confirmed"; email: string; access: Awaited<ReturnType<typeof getPanelAccess>>; clinic: (CurrentClinic & { name: string }) | null }
+  | { kind: "confirmed"; email: string; subjectId: string; access: Awaited<ReturnType<typeof getPanelAccess>>; clinic: (CurrentClinic & { name: string }) | null }
   | { kind: "redirecting" | "forbidden" | "error" | "conflict"; message: string };
 
 export function PanelShell({ children }: { children: ReactNode }) {
@@ -55,7 +55,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       retry();
     });
     function suspend(event: PageTransitionEvent) {
-      if (!event.persisted || !window.location.pathname.startsWith("/app/contatos")) return;
+      if (!event.persisted) return;
       controller.abort();
       flushSync(() => setCheck({ kind: "checking" }));
     }
@@ -78,7 +78,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
         throw new ApiError(409, "STATE_CONFLICT", "A lista de clínicas mudou. Recarregue os dados para continuar.");
       }
       if (!controller.signal.aborted) {
-        setCheck({ kind: "confirmed", email: identity.email, access, clinic: current && membership ? { ...current, name: membership.clinicName } : null });
+        setCheck({ kind: "confirmed", ...identity, access, clinic: current && membership ? { ...current, name: membership.clinicName } : null });
       }
     }
 
@@ -130,7 +130,9 @@ export function PanelShell({ children }: { children: ReactNode }) {
   const selecting = Boolean(confirmed?.access.clinics.length && (!clinic || choosingClinic));
   const overview = pathname === "/app";
   const contacts = pathname === "/app/contatos" || pathname.startsWith("/app/contatos/");
+  const team = pathname === "/app/equipe";
   const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
+  const canViewTeam = clinic?.permissions.TEAM_VIEW === "ALL";
 
   return (
     <PanelNavigation
@@ -139,6 +141,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       canSwitchClinic={Boolean(confirmed && (confirmed.access.clinics.length > 1 || (!clinic && selecting)))}
       hasAgencies={Boolean(confirmed?.access.agencies.length)}
       canViewContacts={canViewContacts && !selecting}
+      canViewTeam={canViewTeam && !selecting}
       currentPath={pathname}
       choosingClinic={selecting}
       signingOut={signingOut}
@@ -203,15 +206,15 @@ export function PanelShell({ children }: { children: ReactNode }) {
                     {children}
                   </div>
                 ) : check.clinic && (
-                  (!contacts || canViewContacts) ? (
-                    <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, refresh: retry }}>
+                  ((!contacts || canViewContacts) && (!team || canViewTeam)) ? (
+                    <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
                       {children}
                     </ClinicContext.Provider>
-                  ) : <PanelState kind="forbidden" title="Sem permissão para acessar contatos" message="Confira as permissões do seu vínculo com esta clínica." />
+                  ) : <PanelState kind="forbidden" title={team ? "Sem permissão para acessar a equipe" : "Sem permissão para acessar contatos"} message="Confira as permissões do seu vínculo com esta clínica." />
                 )
               )}
-              {contacts && check.access.kind === "agency" && (
-                <PanelState kind="forbidden" title="Selecione uma clínica para acessar contatos" message="Sua conta não tem vínculo ativo com uma clínica." />
+              {(contacts || team) && check.access.kind === "agency" && (
+                <PanelState kind="forbidden" title={team ? "Selecione uma clínica para acessar a equipe" : "Selecione uma clínica para acessar contatos"} message="Sua conta não tem vínculo ativo com uma clínica." />
               )}
               {overview && check.access.agencies.length > 0 && (
                 <Card id="suas-agencias" tabIndex={-1} className="scroll-mt-22 focus-visible:outline-2" aria-labelledby="agency-access">

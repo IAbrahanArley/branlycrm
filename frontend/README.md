@@ -55,6 +55,15 @@ Os testes abaixo exercitam a renovação do CSRF, a recusa de mutações e a rev
 
 O termo da busca fica em memória na página e segue no parâmetro `q` da API. Use apenas dados sintéticos até que a configuração de logs do proxy oculte esse parâmetro (CRM-072).
 
+## Teste local de equipe e convites (FE-003)
+
+1. Abra [Equipe](http://localhost:3000/app/equipe) com um gestor sintético. Alterne os filtros de papel e situação e confira a paginação.
+2. Convide uma pessoa com e-mail `@example.test`. Confira o resultado do envio e o convite na lista. Reenvie e confirme que o link anterior deixa de funcionar. Revogue e confira que a lista é atualizada.
+3. Altere o papel e desative um membro de teste. Confira o filtro **Inativos**. Repita com um gestor operacional e uma conta somente leitura para verificar as diferenças de acesso.
+4. Em duas abas, troque para uma segunda clínica de teste. Confirme que a lista e qualquer diálogo da clínica anterior desaparecem. Repita usando Tab e Enter em uma janela estreita.
+
+A listagem de convites informa o vencimento. O resultado da entrega do e-mail aparece depois de enviar ou reenviar, conforme a resposta da API.
+
 ## Verificação
 
 ```sh
