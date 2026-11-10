@@ -24,7 +24,8 @@ public record ContactView(
     Instant archivedAt,
     long version,
     List<TagView> tags,
-    Map<String, String> consent) {
+    Map<String, String> consent,
+    boolean patient) {
   public ContactView {
     tags = List.copyOf(tags);
     // Keeps the channel order in the JSON.

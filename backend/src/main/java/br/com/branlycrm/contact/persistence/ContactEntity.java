@@ -75,6 +75,10 @@ public class ContactEntity {
   @Column(name = "archived_by")
   private UUID archivedBy;
 
+  /** Written only by the sale transactions (CRM-035), never by this entity. */
+  @Column(name = "patient_since", insertable = false, updatable = false)
+  private Instant patientSince;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -126,7 +130,8 @@ public class ContactEntity {
         createdVia,
         createdAt,
         archivedAt,
-        version);
+        version,
+        patientSince);
   }
 
   /**
@@ -136,7 +141,7 @@ public class ContactEntity {
   public ContactSummary toSummary() {
     var listed = new ContactFields(name, new PhoneNumber(phoneE164), email, null, null);
     return new ContactSummary(
-        id, listed.name(), listed.phone(), listed.email(), createdVia, archivedAt);
+        id, listed.name(), listed.phone(), listed.email(), createdVia, archivedAt, patientSince);
   }
 
   private void touch(UUID actor, Instant now) {

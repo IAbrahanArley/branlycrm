@@ -7,6 +7,7 @@ import br.com.branlycrm.common.web.GlobalErrorHandler;
 import br.com.branlycrm.identity.exceptions.ClinicNotSelectedException;
 import br.com.branlycrm.pipeline.dto.response.LeadConflictError;
 import br.com.branlycrm.pipeline.exceptions.LeadException;
+import br.com.branlycrm.pipeline.exceptions.SaleException;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import java.util.List;
 import org.springframework.core.annotation.Order;
@@ -17,8 +18,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-/** HTTP translation for lead endpoints; clinic database failures go to ClinicDataErrorHandler. */
-@RestControllerAdvice(assignableTypes = LeadController.class)
+/**
+ * HTTP translation for lead and sale endpoints; clinic database failures go to
+ * ClinicDataErrorHandler.
+ */
+@RestControllerAdvice(assignableTypes = {LeadController.class, SaleController.class})
 @Order(GlobalErrorHandler.MODULE_ORDER)
 public final class LeadErrorHandler {
   @ExceptionHandler(LeadException.class)
@@ -51,6 +55,22 @@ public final class LeadErrorHandler {
       case RESPONSIBLE_INVALID ->
           ApiErrors.response(
               409, "LEAD_RESPONSIBLE_INVALID", "O responsável precisa ser da equipe ativa.");
+    };
+  }
+
+  @ExceptionHandler(SaleException.class)
+  ResponseEntity<ApiError> sale(SaleException exception) {
+    String code = "SALE_" + exception.reason().name();
+    return switch (exception.reason()) {
+      case NOT_FOUND -> ApiErrors.response(404, code, "Venda não encontrada.");
+      case STALE ->
+          ApiErrors.response(
+              409, code, "A venda foi alterada por outra pessoa. Recarregue e repita.");
+      case CANCELLED -> ApiErrors.response(409, code, "A venda está cancelada.");
+      case PROCEDURE_UNAVAILABLE ->
+          ApiErrors.response(409, code, "Procedimento inexistente ou inativo.");
+      case PROFESSIONAL_UNAVAILABLE ->
+          ApiErrors.response(409, code, "Profissional inexistente ou inativo.");
     };
   }
 

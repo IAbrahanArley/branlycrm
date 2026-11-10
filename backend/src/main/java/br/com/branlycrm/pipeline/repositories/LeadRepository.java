@@ -253,7 +253,7 @@ public class LeadRepository {
 
   /**
    * Moves an open lead to another open stage of its funnel. The won stage is reached only by a sale
-   * ({@link #win}) and the lost one only with a reason ({@link #lose}).
+   * ({@link #closeWon}) and the lost one only with a reason ({@link #lose}).
    */
   public Lead moveStage(ClinicAccess access, UUID id, long expectedVersion, UUID stageId) {
     return change(
@@ -346,18 +346,22 @@ public class LeadRepository {
         });
   }
 
-  /** Closes the lead as won; only the sale registration (CRM-035) calls it. */
-  public Lead win(ClinicAccess access, UUID id, long expectedVersion) {
-    return change(
-        access,
-        id,
-        expectedVersion,
-        (session, row, actor, at) -> {
-          UUID won = terminal(session, row.pipelineId(), "WON");
-          String from = row.stageId().toString();
-          row.close(LeadStatus.WON, won, null, actor, at);
-          event(session, row, LeadEventType.WON, from, won.toString(), null, actor, at);
-        });
+  /**
+   * Closes the open lead read at {@code expectedVersion} as won, inside the sale registration's
+   * transaction (CRM-035); the version is checked again when the session flushes.
+   *
+   * @throws LeadException NOT_FOUND, CLOSED or STALE
+   */
+  static LeadEntity closeWon(
+      Session session, UUID id, long expectedVersion, UUID actor, Instant at) {
+    LeadEntity row = require(session, id);
+    if (row.status() != LeadStatus.OPEN) throw new LeadException(LeadException.Reason.CLOSED);
+    if (row.version() != expectedVersion) throw new LeadException(LeadException.Reason.STALE);
+    UUID won = terminal(session, row.pipelineId(), "WON");
+    String from = row.stageId().toString();
+    row.close(LeadStatus.WON, won, null, actor, at);
+    event(session, row, LeadEventType.WON, from, won.toString(), null, actor, at);
+    return row;
   }
 
   @FunctionalInterface

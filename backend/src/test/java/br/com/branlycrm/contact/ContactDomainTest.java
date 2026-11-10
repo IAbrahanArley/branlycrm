@@ -54,7 +54,8 @@ class ContactDomainTest {
     assertThat(fields.email()).isEqualTo("maria@example.test");
     assertThat(fields.notes()).isNull();
     assertThat(fields.toString()).doesNotContain("Maria").doesNotContain("example.test");
-    var contact = new Contact(UUID.randomUUID(), fields, ContactCreatedVia.MANUAL, T0, null, 0);
+    var contact =
+        new Contact(UUID.randomUUID(), fields, ContactCreatedVia.MANUAL, T0, null, 0, null);
     assertThat(contact.toString()).doesNotContain("Maria").doesNotContain("98765");
   }
 

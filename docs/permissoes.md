@@ -43,6 +43,7 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Leads: corrigir origem manualmente | ✓ | ✓ | ✓ | — |
 | Vendas e perdas: registrar | ✓ | ✓ | ✓ | — |
 | Vendas: corrigir ou cancelar registro | ✓ | ✓ | — | — |
+| Vendas: ver lista, detalhe e histórico (`LEAD_READ`) | ✓ | ✓ | ✓ | ✓ |
 | Caixa de entrada: ler conversas | ✓ | ✓ | ✓ | ✓ |
 | Caixa de entrada: responder, assumir, enviar mídia e template | ✓ | ✓ | ✓ | — |
 | Tarefas: criar e atribuir | ✓ | ✓ | ✓ | — |
