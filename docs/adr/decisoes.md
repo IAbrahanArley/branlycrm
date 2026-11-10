@@ -242,7 +242,7 @@ Data de todos os registros: 04/11/2026.
 
 **Alternativas:** Papel `migrator_<id>` com login (segunda senha por clínica sem ganho de isolamento); superusuário no provisionador; executar o provisionamento no processo HTTP; um pool sem limite por clínica.
 
-**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Entregue na CRM-015 (ADR-030). O cadastro público ainda não cria tarefas. Detalhes em ../provisionamento-clinicas.md.
+**Consequências:** O provisionador é uma autoridade privilegiada sobre todas as clínicas e deve ser tratado como operação administrativa. A persistência JPA de clínica foi adiada até existir a primeira entidade de clínica: um segundo EntityManagerFactory desliga a autoconfiguração JPA central, e sem entidade não há o que validar. Entregue na CRM-015 (ADR-030). O cadastro público ainda não cria tarefas. As migrações de clínica novas chegam às clínicas existentes pelo modo `tenant-migrate` (ADR-031). Detalhes em ../provisionamento-clinicas.md.
 
 ## ADR-019 — Planejamento do produto e escopo do MVP
 
@@ -570,7 +570,42 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - Violação de unicidade sai como `CONFLICT` e versão otimista como `STALE` (ADR-032); a chave estrangeira violada ainda sai como `UNAVAILABLE`.
 - O callback recebe a `Session` inteira: comandos de sessão (`SET`, `doWork`) persistem na conexão do pool da mesma clínica. A revisão de código barra esse uso.
 - O schema da clínica não é validado no boot, porque não há tenant; o `ClinicPersistenceIT` valida as entidades contra uma clínica provisionada, como runtime.
-- Migrações novas de clínica só chegam a clínicas já existentes quando houver o comando de rollout (pendência). Até lá, tabela ausente falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+- Migrações novas de clínica chegam às clínicas já existentes pelo comando de rollout (ADR-031). Clínica não migrada continua falhando fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+
+## ADR-031 — Rollout das migrações de clínica
+
+**Data:** 09/11/2026. **Status:** Aceita pelo usuário, depois da revisão do `architect`. **Complementa:** ADR-014, ADR-018 e ADR-030.
+
+**Decisão:**
+- **Processo próprio:** `APP_MODE=tenant-migrate`, sem HTTP, executado uma vez e encerrado com código de saída (0 sucesso, 1 alguma clínica falhou ou banco central indisponível, 2 uso inválido). Liga só `app.provisioning.rollout.enabled`.
+  - **Credenciais:** as do provisionador (`crm_provisioning_worker` e `crm_tenant_provisioner`) e o volume de segredos só para leitura.
+  - **Fora do processo:** `TenantProvisioningService`, `FileTenantSecretWriter`, a fila e o scheduler. O ArchUnit garante que, no módulo, só o worker usa essas classes e chama `ensureRoles`/`ensureDatabase`; testes de contexto provam os beans de cada modo.
+- **Alcance:** clínicas `ACTIVE`, `AWAITING_OWNER` e `SUSPENDED`. A suspensa é incluída para a reativação, que é só um UPDATE, não cair em schema antigo. `PROVISIONING` e `FAILED` seguem pela fila, que migra.
+  - `--tenant-id UUID` restringe a uma clínica elegível; uma inelegível sai como falha (`TENANT_NOT_ELIGIBLE`).
+- **Por clínica, uma por vez:**
+  1. **Pré-checagem só de leitura:** banco existente com dono `owner_<id>`, papéis criados por este provisionador sem atributos elevados e `tenant_identity` da clínica. Não cria, concede nem altera nada.
+  2. **Migração:** o mesmo `migrate` do provisionamento, como `owner_<id>`, com os mesmos placeholders e a checagem de ownership.
+  3. **Verificação:** o mesmo login real do runtime.
+  - **Falha isolada:** a falha vira código estável, e a próxima clínica roda.
+  - **Retomada:** é a reexecução. O Flyway pula o aplicado e trava cada banco, então execuções simultâneas, ou junto com o provisionador, aplicam cada migração uma vez.
+- **Relatório:** uma linha por clínica em stdout com UUID, resultado, etapa, migrações aplicadas e código, sem SQL, segredo ou dado pessoal; o log só leva UUID, etapa e código.
+- **Provisionador:** a etapa VERIFICATION migra de novo (idempotente) antes da verificação. Assim, uma tarefa que passou da MIGRATION com uma imagem antiga, ou foi retomada por `retryFailed`, não ativa uma clínica com schema antigo.
+- **`lock_timeout` de 10 s** na sessão de migração: um DDL que espera transações da API desiste em vez de enfileirar as consultas seguintes da clínica atrás do pedido de lock.
+- **Ordem de deploy:** parar o provisionador antigo → `migrate` (central) → provisionador novo → `tenant-migrate` → API nova. O provisionador antigo, se continuasse rodando, ativaria clínicas com o schema antigo depois de o rollout listar as clínicas. As migrações de clínica são aditivas (expand/contract): a API antiga funciona sobre o schema novo, e uma remoção só entra depois que nenhuma imagem em uso depende do objeto.
+
+**Alternativas:**
+- Subcomando do `APP_MODE=provision`: o daemon tem scheduler e reinício automático, e receberia o gravador de segredos e a fila.
+- Rollout automático no boot do provisionador: uma falha viraria laço de reinício, as falhas ficariam escondidas e o rollout ficaria acoplado à fila.
+- Papel de migração com login por clínica: recusado na ADR-018.
+
+**Consequências:**
+- O rollout precisa rodar a cada deploy que traga migração de clínica e exige aprovação humana em produção. A clínica não migrada falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+- A verificação confere identidade, privilégios gerais e bancos proibidos, mas não os GRANTs específicos de cada migração nova. Isso continua sendo papel dos ITs da migração, como o `ClinicPersistenceIT`.
+- O probe usa uma conexão do runtime (CONNECTION LIMIT 20). Com a API saturando o limite, sai `VERIFICATION_FAILED` com a migração aplicada; basta reexecutar.
+- `applied` conta só a chamada concluída: se uma migração falha depois de outras aplicadas na mesma execução, o relatório mostra `applied=0` e a próxima execução aplica o restante.
+- `CREATE INDEX CONCURRENTLY` exige migração não transacional, que conflita com o lock do Flyway. Fica para quando uma tabela grande precisar.
+- **Risco residual aceito (revisão de `security`):** o processo usa as credenciais completas do worker (que também altera status, fila e vínculos) e do provisionador (CREATEDB/CREATEROLE), embora só leia `tenants` e use `SET` em `owner_<id>`. O código e o ArchUnit restringem o uso, mas não o banco. Um papel central só de leitura e um papel migrador sem CREATEDB/CREATEROLE são a evolução; exigem decisão humana e mudança no bootstrap.
+- `lock_timeout` limita só a espera por lock: uma migração que reescreve uma tabela segura o lock pelo tempo que levar. A revisão de migrações de clínica barra rewrite de tabela grande.
 
 ## ADR-032 — Contatos, telefone canônico e consentimento
 

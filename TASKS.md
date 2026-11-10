@@ -312,9 +312,26 @@ O frontend acompanha cada API aprovada.
   - `TenantIsolationIT` passou a contar as migrações de clínica pelo classpath.
 - **Revisões:** `security` sem críticos nem altos. Corrigidos os médios (aninhamento, timeout de lock e fronteira de módulos no ArchUnit) e os baixos de construtores, log SQL, identidade, CHECK do fuso, cache e rollback em `Error`. `reviewer` sem bloqueantes; sugestões aplicadas.
 - **Pendências:**
-  - **comando para aplicar migrações de clínica novas a clínicas já existentes** (hoje só o provisionamento aplica); até lá, clínica antiga responde `CLINIC_DATA_SCHEMA_OUTDATED`, inclusive no Docker local;
+  - ~~comando para aplicar migrações de clínica novas a clínicas já existentes~~: resolvido em 09/11/2026 pelo modo `tenant-migrate` (ADR-031), na branch `feat/tenant-migration-rollout`, a partir desta. Detalhes abaixo;
   - ~~motivo de conflito de integridade junto da CRM-020~~ (feito: `CONFLICT` e `STALE`);
   - `MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes` falhou uma vez numa execução completa (todas as respostas 429) e passou nas seguintes: instabilidade anterior a esta tarefa.
+
+**Rollout das migrações de clínica (09/11/2026, ADR-031):** complemento da CRM-015, desenho revisado pelo `architect` e aprovado pelo usuário.
+- **Comando:** `APP_MODE=tenant-migrate` e serviço `tenant-migrate` no profile `tools` do Compose (`docker compose --profile tools run --rm tenant-migrate [--tenant-id UUID]`).
+  - Usa as credenciais do provisionador, com os segredos só para leitura, sem gravador de segredos, fila ou scheduler.
+  - Alcança clínicas `ACTIVE`, `AWAITING_OWNER` e `SUSPENDED`, uma por vez.
+  - Cada clínica passa por pré-checagem só de leitura, migração como `owner_<id>` e verificação de login do runtime.
+  - Falha isolada com código estável, relatório por clínica em stdout, códigos de saída 0, 1 e 2; retomada por reexecução.
+- **Provisionador:** a etapa VERIFICATION migra de novo antes de verificar, e a sessão de migração usa `lock_timeout` de 10 s.
+- **Testes:**
+  - `TenantMigrationRolloutIT`: clínica sem a V3 e a V4 volta a funcionar por `ClinicSettingsRepository` e pelo `ContactService` das rotas de contato; falha isolada entre duas clínicas e retomada; `SUSPENDED` sim, `PROVISIONING`/`FAILED` não; sem banco recusada sem criar banco; `--tenant-id`; duas execuções simultâneas aplicam uma vez;
+  - `TenantMigrationRolloutTest`: uso inválido, ordem das etapas, códigos sem texto de causa, banco central indisponível e beans separados entre os modos;
+  - `TenantMigrateModeIT`: o contexto completo do modo sobe sem worker, scheduler nem MFA;
+  - `TenantProvisioningServiceTest` e a regra ArchUnit `onlyTheProvisioningWorkerHoldsWorkerCapabilities`.
+- **Execução (10/11/2026, sobre a `main` com CRM-020 e CRM-021):** `./mvnw -B -ntp clean verify` → 236 unitários (2 ignorados no Windows) e 131 de integração, tudo verde.
+  - Em execuções anteriores, sobre a CRM-015, `MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes` falhou três vezes (todas as respostas 429). É a instabilidade já registrada: o teste roda antes dos ITs novos e passa isolado.
+- **Revisão `security`:** sem críticos nem altos. Corrigidos: ArchUnit por chamada e por pacote, Flyway sem detalhe de erro do servidor, logs verificados no IT, boot real do modo testado e ordem de deploy com o provisionador antigo parado. Riscos aceitos na ADR-031: credenciais completas do worker e do provisionador no processo (papéis próprios exigem decisão) e `lock_timeout` sem limite de duração do DDL.
+- **Pendências:** runbook de produção na CRM-072; aprovação humana a cada execução em produção.
 
 ## Fase 2 — Contatos e histórico
 
@@ -708,6 +725,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Segurança:** proxy confiável para o IP real; variáveis e segredos.
 - **Arquivos:** armazenamento de objetos.
 - **Backup:** diário, criptografado e fora da VM; procedimento de restauração (central e por clínica).
+- **Migrações:** ordem parar o provisionador antigo → `migrate` → provisionador novo → `tenant-migrate` → API nova, com tratamento do código de saída 1 (ADR-031, [provisionamento-clinicas.md](docs/provisionamento-clinicas.md)).
 **Aceite:** restauração realizada em ambiente isolado; monitoramento e recuperação documentados.
 
 ### [ ] CRM-073 — Revisão de privacidade e LGPD (P0)

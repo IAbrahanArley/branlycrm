@@ -100,6 +100,32 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+  # Schema rollout for existing clinics (ADR-031): run on demand at each deploy, after migrate and
+  # before the new API. Prints one line per clinic (UUID and stable code only). Example:
+  # docker compose --profile tools run --rm tenant-migrate [--tenant-id <uuid>]
+  tenant-migrate:
+    image: branlycrm-backend
+    build: ./backend
+    profiles: ["tools"]
+    environment:
+      APP_MODE: tenant-migrate
+      SPRING_FLYWAY_ENABLED: 'false'
+      SPRING_DOCKER_COMPOSE_ENABLED: 'false'
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-branlycrm}
+      SPRING_DATASOURCE_USERNAME: crm_provisioning_worker
+      SPRING_DATASOURCE_PASSWORD: ${PROVISIONING_WORKER_PASSWORD:?Defina PROVISIONING_WORKER_PASSWORD}
+      APP_TENANCY_HOST: postgres
+      APP_TENANCY_SECRETS_DIRECTORY: /run/branly/tenant-secrets
+      APP_PROVISIONING_ADMIN_USERNAME: crm_tenant_provisioner
+      APP_PROVISIONING_ADMIN_PASSWORD: ${TENANT_PROVISIONER_PASSWORD:?Defina TENANT_PROVISIONER_PASSWORD}
+      APP_PROVISIONING_CONTROL_DATABASE: ${POSTGRES_DB:-branlycrm}
+    volumes:
+      # Read-only: the rollout only reads secrets for the runtime verification.
+      - tenant_secrets:/run/branly/tenant-secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
   # Platform command (ADR-028): run on demand, never as a server. Example:
   # docker compose --profile tools run --rm platform create-agency --request-id <uuid> --name "<nome>" --admin-email <e-mail>
   platform:

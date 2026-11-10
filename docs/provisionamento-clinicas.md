@@ -52,6 +52,36 @@ Nenhum banco é apagado automaticamente.
 - **Pela plataforma:** agências e admins de agência são criados pelo comando de plataforma (seção abaixo).
 - **Cadastro público** (clínica direta): continua previsto na CRM-014.
 
+## Rollout de migrações de clínica
+
+Uma clínica criada antes de uma migração nova de `db/tenant-migration` só a recebe por este comando (ADR-031). Sem ele, a tabela ausente falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`.
+
+```bash
+docker compose --profile tools run --rm tenant-migrate
+docker compose --profile tools run --rm tenant-migrate --tenant-id <uuid>
+```
+
+- **Processo:** `APP_MODE=tenant-migrate`, sem HTTP, executado uma vez. Recebe as credenciais do provisionador e o volume de segredos só para leitura. Não recebe o gravador de segredos, a fila nem o scheduler.
+- **Alcance:** clínicas `ACTIVE`, `AWAITING_OWNER` e `SUSPENDED`, uma por vez, em ordem de UUID. `PROVISIONING` e `FAILED` seguem pela fila.
+- **Por clínica:** pré-checagem só de leitura (banco e dono, papéis, `tenant_identity`), migrações como `owner_<id>` com a checagem de ownership, e a mesma verificação de login do runtime da etapa VERIFICATION.
+- **Saída:** uma linha por clínica e um resumo, por exemplo `tenantId=<uuid> result=MIGRATED stage=VERIFICATION applied=1` ou `result=FAILED stage=PRECHECK applied=0 code=DATABASE_MISSING`. Só UUID e códigos estáveis; nenhum SQL, segredo ou dado pessoal.
+- **Código de saída:** 0 se todas passaram; 1 se alguma falhou ou o banco central ficou indisponível; 2 em uso inválido.
+- **Falha e retomada:** a falha de uma clínica não para as outras. Basta rodar de novo: o Flyway pula o aplicado e trava cada banco, então duas execuções simultâneas, ou o rollout junto com o provisionador, aplicam cada migração uma vez. `VERIFICATION_FAILED` com `applied` maior que zero significa schema já atualizado e verificação a repetir, por exemplo com o runtime no limite de conexões.
+- **Códigos:** `TENANT_NOT_ELIGIBLE`, `DATABASE_MISSING`, `DATABASE_CONFLICT`, `ROLE_CONFLICT`, `IDENTITY_MISMATCH`, `PRECHECK_FAILED`, `MIGRATION_FAILED`, `OWNERSHIP_CONFLICT`, `SECRET_MISSING`, `SECRET_<motivo>` e `VERIFICATION_FAILED`. `DATABASE_CONFLICT`, `ROLE_CONFLICT` e `IDENTITY_MISMATCH` numa clínica ativa são incidentes: investigar antes de reexecutar.
+- **Lock:** a sessão de migração usa `lock_timeout` de 10 s, também no provisionamento; um DDL bloqueado por transações da API falha e é reexecutado depois.
+- **Provisionamento:** a etapa VERIFICATION migra de novo antes de verificar. Uma tarefa que passou da MIGRATION com uma imagem antiga não ativa a clínica com schema antigo.
+- **Privilégios:** o processo usa as credenciais completas do worker e do provisionador. O ArchUnit garante que só o worker grava segredos, mexe na fila e no registro e chama `ensureRoles`/`ensureDatabase`; o banco ainda não restringe isso (risco aceito na ADR-031).
+
+### Ordem no deploy
+
+1. Parar o provisionador antigo. Rodando, ele ativaria clínicas com o schema antigo depois de o rollout listar as clínicas.
+2. `migrate` (banco central).
+3. Provisionador com a imagem nova: a etapa VERIFICATION já aplica as migrações novas.
+4. `tenant-migrate`; com código 1, tratar as clínicas falhas e reexecutar.
+5. API nova.
+
+As migrações de clínica são aditivas: a API antiga funciona sobre o schema novo, e remover coluna ou tabela exige um deploy posterior, quando nenhuma imagem em uso depender dela. Em produção, cada execução exige aprovação humana (AGENTS.md §10). O runbook completo entra na CRM-072.
+
 ## Comando de plataforma
 
 Processo sem HTTP (`APP_MODE=platform`) com a credencial `crm_platform_operator`, que só cria agências e convites de admin de agência:
@@ -83,7 +113,7 @@ docker compose --profile tools run --rm platform invite-agency-admin --agency-id
 
 ## Persistência JPA de clínica
 
-Criada na CRM-015 (ADR-030), com `clinic_settings` como primeira entidade.
+Criada na CRM-015 (ADR-030), com `clinic_settings` como primeira entidade. Clínicas anteriores à V3 recebem a tabela pelo rollout (seção acima).
 - `ClinicPersistence` guarda um `SessionFactory` privado; as conexões vêm de `TenantConnectionRepository.open`, sobre `TenantConnectionPools`, com o tenant passado explicitamente, sem ThreadLocal.
 - A JPA central declara `PersistenceManagedTypes` vazio, então nenhuma entidade cai no EntityManager central.
 - O ArchUnit exige `@Entity` só em pacotes `persistence`, JPA e Hibernate só em `persistence` e `repositories`, e os pacotes `persistence` usados só por repositórios.
@@ -101,5 +131,15 @@ Criada na CRM-015 (ADR-030), com `clinic_settings` como primeira entidade.
 - **Concorrência:** 4 workers simultâneos provisionam a clínica uma única vez.
 - **Falha fechada:** participação ausente, clínica suspensa, identidade divergente, senha divergente e segredo ausente.
 - **Pools:** rotação sem abortar conexões emprestadas, teto global com despejo do pool ocioso mais antigo, limite por clínica e expiração por ociosidade.
+
+`TenantMigrationRolloutIT` provisiona clínicas reais e as deixa sem a V3 e a V4 (objetos e linhas do histórico removidos como dono). Cobre:
+- a clínica volta a funcionar por `ClinicSettingsRepository` e pelas chamadas das rotas de contato (`ContactService`), e a reexecução sai `UP_TO_DATE`;
+- falha isolada entre duas clínicas, sem texto SQL na saída, e retomada;
+- `SUSPENDED` migrada, `PROVISIONING` e `FAILED` ignoradas;
+- clínica sem banco recusada sem criar banco;
+- `--tenant-id` restrito à clínica pedida;
+- duas execuções simultâneas aplicam a migração uma vez.
+
+`TenantMigrationRolloutTest` cobre uso inválido, ordem das etapas, códigos e a separação de beans entre os modos.
 
 Validado também no Compose: o bootstrap, a V5, o script de papéis e um provisionamento completo de clínica sintética chegaram a `ACTIVE`, com todos os objetos removidos depois.
