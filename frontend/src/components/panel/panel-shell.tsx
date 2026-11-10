@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
+import { usePathname, useRouter } from "next/navigation";
 import { BriefcaseBusiness, Building2 } from "lucide-react";
 import { getCurrentClinic, getIdentity, getPanelAccess, logout, type CurrentClinic } from "@/lib/api/auth";
 import { ApiError, onMfaGate, onSessionEnd, sessionEndMessage } from "@/lib/api/client";
 import { getMfaStatus } from "@/lib/api/mfa";
+import { onClinicChange } from "@/lib/api/clinic-session";
 import { clinicRoleLabel } from "@/lib/clinic-role";
 import { PanelState } from "@/components/panel/panel-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClinicPicker } from "@/components/panel/clinic-picker";
 import { PanelNavigation } from "@/components/panel/panel-navigation";
+import { ClinicContext } from "@/components/panel/clinic-context";
 
 type SessionCheck =
   | { kind: "checking" }
@@ -19,12 +22,19 @@ type SessionCheck =
 
 export function PanelShell({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [check, setCheck] = useState<SessionCheck>({ kind: "checking" });
   const [attempt, setAttempt] = useState(0);
   const [choosingClinic, setChoosingClinic] = useState(false);
   const signingOutRef = useRef(false);
   const [signingOut, setSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState<{ message: string; conflict: boolean }>();
+
+  const retry = useCallback(() => {
+    setChoosingClinic(false);
+    setCheck({ kind: "checking" });
+    setAttempt((previous) => previous + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,6 +49,21 @@ export function PanelShell({ children }: { children: ReactNode }) {
       router.replace("/seguranca");
     }
     const unsubscribeMfa = onMfaGate(openSecurity);
+    const unsubscribeClinic = onClinicChange(() => {
+      controller.abort();
+      if (window.location.pathname.startsWith("/app/contatos/")) router.replace("/app/contatos");
+      retry();
+    });
+    function suspend(event: PageTransitionEvent) {
+      if (!event.persisted || !window.location.pathname.startsWith("/app/contatos")) return;
+      controller.abort();
+      flushSync(() => setCheck({ kind: "checking" }));
+    }
+    function resume(event: PageTransitionEvent) {
+      if (event.persisted) retry();
+    }
+    window.addEventListener("pagehide", suspend);
+    window.addEventListener("pageshow", resume);
 
     async function load() {
       const mfa = await getMfaStatus(controller.signal);
@@ -73,15 +98,12 @@ export function PanelShell({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe();
       unsubscribeMfa();
+      unsubscribeClinic();
+      window.removeEventListener("pagehide", suspend);
+      window.removeEventListener("pageshow", resume);
       controller.abort();
     };
-  }, [attempt, router]);
-
-  function retry() {
-    setChoosingClinic(false);
-    setCheck({ kind: "checking" });
-    setAttempt((previous) => previous + 1);
-  }
+  }, [attempt, retry, router]);
 
   async function signOut() {
     if (signingOutRef.current) return;
@@ -106,6 +128,9 @@ export function PanelShell({ children }: { children: ReactNode }) {
   const confirmed = check.kind === "confirmed" ? check : null;
   const clinic = confirmed?.clinic;
   const selecting = Boolean(confirmed?.access.clinics.length && (!clinic || choosingClinic));
+  const overview = pathname === "/app";
+  const contacts = pathname === "/app/contatos" || pathname.startsWith("/app/contatos/");
+  const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
 
   return (
     <PanelNavigation
@@ -113,6 +138,8 @@ export function PanelShell({ children }: { children: ReactNode }) {
       clinic={clinic ? { name: clinic.name, role: clinicRoleLabel(clinic.role) } : undefined}
       canSwitchClinic={Boolean(confirmed && (confirmed.access.clinics.length > 1 || (!clinic && selecting)))}
       hasAgencies={Boolean(confirmed?.access.agencies.length)}
+      canViewContacts={canViewContacts && !selecting}
+      currentPath={pathname}
       choosingClinic={selecting}
       signingOut={signingOut}
       onChooseClinic={() => setChoosingClinic(true)}
@@ -120,7 +147,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       onSignOut={signOut}
     >
       <main id="conteudo-painel" tabIndex={-1} className="mx-auto max-w-7xl scroll-mt-20 space-y-6 px-4 py-7 sm:px-7 sm:py-9">
-        <div className="space-y-2">
+        {(overview || selecting || !clinic || signingOut) && <div className="space-y-2">
           <p className="text-xs font-bold tracking-widest text-[#315683] uppercase">Área de trabalho</p>
           <h1 className="font-[family-name:var(--font-branly)] text-3xl font-extrabold tracking-tight text-balance sm:text-4xl">
             {selecting && !signingOut ? "Selecionar clínica" : "Visão geral"}
@@ -128,7 +155,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
           <p className="max-w-prose text-sm leading-relaxed text-slate-600">
             {selecting && !signingOut ? "Escolha a clínica em que você quer trabalhar nesta sessão." : "Acompanhe o contexto da sua sessão e acesse as áreas disponíveis para sua conta."}
           </p>
-        </div>
+        </div>}
         {check.kind === "checking" && <PanelState kind="loading" title="Verificando a sessão…" />}
         {check.kind === "redirecting" && <PanelState kind="loading" title="Redirecionando…" message={check.message} />}
         {check.kind === "forbidden" && <PanelState kind="forbidden" title="Permissão negada" message={check.message} onRetry={retry} />}
@@ -151,9 +178,15 @@ export function PanelShell({ children }: { children: ReactNode }) {
               {check.access.clinics.length > 0 && (
                 selecting ? (
                   <Card aria-label="Clínicas disponíveis" className="p-4 sm:p-6">
-                    <ClinicPicker clinics={check.access.clinics} currentId={check.clinic?.tenantId} onRefresh={retry} />
+                    <ClinicPicker
+                      clinics={check.access.clinics} currentId={check.clinic?.tenantId} onRefresh={retry}
+                      onSelected={() => {
+                        if (contacts) router.replace("/app/contatos");
+                        retry();
+                      }}
+                    />
                   </Card>
-                ) : (
+                ) : overview ? (
                   <div className="grid gap-4 md:grid-cols-2">
                     {check.clinic && (
                       <Card aria-labelledby="clinic-card-title">
@@ -169,9 +202,18 @@ export function PanelShell({ children }: { children: ReactNode }) {
                     )}
                     {children}
                   </div>
+                ) : check.clinic && (
+                  (!contacts || canViewContacts) ? (
+                    <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, refresh: retry }}>
+                      {children}
+                    </ClinicContext.Provider>
+                  ) : <PanelState kind="forbidden" title="Sem permissão para acessar contatos" message="Confira as permissões do seu vínculo com esta clínica." />
                 )
               )}
-              {check.access.agencies.length > 0 && (
+              {contacts && check.access.kind === "agency" && (
+                <PanelState kind="forbidden" title="Selecione uma clínica para acessar contatos" message="Sua conta não tem vínculo ativo com uma clínica." />
+              )}
+              {overview && check.access.agencies.length > 0 && (
                 <Card id="suas-agencias" tabIndex={-1} className="scroll-mt-22 focus-visible:outline-2" aria-labelledby="agency-access">
                   <CardHeader>
                     <span className="grid size-10 place-items-center rounded-lg bg-[#e9f0fd] text-[#244d8c]">

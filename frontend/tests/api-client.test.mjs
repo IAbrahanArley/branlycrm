@@ -12,6 +12,23 @@ const failure = (status, code) => Response.json(
   { status, headers: { "Retry-After": "10" } },
 );
 
+test("only retains the existing contact ID on a duplicate phone response", async (t) => {
+  const { apiRequest } = await import("../src/lib/api/client.ts?duplicate-contact");
+  const contactId = "00000000-0000-4000-8000-000000000001";
+  const responses = [
+    csrf("contacts"),
+    Response.json({ code: "CONTACT_DUPLICATE_PHONE", contactId }, { status: 409 }),
+    Response.json({ code: "CONTACT_DUPLICATE_PHONE" }, { status: 409 }),
+    Response.json({ code: "CONTACT_STALE", contactId }, { status: 409 }),
+  ];
+  t.mock.method(globalThis, "fetch", async () => responses.shift());
+  const create = () => apiRequest("/v1/clinic/contacts", { method: "POST" });
+
+  await assert.rejects(create(), { code: "CONTACT_DUPLICATE_PHONE", contactId });
+  await assert.rejects(create(), { code: "CONTACT_DUPLICATE_PHONE", contactId: null });
+  await assert.rejects(create(), { code: "CONTACT_STALE", contactId: null });
+});
+
 test("uses the supplied CSRF header and rotates the token after login and logout", async (t) => {
   const { apiRequest } = await import("../src/lib/api/client.ts?rotation");
   const responses = [csrf("before"), empty(), csrf("after-login"), empty(), csrf("after-logout"), empty()];

@@ -44,6 +44,17 @@ Os testes abaixo exercitam a renovação do CSRF, a recusa de mutações e a rev
 2. Use uma janela privada para testar o cadastro de uma conta nova. Para uma conta verificada, entre no próprio fluxo do convite e confirme o aceite. Um convite aceito leva ao login. Para reabrir o convite após recarregar a página, use o link original.
 3. Na aba Rede, confira o cabeçalho `Referrer-Policy: no-referrer` na página. O token segue apenas no corpo JSON da prévia e do aceite.
 
+## Teste local de contatos (CRM-022)
+
+1. Entre com um atendente sintético, selecione a clínica e abra [Contatos](http://localhost:3000/app/contatos). Use **Novo contato**, cadastre nome e telefone fictícios e confira o perfil. Volte à lista e busque pelo nome ou pelo telefone.
+2. Tente cadastrar o mesmo telefone. Confira o aviso e o link para o perfil existente. Em duas abas, abra a edição do mesmo contato e salve uma alteração na primeira. Ao salvar na segunda, consulte a versão atual e revise o rascunho antes de reenviar.
+3. No perfil, crie uma etiqueta no catálogo, vincule-a ao contato e teste o filtro na lista. Registre uma preferência de comunicação e confira o estado atual e o histórico. Os horários aparecem em UTC enquanto o contrato não expõe o fuso da clínica.
+4. Com um gestor sintético, arquive o contato e confirme que só aparece ao marcar **Incluir arquivados**. Restaure-o pelo perfil. Com um perfil de consulta, confira que a leitura está disponível e que as ações de alteração estão ausentes.
+5. Em uma conta de teste com vínculos A e B, abra o perfil de A em duas abas. Troque para B em uma delas. A outra deve sair do perfil de A. Abrir manualmente em B a URL do contato de A deve resultar em contato não encontrado.
+6. Repita o cadastro e a busca com a janela estreita e usando Tab, Shift+Tab e Enter. Confira o foco visível, as mensagens de erro e a abertura do perfil.
+
+O termo da busca fica em memória na página e segue no parâmetro `q` da API. Use apenas dados sintéticos até que a configuração de logs do proxy oculte esse parâmetro (CRM-072).
+
 ## Verificação
 
 ```sh
