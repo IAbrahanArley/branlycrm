@@ -125,6 +125,15 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `PROCEDURE_DUPLICATE` / `PROFESSIONAL_DUPLICATE` | 409 | Já existe item com o mesmo nome, sem diferenciar maiúsculas, inclusive inativo | Catálogo |
 | `PROCEDURE_STALE` / `PROFESSIONAL_STALE` | 409 | O item mudou desde a leitura (`version`) | Catálogo |
 | `PROCEDURE_LIMIT` / `PROFESSIONAL_LIMIT` | 409 | Limite de 300 procedimentos ou 100 profissionais por clínica | Catálogo |
+| `PIPELINE_STALE` | 409 | O funil mudou desde a leitura (`version` do funil, enviada em toda escrita de etapa) | Funil |
+| `STAGE_NOT_FOUND` / `LOSS_REASON_NOT_FOUND` | 404 | Etapa ou motivo inexistente nesta clínica | Funil |
+| `STAGE_DUPLICATE` / `LOSS_REASON_DUPLICATE` | 409 | Nome repetido sem diferenciar maiúsculas (motivos: inclusive arquivados) | Funil |
+| `STAGE_LIMIT` / `LOSS_REASON_LIMIT` | 409 | Limite de 12 etapas abertas ou 50 motivos | Funil |
+| `STAGE_PROTECTED` | 409 | Venda fechada, Perdido e Novo não são arquivadas | Funil |
+| `STAGE_HAS_OPEN_LEADS` | 409 | Há lead aberto na etapa | Funil |
+| `STAGE_ORDER_MISMATCH` | 409 | A ordem não lista exatamente as etapas abertas ativas | Funil |
+| `LOSS_REASON_STALE` | 409 | O motivo mudou desde a leitura | Funil |
+| `LOSS_REASON_LAST_ACTIVE` | 409 | Ao menos um motivo fica ativo | Funil |
 | `SALE_NOT_FOUND` | 404 | Venda inexistente nesta clínica (mesma resposta para a de outra clínica) | Vendas |
 | `SALE_STALE` | 409 | A venda mudou desde a leitura (`version`) | Vendas |
 | `SALE_CANCELLED` | 409 | A venda está cancelada e não muda mais | Vendas |

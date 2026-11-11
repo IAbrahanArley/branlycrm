@@ -27,7 +27,7 @@ public final class ClinicDataErrorHandler {
     return switch (exception.reason()) {
       // Outage, pending migration or a registry incident: retryable for the client.
       case UNAVAILABLE, SCHEMA_OUTDATED, IDENTITY_MISMATCH -> ApiErrors.unavailable();
-      case CONFLICT, STALE ->
+      case CONFLICT, STALE, RULE_VIOLATION ->
           ApiErrors.response(
               409, ApiErrors.STATE_CONFLICT, "A operação conflita com o estado atual.");
       case INVALID_DATA ->

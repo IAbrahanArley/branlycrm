@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.Immutable;
 
-/** The clinic's funnel (tenant migration V5). Read only until the configuration API (CRM-036). */
+/** The clinic's funnel (tenant migration V5), read here; CRM-036 locks and versions it natively. */
 @Entity
 @Table(name = "pipelines")
 @Immutable
