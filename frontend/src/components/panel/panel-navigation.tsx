@@ -6,7 +6,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
   Activity, BriefcaseBusiness, Building2, ChevronDown, Columns3, LayoutDashboard, LogOut,
-  Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ShieldCheck, UserRound, Users, UsersRound, X,
+  Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ReceiptText, ShieldCheck, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,7 @@ function NavigationLinks({
   const agency = currentPath === "/agencia";
   const contacts = currentPath === "/app/contatos" || currentPath.startsWith("/app/contatos/");
   const funnel = currentPath === "/app/funil" || currentPath.startsWith("/app/funil/");
+  const sales = currentPath === "/app/vendas" || currentPath.startsWith("/app/vendas/");
   const team = currentPath === "/app/equipe";
   const active = "bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/18 hover:text-cyan-50";
   return (
@@ -100,6 +101,13 @@ function NavigationLinks({
             onNavigate={onNavigate} className={cn(item, team && active)}>
             <UsersRound className="size-[18px] shrink-0" aria-hidden="true" />
             <span className={label}>Equipe</span>
+          </Link>
+        )}
+        {canViewFunnel && (
+          <Link href="/app/vendas" aria-current={sales ? "page" : undefined} title={compact ? "Vendas" : undefined}
+            onNavigate={onNavigate} className={cn(item, sales && active)}>
+            <ReceiptText className="size-[18px] shrink-0" aria-hidden="true" />
+            <span className={label}>Vendas</span>
           </Link>
         )}
         {canSwitchClinic && (

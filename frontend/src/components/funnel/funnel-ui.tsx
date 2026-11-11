@@ -65,10 +65,10 @@ export function useFunnelResource<T>(load: (signal: AbortSignal) => Promise<T>) 
   return { result: loaded?.load === load && loaded.revision === revision ? loaded : undefined, reload };
 }
 
-export function useLeadMutation() {
+export function useLeadMutation(uncertainMessage = "Não foi possível confirmar a alteração. Atualize o funil e confira a situação antes de tentar novamente.") {
   const { clinic, subjectId, refresh } = useClinic();
   const [pending, setPending] = useState(false);
-  const [failure, setFailure] = useState<{ message: string; needsReload: boolean }>();
+  const [failure, setFailure] = useState<{ message: string; needsReload: boolean; fields: readonly string[] }>();
   const busy = useRef(false);
   const alive = useRef(false);
   useEffect(() => {
@@ -93,8 +93,9 @@ export function useLeadMutation() {
       } else {
         const uncertain = error.status === 0 || error.status >= 500 || (error.status >= 200 && error.status < 300);
         setFailure({
-          message: uncertain ? "Não foi possível confirmar a alteração. Atualize o funil e confira a situação antes de tentar novamente." : funnelErrorMessage(error.code, error.message),
+          message: uncertain ? uncertainMessage : funnelErrorMessage(error.code, error.message),
           needsReload: uncertain || error.status === 409 || error.status === 404,
+          fields: error.fields,
         });
       }
     } finally {
