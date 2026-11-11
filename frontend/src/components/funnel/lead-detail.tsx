@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { contactPath, getContact, isContactId } from "@/lib/api/contacts";
 import { getLead, getLossReasons, getPipeline, loseLead, moveLead } from "@/lib/api/leads";
 import { fieldClass, FunnelHeading, FunnelProblem, statusLabel, TemperatureBadge, useFunnelResource, useLeadMutation } from "./funnel-ui";
+import { LeadHistory } from "./lead-history";
 import { RegisterSaleDialog } from "./register-sale-dialog";
 
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
-function LeadDetail({ leadId }: { leadId: string }) {
+function LeadOverview({ leadId, onChanged }: { leadId: string; onChanged: () => void }) {
   const { clinic, subjectId } = useClinic();
   const [notice, setNotice] = useState("");
   const [recordLoss, setRecordLoss] = useState(false);
@@ -57,7 +58,7 @@ function LeadDetail({ leadId }: { leadId: string }) {
     const destination = destinations.find(({ id }) => id === stageId);
     if (!allowMove || !destination) return;
     setNotice("");
-    void mutation.run(() => moveLead(lead, destination.id), () => { setNotice(`Lead movido para ${destination.name}.`); reload(); });
+    void mutation.run(() => moveLead(lead, destination.id), () => { setNotice(`Lead movido para ${destination.name}.`); reload(); onChanged(); });
   }
 
   function submitLoss(event: FormEvent<HTMLFormElement>) {
@@ -70,6 +71,7 @@ function LeadDetail({ leadId }: { leadId: string }) {
       setRecordLoss(false);
       setNotice("Perda registrada.");
       reload();
+      onChanged();
     });
   }
 
@@ -83,7 +85,7 @@ function LeadDetail({ leadId }: { leadId: string }) {
       </FunnelHeading>
       {notice && <p role="status" className="rounded-lg border bg-white p-3 text-sm">{notice}</p>}
       {mutation.failure && !registeringSale && <PanelState kind="conflict" title="A alteração não foi confirmada" message={mutation.failure.message}
-        onRetry={() => { mutation.clearFailure(); setRecordLoss(false); reload(); }} />}
+        onRetry={() => { mutation.clearFailure(); setRecordLoss(false); reload(); onChanged(); }} />}
       <Card aria-labelledby="lead-summary">
         <CardHeader><CardTitle id="lead-summary">Resumo da oportunidade</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -137,24 +139,37 @@ function LeadDetail({ leadId }: { leadId: string }) {
       {allowOutcome && registeringSale && (
         <RegisterSaleDialog lead={lead} mutation={mutation}
           onClose={() => { setRegisteringSale(false); mutation.clearFailure(); }}
-          onReload={() => { setRegisteringSale(false); mutation.clearFailure(); reload(); }}
+          onReload={() => { setRegisteringSale(false); mutation.clearFailure(); reload(); onChanged(); }}
           onRegistered={() => {
             setRegisteringSale(false);
             setNotice("Venda registrada. O lead foi movido para Venda fechada.");
             reload();
+            onChanged();
           }} />
       )}
     </>
   );
 }
 
+function LeadDetail({ leadId }: { leadId: string }) {
+  const { clinic } = useClinic();
+  const [historyRevision, setHistoryRevision] = useState(0);
+  return (
+    <>
+      <LeadOverview leadId={leadId} onChanged={() => setHistoryRevision((revision) => revision + 1)} />
+      {clinic.permissions.LEAD_READ === "ALL" && <LeadHistory leadId={leadId} revision={historyRevision} />}
+    </>
+  );
+}
+
 export function LeadDetailPage({ leadId }: { leadId: string }) {
+  const { clinic, subjectId } = useClinic();
   return (
     <>
       <Link href="/app/funil" className="inline-flex min-h-11 items-center gap-2 rounded-sm text-sm font-semibold text-[#143e75] underline-offset-4 hover:underline focus-visible:outline-2">
         <ArrowLeft size={16} aria-hidden="true" />Voltar ao funil
       </Link>
-      {isContactId(leadId) ? <LeadDetail key={leadId} leadId={leadId} /> : <PanelState kind="empty" title="Lead não encontrado" />}
+      {isContactId(leadId) ? <LeadDetail key={`${clinic.tenantId}:${subjectId}:${leadId}`} leadId={leadId} /> : <PanelState kind="empty" title="Lead não encontrado" />}
     </>
   );
 }
