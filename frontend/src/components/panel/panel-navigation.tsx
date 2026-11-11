@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
-  Activity, BriefcaseBusiness, Building2, ChevronDown, ClipboardList, Columns3, LayoutDashboard, LogOut,
+  Activity, BriefcaseBusiness, Building2, ChartNoAxesColumn, ChevronDown, ClipboardList, Columns3, LayoutDashboard, LogOut,
   Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ReceiptText, ShieldCheck, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ type NavigationProps = {
   canViewContacts: boolean;
   canReadCommercial: boolean;
   canViewTeam: boolean;
+  canViewReport: boolean;
   currentPath: string;
   choosingClinic: boolean;
   signingOut: boolean;
@@ -44,7 +45,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function NavigationLinks({
-  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
+  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
 }: {
   compact?: boolean;
   ready: boolean;
@@ -53,6 +54,7 @@ function NavigationLinks({
   canViewContacts: boolean;
   canReadCommercial: boolean;
   canViewTeam: boolean;
+  canViewReport: boolean;
   currentPath: string;
   canSwitchClinic: boolean;
   choosingClinic: boolean;
@@ -70,6 +72,7 @@ function NavigationLinks({
   const catalog = currentPath === "/app/catalogo";
   const sales = currentPath === "/app/vendas" || currentPath.startsWith("/app/vendas/");
   const team = currentPath === "/app/equipe";
+  const reports = currentPath === "/app/relatorios";
   const active = "bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/18 hover:text-cyan-50";
   return (
     <nav aria-label="Navegação do painel" className="space-y-6">
@@ -116,6 +119,13 @@ function NavigationLinks({
             onNavigate={onNavigate} className={cn(item, sales && active)}>
             <ReceiptText className="size-[18px] shrink-0" aria-hidden="true" />
             <span className={label}>Vendas</span>
+          </Link>
+        )}
+        {canViewReport && (
+          <Link href="/app/relatorios" aria-current={reports ? "page" : undefined} title={compact ? "Relatórios" : undefined}
+            onNavigate={onNavigate} className={cn(item, reports && active)}>
+            <ChartNoAxesColumn className="size-[18px] shrink-0" aria-hidden="true" />
+            <span className={label}>Relatórios</span>
           </Link>
         )}
         {canSwitchClinic && (
@@ -183,7 +193,7 @@ function AccountMenu({ email, onSignOut }: { email: string; onSignOut: () => voi
 }
 
 export function PanelNavigation({
-  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
+  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
 }: NavigationProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -198,7 +208,7 @@ export function PanelNavigation({
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
-  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, currentPath, choosingClinic, onChooseClinic, onOverview };
+  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, currentPath, choosingClinic, onChooseClinic, onOverview };
 
   return (
     <div className="flex min-h-dvh bg-[#f3f6fa] text-[#10233b]">

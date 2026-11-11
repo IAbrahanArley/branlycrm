@@ -140,11 +140,13 @@ export function PanelShell({ children }: { children: ReactNode }) {
   const catalog = pathname === "/app/catalogo";
   const sales = pathname === "/app/vendas" || pathname.startsWith("/app/vendas/");
   const team = pathname === "/app/equipe";
+  const reports = pathname === "/app/relatorios";
   const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
   const canViewTeam = clinic?.permissions.TEAM_VIEW === "ALL";
   const canReadCommercial = clinic?.permissions.LEAD_READ === "ALL";
+  const canViewReport = clinic?.permissions.MONTHLY_REPORT_VIEW === "ALL";
   const commercial = funnel || catalog || sales;
-  const sectionName = team ? "a equipe" : funnel ? "o funil" : catalog ? "o catálogo" : sales ? "vendas" : "contatos";
+  const sectionName = team ? "a equipe" : funnel ? "o funil" : catalog ? "o catálogo" : sales ? "vendas" : reports ? "relatórios" : "contatos";
 
   useEffect(() => {
     if (redirectToAgency) router.replace("/agencia");
@@ -160,6 +162,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       canViewContacts={canViewContacts && !selecting}
       canViewTeam={canViewTeam && !selecting}
       canReadCommercial={canReadCommercial && !selecting}
+      canViewReport={canViewReport && !selecting}
       currentPath={pathname}
       choosingClinic={selecting}
       signingOut={signingOut}
@@ -218,30 +221,37 @@ export function PanelShell({ children }: { children: ReactNode }) {
                     />
                   </Card>
                 ) : overview ? (
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-5">
                     {check.clinic && (
                       <Card aria-labelledby="clinic-card-title">
-                        <CardHeader>
+                        <CardHeader className="flex items-center gap-3 space-y-0">
                           <span className="grid size-10 place-items-center rounded-lg bg-[#e9f0fd] text-[#244d8c]">
                             <Building2 size={19} aria-hidden="true" />
                           </span>
-                          <CardTitle id="clinic-card-title" className="pt-1">Clínica em uso</CardTitle>
-                          <CardDescription>{check.clinic.name}</CardDescription>
-                          <span className="inline-flex w-fit max-w-full rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 wrap-anywhere">{clinicRoleLabel(check.clinic.role)}</span>
+                          <div className="min-w-0 flex-1">
+                            <CardTitle id="clinic-card-title">Clínica em uso</CardTitle>
+                            <CardDescription className="wrap-anywhere">{check.clinic.name}</CardDescription>
+                          </div>
+                          <span className="hidden w-fit max-w-full rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 wrap-anywhere sm:inline-flex">{clinicRoleLabel(check.clinic.role)}</span>
                         </CardHeader>
                       </Card>
                     )}
-                    {children}
+                    {check.clinic?.permissions.RECEPTION_DASHBOARD_VIEW === "ALL" && (
+                      <ClinicContext.Provider key={`${check.clinic.tenantId}:${check.subjectId}`}
+                        value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
+                        {children}
+                      </ClinicContext.Provider>
+                    )}
                   </div>
                 ) : check.clinic && (
-                  ((!contacts || canViewContacts) && (!team || canViewTeam) && (!commercial || canReadCommercial)) ? (
-                    <ClinicContext.Provider key={check.clinic.tenantId} value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
+                  ((!contacts || canViewContacts) && (!team || canViewTeam) && (!commercial || canReadCommercial) && (!reports || canViewReport)) ? (
+                    <ClinicContext.Provider key={`${check.clinic.tenantId}:${check.subjectId}`} value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
                       {children}
                     </ClinicContext.Provider>
                   ) : <PanelState kind="forbidden" title={`Sem permissão para acessar ${sectionName}`} message="Confira as permissões do seu vínculo com esta clínica." />
                 )
               )}
-              {(contacts || team || commercial) && check.access.kind === "agency" && (
+              {(contacts || team || commercial || reports) && check.access.kind === "agency" && (
                 <PanelState kind="forbidden" title={`Selecione uma clínica para acessar ${sectionName}`} message="Sua conta não tem vínculo ativo com uma clínica." />
               )}
             </>
