@@ -3,10 +3,10 @@
 import { useCallback, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowRightLeft, ChevronLeft, ChevronRight, Columns3, GripVertical, List } from "lucide-react";
+import { ArrowRightLeft, ChevronLeft, ChevronRight, Columns3, GripVertical, List, Settings2 } from "lucide-react";
 import { useClinic } from "@/components/panel/clinic-context";
 import { PanelState } from "@/components/panel/panel-state";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getPipeline, listLeads, moveLead, temperatures, type LeadPage, type LeadStatus, type LeadSummary, type Stage, type Temperature } from "@/lib/api/leads";
 import { previewStageMove } from "@/lib/api/funnel-view";
@@ -173,11 +173,18 @@ export function FunnelWorkspace() {
   return (
     <>
       <FunnelHeading title="Funil de vendas" description="Acompanhe os leads da clínica e mova cada oportunidade conforme o atendimento avança.">
-        <div role="group" aria-label="Visualização do funil" className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-          <Button type="button" variant={view === "board" ? "secondary" : "ghost"} className="min-h-11 gap-2" aria-pressed={view === "board"} disabled={mutation.pending}
-            onClick={() => { setView("board"); changeFilters({ ...filters, stageId: "" }); }}><Columns3 size={16} aria-hidden="true" />Kanban</Button>
-          <Button type="button" variant={view === "list" ? "secondary" : "ghost"} className="min-h-11 gap-2" aria-pressed={view === "list"} disabled={mutation.pending}
-            onClick={() => { setView("list"); changeFilters({ ...filters, stageId: "" }); }}><List size={16} aria-hidden="true" />Lista</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {clinic.permissions.COMMERCIAL_SETTINGS_EDIT === "ALL" && (
+            <Link href="/app/funil/configuracao" className={buttonVariants({ variant: "outline", className: "min-h-11 gap-2" })}>
+              <Settings2 size={16} aria-hidden="true" />Configurar funil
+            </Link>
+          )}
+          <div role="group" aria-label="Visualização do funil" className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+            <Button type="button" variant={view === "board" ? "secondary" : "ghost"} className="min-h-11 gap-2" aria-pressed={view === "board"} disabled={mutation.pending}
+              onClick={() => { setView("board"); changeFilters({ ...filters, stageId: "" }); }}><Columns3 size={16} aria-hidden="true" />Kanban</Button>
+            <Button type="button" variant={view === "list" ? "secondary" : "ghost"} className="min-h-11 gap-2" aria-pressed={view === "list"} disabled={mutation.pending}
+              onClick={() => { setView("list"); changeFilters({ ...filters, stageId: "" }); }}><List size={16} aria-hidden="true" />Lista</Button>
+          </div>
         </div>
       </FunnelHeading>
       {pipeline.result?.error && <FunnelProblem error={pipeline.result.error} retry={refresh} />}

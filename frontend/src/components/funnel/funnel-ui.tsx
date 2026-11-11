@@ -39,7 +39,10 @@ export function FunnelProblem({ error, retry }: { error: ApiError; retry: () => 
     message={funnelErrorMessage(error.code, error.message)} onRetry={error.status === 404 || error.status === 403 ? undefined : retry} />;
 }
 
-export function useLeadMutation(uncertainMessage = "Não foi possível confirmar a alteração. Atualize o funil e confira a situação antes de tentar novamente.") {
+export function useLeadMutation(
+  uncertainMessage = "Não foi possível confirmar a alteração. Atualize o funil e confira a situação antes de tentar novamente.",
+  feedback?: (error: ApiError) => { message: string; needsReload: boolean },
+) {
   const { clinic, subjectId, refresh } = useClinic();
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<{ message: string; needsReload: boolean; fields: readonly string[] }>();
@@ -66,11 +69,11 @@ export function useLeadMutation(uncertainMessage = "Não foi possível confirmar
         refresh();
       } else {
         const uncertain = error.status === 0 || error.status >= 500 || (error.status >= 200 && error.status < 300);
-        setFailure({
-          message: uncertain ? uncertainMessage : funnelErrorMessage(error.code, error.message),
-          needsReload: uncertain || error.status === 409 || error.status === 404,
-          fields: error.fields,
-        });
+        const problem = uncertain ? { message: uncertainMessage, needsReload: true } : feedback?.(error) ?? {
+          message: funnelErrorMessage(error.code, error.message),
+          needsReload: error.status === 409 || error.status === 404,
+        };
+        setFailure({ ...problem, fields: error.fields });
       }
     } finally {
       busy.current = false;

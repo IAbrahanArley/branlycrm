@@ -13,23 +13,24 @@ export function clinicContextChanged(error: ApiError) {
   return ["CLINIC_NOT_SELECTED", "CLINIC_ACCESS_DENIED", "SESSION_CONTEXT_CHANGED"].includes(error.code);
 }
 
-export function useClinicResource<T>(load: (signal: AbortSignal) => Promise<T>) {
+export function useClinicResource<T>(load: (signal: AbortSignal) => Promise<T>, externalRevision = 0) {
   const { clinic, subjectId, refresh } = useClinic();
   const [revision, setRevision] = useState(0);
-  const [loaded, setLoaded] = useState<{ load: typeof load; revision: number; data?: T; error?: ApiError }>();
+  const [loaded, setLoaded] = useState<{ load: typeof load; revision: number; externalRevision: number; data?: T; error?: ApiError }>();
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
     const controller = new AbortController();
     void withSelectedClinic(clinic.tenantId, () => load(controller.signal), controller.signal, subjectId).then(
-      (data) => { if (!controller.signal.aborted) setLoaded({ load, revision, data }); },
+      (data) => { if (!controller.signal.aborted) setLoaded({ load, revision, externalRevision, data }); },
       (cause: unknown) => {
         if (controller.signal.aborted) return;
         const error = clinicApiError(cause);
         if (clinicContextChanged(error)) refresh();
-        else setLoaded({ load, revision, error });
+        else setLoaded({ load, revision, externalRevision, error });
       },
     );
     return () => controller.abort();
-  }, [clinic.tenantId, load, refresh, revision, subjectId]);
-  return { result: loaded?.load === load && loaded.revision === revision ? loaded : undefined, reload };
+  }, [clinic.tenantId, externalRevision, load, refresh, revision, subjectId]);
+  const current = loaded?.load === load && loaded.revision === revision && loaded.externalRevision === externalRevision;
+  return { result: current ? loaded : undefined, reload };
 }
