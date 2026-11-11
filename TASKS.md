@@ -853,7 +853,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 ## Fase 6 — Lista, dashboard e relatórios
 
-### [ ] CRM-050 — Definir métricas (P0)
+### [x] CRM-050 — Definir métricas (P0)
 **Depende de:** CRM-032, CRM-035, CRM-090.
 **Atende:** REL-01, REL-02.
 **Entregas:** especificação com fórmula e período de cada indicador:
@@ -865,11 +865,20 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - procedimentos mais vendidos;
 - contatos por origem.
 **Aceite:** exemplos numéricos revisados pelo responsável; valor de venda registrado nunca é chamado de receita recebida.
+**Estado (11/11/2026):** especificação aprovada pelo responsável em [docs/metricas.md](docs/metricas.md).
+- **Período por acontecimento**, no fuso da clínica.
+- **Conversão** = vendas fechadas ÷ (vendas fechadas + perdidos), pela data em que o lead foi encerrado.
+- **Frio revertido** = venda fechada de um lead que esteve frio em algum momento.
+- **Faturamento registrado** = vendas ativas pela data da venda.
+- **Leads por origem e por temperatura:** leads criados no mês, pelo valor atual.
+- **Procedimentos mais vendidos:** os 10 primeiros por quantidade.
+- **Dashboard:** leads de hoje, vendas de hoje e do mês, tarefas atrasadas e de hoje. As conversas entram com a CRM-083.
 
 ### [ ] CRM-051 — API do dashboard da recepção e do relatório mensal (P1)
 **Depende de:** CRM-050, CRM-083.
 **Atende:** REL-01, REL-02.
-**Entregas:** consultas agregadas por período no fuso da clínica.
+**Entregas:** consultas agregadas por período no fuso da clínica, conforme [docs/metricas.md](docs/metricas.md).
+**Plano (11/11/2026, aprovado):** implementar já o relatório mensal e os cards do dashboard que não dependem do WhatsApp; os cards de conversas entram com a CRM-083.
 **Aceite:** valores conferem com fixtures conhecidas; nenhuma agregação inclui outra clínica; permissões testadas.
 
 ### [ ] CRM-052 — Telas de dashboard e relatório (P1)
