@@ -79,5 +79,8 @@ Atualizado por consulta periódica na Fase 1; o tempo real é REL-03, da F2.
 
 ## Permissões
 
-- O dashboard e o relatório são visíveis a todos os papéis da clínica, inclusive Somente leitura. São só números agregados, sem nomes nem telefones.
+- Pelo catálogo de papéis (ADR-025, [permissoes.md](permissoes.md)):
+  - o **dashboard da recepção** é visto por todos os papéis;
+  - o **relatório mensal** é visto pelo Proprietário, pelo Gestor e pelo Somente leitura, e não pelo Atendente.
+- São só números agregados e nomes do catálogo (procedimentos e motivos), sem dados de contatos.
 - Os números são os mesmos para todos os papéis. Não existe filtro "só meus leads" no MVP.

@@ -874,11 +874,33 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Procedimentos mais vendidos:** os 10 primeiros por quantidade.
 - **Dashboard:** leads de hoje, vendas de hoje e do mês, tarefas atrasadas e de hoje. As conversas entram com a CRM-083.
 
-### [ ] CRM-051 — API do dashboard da recepção e do relatório mensal (P1)
+### [-] CRM-051 — API do dashboard da recepção e do relatório mensal (P1)
 **Depende de:** CRM-050, CRM-083.
 **Atende:** REL-01, REL-02.
 **Entregas:** consultas agregadas por período no fuso da clínica, conforme [docs/metricas.md](docs/metricas.md).
 **Plano (11/11/2026, aprovado):** implementar já o relatório mensal e os cards do dashboard que não dependem do WhatsApp; os cards de conversas entram com a CRM-083.
+**Estado (11/11/2026):** concluída na branch `feat/crm-051-relatorios`, exceto os cards de conversas (CRM-083), por isso `[-]`.
+- **Módulo `report`**, só leitura, com SQL nativo numa transação por leitura; migração de clínica V13 só com índices.
+- **Rotas:**
+  - `GET /v1/clinic/reports/monthly?month=yyyy-MM` (`MONTHLY_REPORT_VIEW`: Proprietário, Gestor e Somente leitura); por padrão o mês corrente no fuso da clínica; mês futuro ou anterior a 2000 dá 400;
+  - `GET /v1/clinic/dashboard` (`RECEPTION_DASHBOARD_VIEW`: todos): leads de hoje, vendas de hoje e do mês, tarefas atrasadas e de hoje.
+- **Testes:** `ReportApiIT` monta pela API um cenário com valores conhecidos e confere cada número de `docs/metricas.md`:
+  - venda cancelada fora de tudo;
+  - venda retroativa no faturamento do mês anterior;
+  - frio revertido;
+  - motivo arquivado que continua no relatório;
+  - outra clínica isolada;
+  - Atendente 403 no relatório e 200 no dashboard;
+  - mês inválido.
+- **Correção:** a seção de permissões de `docs/metricas.md` dizia que todos os papéis veem o relatório; agora segue a ADR-025.
+- **Revisão (`reviewer`):** sem críticos nem altos; as fórmulas conferem com `docs/metricas.md`. Corrigidos:
+  - o teste recalcula a meia-noite depois de esperar a virada do dia;
+  - consultas escalares tipadas;
+  - a permissão é checada antes de validar o mês;
+  - nota de lock e rollback na V13.
+- **Pendente:**
+  - cards de conversas (CRM-083);
+  - telas (CRM-052, Codex).
 **Aceite:** valores conferem com fixtures conhecidas; nenhuma agregação inclui outra clínica; permissões testadas.
 
 ### [ ] CRM-052 — Telas de dashboard e relatório (P1)

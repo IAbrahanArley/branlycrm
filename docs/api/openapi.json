@@ -330,6 +330,18 @@
         },
         "type" : "object"
       },
+      "CountView" : {
+        "properties" : {
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "key" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "CsrfToken" : {
         "properties" : {
           "headerName" : {
@@ -371,6 +383,46 @@
           },
           "tenantId" : {
             "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DashboardView" : {
+        "properties" : {
+          "leadsToday" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesMonthCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesMonthCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesTodayCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesTodayCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "tasksOverdue" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "tasksToday" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "timeZone" : {
+            "type" : "string"
+          },
+          "today" : {
+            "format" : "date",
             "type" : "string"
           }
         },
@@ -713,6 +765,69 @@
         },
         "type" : "object"
       },
+      "MonthlyReportView" : {
+        "properties" : {
+          "coldReverted" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contactsCreated" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "conversionPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "leadsByOrigin" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CountView"
+            },
+            "type" : "array"
+          },
+          "leadsByTemperature" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CountView"
+            },
+            "type" : "array"
+          },
+          "lost" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lostByReason" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReasonCountView"
+            },
+            "type" : "array"
+          },
+          "month" : {
+            "type" : "string"
+          },
+          "revenueCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesClosed" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "timeZone" : {
+            "type" : "string"
+          },
+          "topProcedures" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProcedureRankView"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "NoteRequest" : {
         "properties" : {
           "body" : {
@@ -1014,6 +1129,26 @@
         },
         "type" : "object"
       },
+      "ProcedureRankView" : {
+        "properties" : {
+          "amountCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ProcedureRequest" : {
         "properties" : {
           "category" : {
@@ -1094,6 +1229,22 @@
           "version" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ReasonCountView" : {
+        "properties" : {
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -4097,6 +4248,68 @@
         "tags" : [ "Contacts" ]
       }
     },
+    "/v1/clinic/dashboard" : {
+      "get" : {
+        "operationId" : "getDashboard",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DashboardView"
+                }
+              }
+            },
+            "description" : "Dashboard"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Reception dashboard for today (all roles)",
+        "tags" : [ "Reports" ]
+      }
+    },
     "/v1/clinic/leads" : {
       "get" : {
         "operationId" : "listLeads",
@@ -6722,6 +6935,86 @@
         "tags" : [ "Professionals" ]
       }
     },
+    "/v1/clinic/reports/monthly" : {
+      "get" : {
+        "operationId" : "getMonthlyReport",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MonthlyReportView"
+                }
+              }
+            },
+            "description" : "Report"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: month (format, future, < 2000)"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Monthly report (OWNER, MANAGER, VIEWER); month=yyyy-MM, default current month",
+        "tags" : [ "Reports" ]
+      }
+    },
     "/v1/clinic/sales" : {
       "get" : {
         "operationId" : "listSales",
@@ -9016,6 +9309,9 @@
   "tags" : [ {
     "description" : "TOTP enrollment, verification and recovery codes",
     "name" : "Second factor"
+  }, {
+    "description" : "Monthly report and reception dashboard",
+    "name" : "Reports"
   }, {
     "description" : "Contacts, their tags and consent in the selected clinic",
     "name" : "Contacts"
