@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ClipboardList, Plus, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { ClipboardList, Plus, Settings2, UsersRound } from "lucide-react";
 import { useClinic } from "@/components/panel/clinic-context";
 import { useClinicResource } from "@/components/panel/clinic-resource";
 import { PanelState } from "@/components/panel/panel-state";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isProcedure, listCatalog, type CatalogKind } from "@/lib/api/catalog";
 import { formatCatalogPrice } from "@/lib/catalog-input";
@@ -43,9 +44,14 @@ export function CatalogWorkspace() {
 
   return (
     <>
-      <header className="space-y-2">
-        <h1 className="font-[family-name:var(--font-branly)] text-3xl font-extrabold tracking-tight sm:text-4xl">Catálogo da clínica</h1>
-        <p className="text-sm text-slate-600">Consulte os procedimentos e profissionais disponíveis para as vendas da clínica.</p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-2">
+          <h1 className="font-[family-name:var(--font-branly)] text-3xl font-extrabold tracking-tight sm:text-4xl">Catálogo da clínica</h1>
+          <p className="text-sm text-slate-600">Consulte os procedimentos e profissionais disponíveis para as vendas da clínica.</p>
+        </div>
+        {canEdit && <Link href="/app/funil/configuracao" className={buttonVariants({ variant: "outline", className: "min-h-11 gap-2" })}>
+          <Settings2 aria-hidden="true" />Configurar funil
+        </Link>}
       </header>
       <div role="group" aria-label="Seções do catálogo" className="flex w-fit flex-wrap gap-1 rounded-lg border border-slate-200 bg-white p-1">
         {options.map(({ kind, label, icon: Icon }) => (
