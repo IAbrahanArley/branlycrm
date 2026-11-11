@@ -29,6 +29,10 @@ export function ContactLink({ href, children, primary = false }: { href: string;
   return <Link href={href} className={buttonVariants({ variant: primary ? "default" : "outline", className: "min-h-11 gap-2 motion-reduce:transition-none" })}>{children}</Link>;
 }
 
+export function PatientBadge() {
+  return <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">Paciente</span>;
+}
+
 export function ContactProblem({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
   if (error.status === 404) return <PanelState kind="error" title="Contato não encontrado" message="Volte à lista e confira se ele está disponível nesta clínica." />;
   if (error.status === 403) return <PanelState kind="forbidden" title="Permissão negada" message={error.message} />;

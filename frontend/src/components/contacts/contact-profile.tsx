@@ -12,7 +12,7 @@ import {
 } from "@/lib/api/contacts";
 import {
   asContactError, clinicNeedsRefresh, ContactHeading, ContactLink, ContactProblem, contactInput,
-  mutationResultUncertain, useContactResource,
+  mutationResultUncertain, PatientBadge, useContactResource,
 } from "./contact-ui";
 
 const channels = { WHATSAPP: "WhatsApp", EMAIL: "E-mail" } as const;
@@ -187,6 +187,7 @@ function ProfileDetails({ contact, consents, onRefresh }: {
     <>
       <ContactHeading title={contact.name} description={archived ? "Contato arquivado" : "Contato ativo"} back
         action={canWrite && !archived && <ContactLink href={`${contactPath(contact.id)}/editar`}><Pencil size={16} aria-hidden="true" />Editar contato</ContactLink>} />
+      {contact.patient && <PatientBadge />}
       {pending && <p role="status" className="text-sm text-slate-600">Salvando alteração…</p>}
       {failure && (
         <div className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900">
