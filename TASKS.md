@@ -437,10 +437,11 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
     - renomear tag não tem versão (a última escrita vence);
     - vincular tag e arquivar ao mesmo tempo pode deixar uma tag num contato arquivado (só estética).
 
-### [ ] CRM-022 — Telas de contatos e perfil (P1)
+### [x] CRM-022 — Telas de contatos e perfil (P1)
 **Depende de:** CRM-021.
 **Entregas:** lista, busca, filtros, cadastro, edição, perfil com histórico e consentimento, e estados vazio, erro e carregamento.
 **Aceite:** atendente conclui cadastro e encontra contato no celular e no desktop; acessível por teclado.
+**Estado (11/11/2026):** entregue pelo Codex (`feat(frontend): add clinic contacts and profiles`, na `main`): `/app/contatos`, com perfil, cadastro e edição.
 
 ### [ ] CRM-023 — Linha do tempo do contato e do lead (P1)
 **Depende de:** CRM-021, CRM-032.
@@ -562,11 +563,12 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - publicação dos eventos para notificações, na CRM-093 (ainda não há quem os consuma);
   - a busca junta a entidade de contatos pelo nome na HQL: renomear campos de `ContactEntity` quebra só em tempo de execução, o que o `LeadApiIT` cobre.
 
-### [ ] CRM-033 — Kanban e lista do funil (P1)
+### [x] CRM-033 — Kanban e lista do funil (P1)
 **Depende de:** CRM-032, CRM-022.
 **Atende:** CRM-02, ORI-04.
 **Entregas:** colunas, cartões com selo de origem e temperatura, arrastar, visão em lista, filtros e detalhe do lead.
 **Aceite:** movimento persiste; falha do servidor desfaz o cartão com mensagem clara; funciona no celular.
+**Estado (11/11/2026):** entregue pelo Codex (`feat(frontend): add sales funnel board and lead detail`, na `main`): `/app/funil` e o detalhe do lead. O selo de origem segue com a CRM-092, que traz os filtros por origem.
 
 ### [x] CRM-034 — Catálogo de procedimentos e profissionais (P1)
 **Depende de:** CRM-015.
@@ -583,7 +585,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Mudança global:** o teste revelou que o Jackson truncava `1.5` para `1` em campos inteiros (centavos e `version` em toda a API). Agora `spring.jackson.deserialization.accept-float-as-int=false`, e esse valor responde 400.
 - **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos: mensagem do limite (inativar não libera vaga), teste dos grants, número fracionário e javadocs.
 - **Para a CRM-035:** a venda referencia o id e recusa item inativo em venda nova; o histórico continua lendo os inativos.
-- **Pendente:** tela de configuração do catálogo (frontend, junto com a CRM-036).
+- **Tela:** entregue pelo Codex em `/app/catalogo` (na `main`).
 
 ### [x] CRM-035 — Registro de vendas (P1)
 **Depende de:** CRM-032, CRM-034.
@@ -627,7 +629,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - CHECK da forma de pagamento nos eventos;
   - lacunas de teste e javadoc.
 - **Pendente:**
-  - tela rápida de registro (Codex);
+  - ~~tela rápida de registro~~: entregue pelo Codex (registro no detalhe do lead e gestão em `/app/vendas`, na `main`);
   - uso das vendas ativas no dashboard e no relatório (CRM-051).
 
 ### [-] CRM-036 — Configuração do funil e dos motivos de perda (P1)
@@ -671,7 +673,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - posição no fim calculada pelo máximo;
   - 404 documentado na OpenAPI.
 - **Implantação:** rodar o `tenant-migrate` (V11) antes da API nova. Sem a V11, o movimento de lead trava a etapa sem permissão e responde 503.
-- **Pendente:** tela de configuração do funil, dos motivos e do catálogo (Codex).
+- **Pendente:** tela de configuração do funil e dos motivos de perda (Codex; brief de 11/11/2026). O catálogo já foi entregue.
 
 ## Fase 4 — WhatsApp e caixa de entrada
 
@@ -777,7 +779,9 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - versão desatualizada, Somente leitura 403 e isolamento A/B;
   - grants da V10.
 - **Revisão (`reviewer`):** sem críticos, altos nem médios. Os baixos ficaram registrados na ADR-035 (evento com o mesmo tipo dos dois lados quando só o código ou o título muda; acesso próprio do worker na CRM-091).
-- **Pendente:** selo e filtros por origem (CRM-092).
+- **Pendente:**
+  - selo e filtros por origem (CRM-092);
+  - tela da origem no detalhe do lead, com correção e histórico de chegadas (Codex; brief de 11/11/2026).
 
 ### [ ] CRM-091 — Detecção automática da origem (P0)
 **Depende de:** CRM-082, CRM-090.
