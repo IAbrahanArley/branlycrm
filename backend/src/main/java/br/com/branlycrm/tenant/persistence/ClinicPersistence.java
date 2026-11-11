@@ -50,6 +50,9 @@ public class ClinicPersistence implements AutoCloseable {
   private static final String UNDEFINED_COLUMN = "42703";
   private static final String UNIQUE_VIOLATION = "23505";
 
+  /** SQLState class of the clinic migrations' own rule triggers (BRL03: lead stage). */
+  private static final String RULE_CLASS = "BRL";
+
   /**
    * Only a nesting flag per thread; it never carries a tenant, which is always passed explicitly.
    */
@@ -198,7 +201,8 @@ public class ClinicPersistence implements AutoCloseable {
     if (error.reason() == ClinicDataException.Reason.IDENTITY_MISMATCH) {
       LOG.error("SECURITY clinic database identity mismatch tenant={}", tenant.tenantId());
     } else if (error.reason() == ClinicDataException.Reason.CONFLICT
-        || error.reason() == ClinicDataException.Reason.STALE) {
+        || error.reason() == ClinicDataException.Reason.STALE
+        || error.reason() == ClinicDataException.Reason.RULE_VIOLATION) {
       // Expected business outcomes (duplicate, concurrent edit): no alarm.
       LOG.debug("Clinic data {} tenant={}", error.getMessage(), tenant.tenantId());
     } else {
@@ -231,6 +235,9 @@ public class ClinicPersistence implements AutoCloseable {
     // on the server's message language).
     if (UNIQUE_VIOLATION.equals(state)) {
       return new ClinicDataException(ClinicDataException.Reason.CONFLICT, error);
+    }
+    if (state != null && state.startsWith(RULE_CLASS)) {
+      return new ClinicDataException(ClinicDataException.Reason.RULE_VIOLATION, error);
     }
     if (error instanceof OptimisticLockException || error instanceof StaleStateException) {
       return new ClinicDataException(ClinicDataException.Reason.STALE, error);

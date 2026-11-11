@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.Immutable;
 
-/** A stage of the funnel (tenant migration V5). Read only until CRM-036. */
+/** A stage of the funnel (tenant migration V5), read here; CRM-036 writes it natively. */
 @Entity
 @Table(name = "pipeline_stages")
 @Immutable

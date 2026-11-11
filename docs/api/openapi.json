@@ -124,6 +124,30 @@
         },
         "type" : "object"
       },
+      "ConfigArchiveRequest" : {
+        "properties" : {
+          "archived" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ConfigNameRequest" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ConsentRecordView" : {
         "properties" : {
           "channel" : {
@@ -621,6 +645,10 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -915,6 +943,12 @@
       },
       "PipelineView" : {
         "properties" : {
+          "archivedStages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StageView"
+            },
+            "type" : "array"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
@@ -1223,6 +1257,21 @@
         "properties" : {
           "stageId" : {
             "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "StageOrderRequest" : {
+        "properties" : {
+          "stageIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "version" : {
             "format" : "int64",
@@ -5127,6 +5176,294 @@
         } ],
         "summary" : "Loss reasons of the clinic ordered by name (all roles)",
         "tags" : [ "Pipeline" ]
+      },
+      "post" : {
+        "operationId" : "createLossReason",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigNameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LossReasonView"
+                }
+              }
+            },
+            "description" : "Loss reason"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LOSS_REASON_LIMIT (50), LOSS_REASON_DUPLICATE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Add a loss reason",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/loss-reasons/{reasonId}" : {
+      "put" : {
+        "operationId" : "renameLossReason",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reasonId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigNameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LossReasonView"
+                }
+              }
+            },
+            "description" : "Loss reason"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LOSS_REASON_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LOSS_REASON_STALE, LOSS_REASON_DUPLICATE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Rename a loss reason",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/loss-reasons/{reasonId}/archived" : {
+      "put" : {
+        "operationId" : "setLossReasonArchived",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reasonId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigArchiveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LossReasonView"
+                }
+              }
+            },
+            "description" : "Loss reason"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LOSS_REASON_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "LOSS_REASON_LAST_ACTIVE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Archive or unarchive a loss reason; one always stays active",
+        "tags" : [ "Pipeline" ]
       }
     },
     "/v1/clinic/pipeline" : {
@@ -5199,6 +5536,380 @@
           "session" : [ ]
         } ],
         "summary" : "The clinic's sales funnel with its active stages in display order (all roles)",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/pipeline/stages" : {
+      "post" : {
+        "operationId" : "createStage",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigNameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description" : "The funnel"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "PIPELINE_STALE, STAGE_LIMIT (12 open), STAGE_DUPLICATE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Add an open stage at the end",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/pipeline/stages/order" : {
+      "put" : {
+        "operationId" : "reorderStages",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StageOrderRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description" : "The funnel"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "PIPELINE_STALE, STAGE_ORDER_MISMATCH"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Reorder the open stages: every active open stage id, in the new order",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/pipeline/stages/{stageId}" : {
+      "put" : {
+        "operationId" : "renameStage",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "stageId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigNameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description" : "The funnel"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "STAGE_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "PIPELINE_STALE, STAGE_DUPLICATE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Rename an active stage, won and lost included",
+        "tags" : [ "Pipeline" ]
+      }
+    },
+    "/v1/clinic/pipeline/stages/{stageId}/archived" : {
+      "put" : {
+        "operationId" : "setStageArchived",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "stageId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigArchiveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PipelineView"
+                }
+              }
+            },
+            "description" : "The funnel"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "STAGE_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "PIPELINE_STALE, STAGE_PROTECTED, STAGE_HAS_OPEN_LEADS, STAGE_LIMIT, STAGE_DUPLICATE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrf" : [ ]
+        }, {
+          "session" : [ ]
+        } ],
+        "summary" : "Archive an open stage without open leads, or unarchive it at the end",
         "tags" : [ "Pipeline" ]
       }
     },

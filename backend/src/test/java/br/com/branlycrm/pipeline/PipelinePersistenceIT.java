@@ -297,8 +297,10 @@ class PipelinePersistenceIT {
   }
 
   @Test
-  void runtimeOnlyReadsTheFunnel() throws Exception {
+  void runtimeConfiguresTheFunnelOnlyWithinItsGrants() throws Exception {
     Clinic a = provision();
+    // V11 (CRM-036): names, positions, archiving and versions; never kind, key, funnel nor
+    // creation authorship, never deletes, and only one funnel.
     try (Connection runtime = runtime(a.database())) {
       for (String forbidden :
           List.of(
@@ -306,13 +308,15 @@ class PipelinePersistenceIT {
                   + " VALUES (gen_random_uuid(), 'Outro funil', now(), now())",
               "DELETE FROM pipelines",
               "UPDATE pipelines SET name = 'X'",
-              "UPDATE pipeline_stages SET name = 'X'",
+              "UPDATE pipeline_stages SET kind = 'OPEN'",
+              "UPDATE pipeline_stages SET system_key = NULL",
+              "UPDATE pipeline_stages SET pipeline_id = gen_random_uuid()",
+              "UPDATE pipeline_stages SET created_by = gen_random_uuid()",
               "DELETE FROM pipeline_stages",
-              "UPDATE loss_reasons SET name = 'X'",
+              "UPDATE loss_reasons SET seeded = false",
+              "UPDATE loss_reasons SET created_by = gen_random_uuid()",
               "DELETE FROM loss_reasons",
-              "TRUNCATE loss_reasons",
-              "INSERT INTO loss_reasons (id, name, created_at, updated_at)"
-                  + " VALUES (gen_random_uuid(), 'Novo motivo', now(), now())")) {
+              "TRUNCATE loss_reasons")) {
         assertThatThrownBy(() -> runtime.createStatement().execute(forbidden))
             .as(forbidden)
             .isInstanceOf(SQLException.class)
@@ -320,7 +324,6 @@ class PipelinePersistenceIT {
             .isEqualTo("42501");
       }
     }
-    // Inventory, not just samples: the runtime holds SELECT and nothing else on the funnel.
     String role = a.database().databaseUser();
     for (String table : List.of("pipelines", "pipeline_stages", "loss_reasons")) {
       try (Connection owner = asOwner(a);
@@ -336,16 +339,10 @@ class PipelinePersistenceIT {
                           + role
                           + "', '"
                           + table
-                          + "', 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),"
-                          + " has_any_column_privilege('"
-                          + role
-                          + "', '"
-                          + table
-                          + "', 'INSERT,UPDATE,REFERENCES')")) {
+                          + "', 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')")) {
         rows.next();
         assertThat(rows.getBoolean(1)).as(table + " SELECT").isTrue();
-        assertThat(rows.getBoolean(2)).as(table + " table writes").isFalse();
-        assertThat(rows.getBoolean(3)).as(table + " column writes").isFalse();
+        assertThat(rows.getBoolean(2)).as(table + " table-wide writes").isFalse();
       }
     }
   }

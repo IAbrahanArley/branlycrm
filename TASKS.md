@@ -630,7 +630,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - tela rápida de registro (Codex);
   - uso das vendas ativas no dashboard e no relatório (CRM-051).
 
-### [ ] CRM-036 — Configuração do funil e dos motivos de perda (P1)
+### [-] CRM-036 — Configuração do funil e dos motivos de perda (P1)
 **Depende de:** CRM-031, CRM-030.
 **Atende:** CRM-01, CRM-06 (ADR-033).
 **Entregas:**
@@ -644,6 +644,34 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - Pelo menos um motivo ativo sempre; limites de 12 etapas abertas e 50 motivos.
 - Autores validados contra participação ativa; a CRM-036 sempre grava o autor.
 - Matriz de permissões (Atendente e Somente leitura recebem 403) e A/B nas mutações.
+**Estado (10/11/2026):** API concluída na branch `feat/crm-036-config-funil`, no modo MVP; falta a tela (Codex), por isso `[-]`.
+- **Migração de clínica V11:** só grants, conforme as entregas acima.
+- **Rotas** (`COMMERCIAL_SETTINGS_EDIT`):
+  - `POST /v1/clinic/pipeline/stages`, `PUT /stages/{id}` (nome), `PUT /stages/order` e `PUT /stages/{id}/archived`, sempre com a `version` do funil e respondendo o funil inteiro;
+  - `POST /v1/clinic/loss-reasons`, `PUT /{id}` (nome, com a `version` do motivo) e `PUT /{id}/archived`.
+- **Contrato:** `GET /v1/clinic/pipeline` ganha `archivedStages`; o motivo ganha `version` (aditivo).
+- **Concorrência:**
+  - toda escrita de etapa trava o funil;
+  - o movimento de lead trava a etapa em modo compartilhado e o arquivamento em modo exclusivo, então nunca sobra lead aberto em etapa arquivada;
+  - o arquivamento de motivos trava os ativos antes de contar.
+- **`BRL03`:** a recusa do trigger vira `RULE_VIOLATION` e, no movimento de lead, 409 `LEAD_STAGE_NOT_ALLOWED`.
+- **Testes:** `PipelineConfigIT`:
+  - criação, duplicado, versão desatualizada, renomeação da ganha;
+  - reordenação incompleta e completa, e duas reordenações simultâneas;
+  - etapas protegidas, etapa com lead, renumeração, desarquivamento no fim;
+  - corrida entre arquivar e mover lead;
+  - motivos (duplicado, versão desatualizada, último ativo);
+  - 403 para Atendente e Somente leitura, e A/B.
+  `PipelinePersistenceIT` passou a conferir os grants da V11.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos:
+  - renomeação concorrente de motivo (a versão agora é comparada no próprio `UPDATE`);
+  - perda que trava o motivo em modo compartilhado;
+  - limite de motivos e arquivamento com travas em ordem fixa;
+  - arquivar sem mudança não altera a versão do funil;
+  - posição no fim calculada pelo máximo;
+  - 404 documentado na OpenAPI.
+- **Implantação:** rodar o `tenant-migrate` (V11) antes da API nova. Sem a V11, o movimento de lead trava a etapa sem permissão e responde 503.
+- **Pendente:** tela de configuração do funil, dos motivos e do catálogo (Codex).
 
 ## Fase 4 — WhatsApp e caixa de entrada
 

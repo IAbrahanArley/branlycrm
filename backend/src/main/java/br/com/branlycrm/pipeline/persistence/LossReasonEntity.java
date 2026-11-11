@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.Immutable;
 
-/** A loss reason (tenant migration V5). Read only until CRM-036. */
+/** A loss reason (tenant migration V5), read here; CRM-036 writes it with native statements. */
 @Entity
 @Table(name = "loss_reasons")
 @Immutable
@@ -48,6 +48,6 @@ public class LossReasonEntity {
   protected LossReasonEntity() {}
 
   public LossReason toDomain() {
-    return new LossReason(id, name, archivedAt != null);
+    return new LossReason(id, name, archivedAt != null, version);
   }
 }

@@ -356,7 +356,10 @@ public class LeadRepository {
           boolean active =
               !session
                   .createNativeQuery(
-                      "SELECT id FROM loss_reasons WHERE id = :id AND archived_at IS NULL",
+                      // Share-locked: an archive of the reason waits, or this loss sees it
+                      // archived.
+                      "SELECT id FROM loss_reasons WHERE id = :id AND archived_at IS NULL"
+                          + " FOR SHARE",
                       UUID.class)
                   .setParameter("id", lossReasonId)
                   .getResultList()
@@ -498,6 +501,10 @@ public class LeadRepository {
       if (failure.reason() == ClinicDataException.Reason.STALE) {
         throw new LeadException(LeadException.Reason.STALE);
       }
+      // The stage trigger (BRL03) refused the stage: archived or of the wrong kind.
+      if (failure.reason() == ClinicDataException.Reason.RULE_VIOLATION) {
+        throw new LeadException(LeadException.Reason.STAGE_NOT_ALLOWED);
+      }
       throw failure;
     }
   }
@@ -520,8 +527,9 @@ public class LeadRepository {
     if (stageId == null) return null;
     return session
         .createNativeQuery(
+            // Share-locked: archiving the stage (CRM-036) waits, or this move sees it archived.
             "SELECT kind, archived_at IS NOT NULL FROM pipeline_stages"
-                + " WHERE id = :id AND pipeline_id = :pipeline",
+                + " WHERE id = :id AND pipeline_id = :pipeline FOR SHARE",
             Object[].class)
         .setParameter("id", stageId)
         .setParameter("pipeline", pipelineId)
