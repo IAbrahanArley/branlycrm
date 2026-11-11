@@ -7,5 +7,7 @@ public enum LeadEventType {
   TEMPERATURE_CHANGED,
   RESPONSIBLE_CHANGED,
   WON,
-  LOST
+  LOST,
+  /** Manual correction of the origin; from and to are origin types (CRM-090). */
+  ORIGIN_CHANGED
 }

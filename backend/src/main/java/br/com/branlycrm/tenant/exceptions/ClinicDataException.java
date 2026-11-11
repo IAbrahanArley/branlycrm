@@ -19,6 +19,8 @@ public final class ClinicDataException extends RuntimeException {
     CONFLICT,
     /** The row changed since it was read (optimistic version check). */
     STALE,
+    /** A business rule kept by the database (a trigger, SQLState class BRL) refused the write. */
+    RULE_VIOLATION,
     /** Connection, lock, timeout or any other database failure. */
     UNAVAILABLE
   }

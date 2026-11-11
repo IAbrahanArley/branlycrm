@@ -9,6 +9,7 @@ export type ContactSummary = {
   email: string | null;
   createdVia: string;
   archivedAt: string | null;
+  patient: boolean;
 };
 export type Tag = { id: string; name: string };
 export type ConsentChannel = "WHATSAPP" | "EMAIL";

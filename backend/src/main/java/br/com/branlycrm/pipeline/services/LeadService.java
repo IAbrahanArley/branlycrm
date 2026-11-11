@@ -1,9 +1,12 @@
 package br.com.branlycrm.pipeline.services;
 
 import br.com.branlycrm.pipeline.domain.Lead;
+import br.com.branlycrm.pipeline.domain.LeadOrigin;
 import br.com.branlycrm.pipeline.domain.Temperature;
 import br.com.branlycrm.pipeline.dto.response.LeadEventView;
+import br.com.branlycrm.pipeline.dto.response.LeadOriginView;
 import br.com.branlycrm.pipeline.dto.response.LeadView;
+import br.com.branlycrm.pipeline.dto.response.OriginTouchView;
 import br.com.branlycrm.pipeline.exceptions.LeadException;
 import br.com.branlycrm.pipeline.repositories.LeadRepository;
 import br.com.branlycrm.tenant.domain.AccessScope;
@@ -41,6 +44,44 @@ public class LeadService {
     ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.LEAD_WRITE);
     if (responsibleId != null) requireAssignable(tenantId, clinic, null, responsibleId);
     return view(leads.open(clinic, contactId, temperature, responsibleId));
+  }
+
+  /** Opens with an origin chosen by a person (MANUAL); LEAD_WRITE and LEAD_ORIGIN_EDIT. */
+  public LeadView open(
+      UUID tenantId,
+      UUID actor,
+      UUID contactId,
+      Temperature temperature,
+      UUID responsibleId,
+      LeadOrigin origin) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.LEAD_WRITE);
+    if (!clinic.allows(ClinicPermission.LEAD_ORIGIN_EDIT)) throw new TenantAccessException();
+    if (responsibleId != null) requireAssignable(tenantId, clinic, null, responsibleId);
+    return view(leads.open(clinic, contactId, temperature, responsibleId, origin));
+  }
+
+  /** Manual correction of the origin, open or closed lead (LEAD_ORIGIN_EDIT). */
+  public LeadView correctOrigin(
+      UUID tenantId, UUID actor, UUID leadId, long version, LeadOrigin manual) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.LEAD_ORIGIN_EDIT);
+    return view(leads.correctOrigin(clinic, leadId, version, manual));
+  }
+
+  /** The contact's later arrivals with their origin, newest first. */
+  public List<OriginTouchView> touches(UUID tenantId, UUID actor, UUID contactId) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.LEAD_READ);
+    return leads.touches(clinic, contactId).stream()
+        .map(
+            touch ->
+                new OriginTouchView(
+                    touch.id(), touch.leadId(), origin(touch.origin()), touch.receivedAt()))
+        .toList();
+  }
+
+  /** The click id is never returned (data minimization). */
+  static LeadOriginView origin(LeadOrigin origin) {
+    return new LeadOriginView(
+        origin.type().name(), origin.source().name(), origin.adId(), origin.code(), origin.title());
   }
 
   public LeadView get(UUID tenantId, UUID actor, UUID leadId) {
@@ -131,6 +172,7 @@ public class LeadService {
         lead.lossReasonId(),
         lead.openedAt(),
         lead.closedAt(),
-        lead.version());
+        lead.version(),
+        origin(lead.origin()));
   }
 }

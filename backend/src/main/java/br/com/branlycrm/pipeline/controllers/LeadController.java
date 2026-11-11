@@ -6,6 +6,7 @@ import br.com.branlycrm.identity.security.SelectedClinic;
 import br.com.branlycrm.pipeline.dto.request.LossRequest;
 import br.com.branlycrm.pipeline.dto.request.NoteRequest;
 import br.com.branlycrm.pipeline.dto.request.OpenLeadRequest;
+import br.com.branlycrm.pipeline.dto.request.OriginRequest;
 import br.com.branlycrm.pipeline.dto.request.ResponsibleChangeRequest;
 import br.com.branlycrm.pipeline.dto.request.StageChangeRequest;
 import br.com.branlycrm.pipeline.dto.request.TemperatureChangeRequest;
@@ -170,6 +171,23 @@ public final class LeadController {
       @AuthenticationPrincipal CrmPrincipal principal,
       HttpSession session) {
     return requests.lose(SelectedClinic.require(session), principal.subjectId(), leadId, request);
+  }
+
+  @Operation(
+      operationId = "correctLeadOrigin",
+      summary = "Correct the origin of an open or closed lead by hand (OWNER, MANAGER, ATTENDANT)")
+  @ApiResponse(responseCode = "200", description = "Lead")
+  @ApiResponse(responseCode = "400", description = "INVALID_INPUT: type, code, title, version")
+  @ApiResponse(responseCode = "409", description = "LEAD_STALE")
+  @SecurityRequirement(name = "csrf")
+  @PutMapping("/{leadId}/origin")
+  public LeadView correctOrigin(
+      @PathVariable UUID leadId,
+      @RequestBody OriginRequest request,
+      @AuthenticationPrincipal CrmPrincipal principal,
+      HttpSession session) {
+    return requests.correctOrigin(
+        SelectedClinic.require(session), principal.subjectId(), leadId, request);
   }
 
   @Operation(operationId = "listLeadEvents", summary = "The lead's timeline, oldest first")
