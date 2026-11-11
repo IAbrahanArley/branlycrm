@@ -14,5 +14,9 @@ export function parseSaleAmount(value: string) {
 }
 
 export function formatSaleAmount(cents: number) {
-  return currency.format(cents / 100);
+  const remainder = cents % 100;
+  const wholeReais = (cents - remainder) / 100;
+  const fraction = String(Math.abs(remainder)).padStart(2, "0");
+  const reais = cents < 0 && wholeReais === 0 ? -0 : wholeReais;
+  return currency.formatToParts(reais).map((part) => part.type === "fraction" ? fraction : part.value).join("");
 }
