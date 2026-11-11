@@ -134,6 +134,12 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `STAGE_ORDER_MISMATCH` | 409 | A ordem não lista exatamente as etapas abertas ativas | Funil |
 | `LOSS_REASON_STALE` | 409 | O motivo mudou desde a leitura | Funil |
 | `LOSS_REASON_LAST_ACTIVE` | 409 | Ao menos um motivo fica ativo | Funil |
+| `TASK_NOT_FOUND` | 404 | Tarefa inexistente nesta clínica | Tarefas |
+| `TASK_STALE` | 409 | A tarefa mudou desde a leitura (`version`), ou reabertura de tarefa aberta | Tarefas |
+| `TASK_DONE` | 409 | Tarefa concluída: reabra para alterar | Tarefas |
+| `TASK_CONTACT_UNAVAILABLE` | 409 | Contato inexistente ou arquivado | Tarefas |
+| `TASK_LEAD_MISMATCH` | 409 | O lead não existe ou é de outro contato | Tarefas |
+| `TASK_RESPONSIBLE_INVALID` | 409 | O responsável não é membro ativo que trabalha tarefas | Tarefas |
 | `SALE_NOT_FOUND` | 404 | Venda inexistente nesta clínica (mesma resposta para a de outra clínica) | Vendas |
 | `SALE_STALE` | 409 | A venda mudou desde a leitura (`version`) | Vendas |
 | `SALE_CANCELLED` | 409 | A venda está cancelada e não muda mais | Vendas |

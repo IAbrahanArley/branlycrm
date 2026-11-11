@@ -797,11 +797,39 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Entregas:** selo "Tráfego" na lista, no Kanban e na conversa; filtros por origem e campanha; contagem de leads e vendas por origem.
 **Aceite:** só contagens, sem custos; filtros conferem com fixtures.
 
-### [ ] CRM-040 — Tarefas e follow-ups (P1)
+### [-] CRM-040 — Tarefas e follow-ups (P1)
 **Depende de:** CRM-021, CRM-032.
 **Atende:** CRM-07.
 **Entregas:** tabela `tasks`, API e telas por responsável, prazo e conclusão, vinculadas a contato e lead.
 **Aceite:** tarefa vincula registros da mesma clínica; filtros de hoje, atrasadas e futuras no fuso da clínica; permissões testadas.
+**Estado (11/11/2026):** API concluída na branch `feat/crm-040-tarefas`, no modo MVP; falta a tela (Codex), por isso `[-]`.
+- **Módulo `task`** e migração de clínica V12: tarefa ligada a um contato e, opcionalmente, a um lead do mesmo contato; concluída ou reaberta, nunca excluída; runtime sem `DELETE` e sem mudar o contato, o lead nem a autoria.
+- **Rotas** `/v1/clinic/tasks`:
+  - `GET` paginado, com `due=OVERDUE|TODAY|UPCOMING` no fuso da clínica (só abertas), `responsibleId=mine` e filtros de contato, lead e situação;
+  - `POST`, `GET /{id}` e `PUT /{id}` (só abertas, com `version`);
+  - `POST /{id}/completion` (nota opcional) e `POST /{id}/reopening`.
+- **Permissões:** `TASK_WRITE` para Proprietário, Gestor e Atendente; `TASK_READ` para todos. O responsável precisa ser membro ativo com `TASK_WRITE`.
+- **Janelas de prazo:**
+  - atrasada: antes de agora;
+  - hoje: de agora até a próxima meia-noite no fuso da clínica;
+  - futura: depois disso.
+- **Testes:** `TaskApiIT`:
+  - as três janelas e `mine`;
+  - lead de outro contato e responsável inválido recusados;
+  - edição com versão, conclusão e reabertura;
+  - Somente leitura 403;
+  - isolamento A/B (lista, detalhe, alterações e contato de outra clínica);
+  - grants da V12.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos:
+  - o teste espera o novo dia quando roda perto da meia-noite da clínica;
+  - a nota de conclusão não vai para logs;
+  - o responsável só é validado quando muda, para que a tarefa de quem saiu da equipe continue editável;
+  - prazo entre 2000 e 2100;
+  - `due` combinado com `status` diferente de `OPEN` responde 400.
+- **Pendente:**
+  - tela de tarefas (Codex);
+  - lembretes de tarefa vencendo (CRM-093);
+  - tarefas no histórico do contato (CRM-023).
 
 ### [ ] CRM-093 — Notificações dentro do sistema (P1)
 **Depende de:** CRM-032, CRM-035, CRM-091.
