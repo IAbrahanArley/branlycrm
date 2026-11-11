@@ -196,7 +196,7 @@ A Fase 3 (escala) junta o que sobrar e as ideias da seção 12 do documento: NPS
   - leads por temperatura e taxa de conversão;
   - vendas fechadas, perdidos por motivo e faturamento registrado;
   - leads frios revertidos em venda e procedimentos mais vendidos.
-- **Definições:** fórmulas exatas (denominadores, período por data de criação ou de fechamento, o que conta como "frio revertido") a fixar em CRM-050, com exemplos numéricos antes da implementação.
+- **Definições:** fórmulas, períodos e exemplos numéricos em [metricas.md](metricas.md) (CRM-050, aprovado em 11/11/2026).
 
 ## 6. Fase 2 e sugestões (não iniciar sem autorização)
 
@@ -330,7 +330,7 @@ A estimativa anterior (12 a 16 semanas) não vale mais: o WhatsApp e a caixa de 
 - [ ] **Notificação ao gestor por WhatsApp:** confirmar o custo por template e quem paga.
 - [ ] **Ferramentas prontas:** usar algo pronto para a caixa de entrada ou para automações em vez de construir (seção 11 do documento).
 - [ ] **Prazo:** prazo, orçamento e número de clínicas no lançamento.
-- [ ] **Relatórios:** definições exatas das métricas (CRM-050).
+- [x] **Relatórios:** definições das métricas aprovadas em [metricas.md](metricas.md) (CRM-050).
 - [ ] **Dados:** retenção de mensagens e mídias, exportação e exclusão; contratos de tratamento de dados (CRM-073).
 - [-] **Nome do produto:** "Branly CRM" em uso; confirmação comercial pendente.
 - [x] **Fonte do escopo:** documento do cliente v1.1 (ADR-024).
