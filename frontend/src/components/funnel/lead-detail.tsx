@@ -1,5 +1,7 @@
 "use client";
 
+import { TaskWorkspace } from "@/components/tasks/task-workspace";
+
 import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, ReceiptText } from "lucide-react";
@@ -25,7 +27,7 @@ function LeadOverview({ leadId, onChanged }: { leadId: string; onChanged: () => 
   const load = useCallback(async (signal: AbortSignal) => {
     const [lead, pipeline] = await Promise.all([getLead(leadId, signal), getPipeline(signal)]);
     const [contact, reasons] = await Promise.all([
-      canReadContact ? getContact(lead.contactId, signal).then(({ id, name, phone }) => ({ id, name, phone })) : null,
+      canReadContact ? getContact(lead.contactId, signal).then(({ id, name, phone, archivedAt }) => ({ id, name, phone, archivedAt })) : null,
       lead.status === "LOST" || (lead.status === "OPEN" && canRegisterOutcome)
         ? getLossReasons(signal, lead.status === "LOST")
         : [],
@@ -136,6 +138,9 @@ function LeadOverview({ leadId, onChanged }: { leadId: string; onChanged: () => 
           </CardContent>
         </Card>
       )}
+      {clinic.permissions.TASK_READ === "ALL" && <TaskWorkspace binding={{
+        contactId: lead.contactId, contactName: contact?.name, leadId, archived: !contact || Boolean(contact.archivedAt),
+      }} />}
       {allowOutcome && registeringSale && (
         <RegisterSaleDialog lead={lead} mutation={mutation}
           onClose={() => { setRegisteringSale(false); mutation.clearFailure(); }}

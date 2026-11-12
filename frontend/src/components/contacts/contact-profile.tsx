@@ -1,5 +1,7 @@
 "use client";
 
+import { TaskWorkspace } from "@/components/tasks/task-workspace";
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Archive, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -249,6 +251,7 @@ function ProfileDetails({ contact, consents, onRefresh }: {
         </Card>
       </div>
       <ConsentCard contact={contact} consents={consents} canWrite={canWrite} pending={locked} run={run} />
+      {clinic.permissions.TASK_READ === "ALL" && <TaskWorkspace binding={{ contactId: contact.id, contactName: contact.name, archived }} />}
     </>
   );
 }
