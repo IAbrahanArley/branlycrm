@@ -30,6 +30,7 @@ async function writeStage(path: `/v1/${string}`, method: "POST" | "PUT", body: o
   if (!isPipeline(result) || result.id !== pipeline.id || result.version < pipeline.version || !confirms(result)) {
     throw new ApiError(200, "UNEXPECTED_RESPONSE", "A API não confirmou a configuração do funil.");
   }
+  return result;
 }
 
 export function saveStage(pipeline: Pipeline, name: string, id?: string) {
@@ -56,6 +57,7 @@ async function writeReason(path: `/v1/${string}`, method: "POST" | "PUT", body: 
   if (!isLossReason(result) || (reason && (result.id !== reason.id || result.version < reason.version)) || !confirms(result)) {
     throw new ApiError(200, "UNEXPECTED_RESPONSE", "A API não confirmou o motivo de perda.");
   }
+  return result;
 }
 
 export function saveLossReason(name: string, reason?: LossReason) {

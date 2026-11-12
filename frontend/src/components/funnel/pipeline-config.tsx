@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Archive, ArchiveRestore, ArrowDownUp, ArrowLeft, ChevronDown, Pencil, Plus } from "lucide-react";
 import { useClinic } from "@/components/panel/clinic-context";
@@ -11,7 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { archiveLossReason, archiveStage, loadPipelineConfig, reorderStages, saveLossReason, saveStage } from "@/lib/api/pipeline-config";
 import type { LossReason, Stage } from "@/lib/api/leads";
 import { FunnelHeading } from "./funnel-ui";
-import { PipelineConfigDialog, type ConfigDialogAction } from "./pipeline-config-dialog";
+import { PipelineConfigDialog, type ConfigDialogAction, type ConfigUpdate } from "./pipeline-config-dialog";
+
+type Configuration = Awaited<ReturnType<typeof loadPipelineConfig>>;
+const reasonOrder = new Intl.Collator("pt-BR", { sensitivity: "base" });
 
 function ConfigRow({ name, detail, onEdit, onArchive, archived = false }: {
   name: string; detail?: string; onEdit?: () => void; onArchive?: () => void; archived?: boolean;
@@ -48,9 +51,10 @@ function ArchivedItems({ label, count, children }: { label: string; count: numbe
 
 function PipelineConfig() {
   const { result, reload } = useClinicResource(loadPipelineConfig);
+  const [confirmed, setConfirmed] = useState<Configuration>();
   const [action, setAction] = useState<ConfigDialogAction>();
   const [notice, setNotice] = useState("");
-  const data = result?.data;
+  const data = confirmed ?? result?.data;
   const error = result?.error;
 
   function open(next: ConfigDialogAction) {
@@ -58,9 +62,24 @@ function PipelineConfig() {
     setAction(next);
   }
 
-  function refresh() {
+  const refresh = useCallback((message?: string) => {
+    if (message) setNotice(message);
     setAction(undefined);
+    setConfirmed(undefined);
     reload();
+  }, [reload]);
+
+  function applyUpdate(update: ConfigUpdate, message: string) {
+    if (!data) return;
+    if ("stages" in update) {
+      setConfirmed({ ...data, pipeline: update });
+    } else {
+      const reasons = [...data.reasons.filter(({ id }) => id !== update.id), update];
+      reasons.sort((a, b) => reasonOrder.compare(a.name, b.name));
+      setConfirmed({ ...data, reasons });
+    }
+    setAction(undefined);
+    setNotice(message);
   }
 
   function renderConfig({ pipeline, reasons }: NonNullable<typeof data>) {
@@ -119,7 +138,7 @@ function PipelineConfig() {
               <Button type="button" className="min-h-11" onClick={() => nameStage()}><Plus aria-hidden="true" />Nova etapa</Button>
               <Button type="button" variant="outline" className="min-h-11" disabled={openStages.length < 2} onClick={() => open({
                 kind: "order", stages: openStages, title: "Reordenar etapas",
-                description: "Use as setas para mover as etapas abertas e salve a nova ordem.",
+                description: "Arraste pela alça ou use as setas para mover as etapas abertas. Depois, salve a ordem.",
                 save: (ids) => reorderStages(pipeline, ids), success: "Ordem das etapas salva.",
               })}><ArrowDownUp aria-hidden="true" />Reordenar</Button>
             </div>
@@ -169,8 +188,7 @@ function PipelineConfig() {
         message={error.status === 403 ? "Você não tem permissão para acessar a configuração do funil." : error.message}
         onRetry={error.status === 403 ? undefined : reload} />}
       {data && renderConfig(data)}
-      {action && <PipelineConfigDialog action={action} onClose={() => setAction(undefined)} onReload={refresh}
-        onSaved={(message) => { setNotice(message); refresh(); }} />}
+      {action && <PipelineConfigDialog action={action} onClose={() => setAction(undefined)} onReload={refresh} onSaved={applyUpdate} />}
     </>
   );
 }

@@ -45,7 +45,7 @@ export function useLeadMutation(
 ) {
   const { clinic, subjectId, refresh } = useClinic();
   const [pending, setPending] = useState(false);
-  const [failure, setFailure] = useState<{ message: string; needsReload: boolean; fields: readonly string[] }>();
+  const [failure, setFailure] = useState<{ code: string; message: string; needsReload: boolean; fields: readonly string[] }>();
   const busy = useRef(false);
   const alive = useRef(false);
   useEffect(() => {
@@ -53,15 +53,15 @@ export function useLeadMutation(
     return () => { alive.current = false; };
   }, []);
 
-  async function run(action: () => Promise<unknown>, onSuccess: () => void, preview?: () => void) {
+  async function run<T>(action: () => Promise<T>, onSuccess: (result: T) => void, preview?: () => void) {
     if (busy.current || failure?.needsReload) return;
     busy.current = true;
     setPending(true);
     setFailure(undefined);
     preview?.();
     try {
-      await withSelectedClinic(clinic.tenantId, action, undefined, subjectId);
-      if (alive.current) onSuccess();
+      const result = await withSelectedClinic(clinic.tenantId, action, undefined, subjectId);
+      if (alive.current) onSuccess(result);
     } catch (cause) {
       if (!alive.current) return;
       const error = clinicApiError(cause);
@@ -73,7 +73,7 @@ export function useLeadMutation(
           message: funnelErrorMessage(error.code, error.message),
           needsReload: error.status === 409 || error.status === 404,
         };
-        setFailure({ ...problem, fields: error.fields });
+        setFailure({ ...problem, code: error.code, fields: error.fields });
       }
     } finally {
       busy.current = false;

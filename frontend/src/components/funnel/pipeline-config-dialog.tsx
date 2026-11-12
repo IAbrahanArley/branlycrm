@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ApiError } from "@/lib/api/client";
-import type { Stage } from "@/lib/api/leads";
+import type { LossReason, Pipeline, Stage } from "@/lib/api/leads";
+import { moveStageInOrder } from "@/lib/stage-order";
 import { fieldClass, useLeadMutation } from "./funnel-ui";
 
-export type ConfigAction =
-  | { kind: "name"; name?: string; maxLength: number; save: (name: string) => Promise<void> }
-  | { kind: "archive"; archived: boolean; save: () => Promise<void> }
-  | { kind: "order"; stages: Stage[]; save: (ids: string[]) => Promise<void> };
+export type ConfigUpdate = Pipeline | LossReason;
+
+type ConfigAction =
+  | { kind: "name"; name?: string; maxLength: number; save: (name: string) => Promise<ConfigUpdate> }
+  | { kind: "archive"; archived: boolean; save: () => Promise<ConfigUpdate> }
+  | { kind: "order"; stages: Stage[]; save: (ids: string[]) => Promise<Pipeline> };
 
 export type ConfigDialogAction = ConfigAction & { title: string; description: string; success: string };
 
 const messages = new Map([
-  ["PIPELINE_STALE", "Outra pessoa alterou o funil. Recarregue a configuração para continuar."],
+  ["PIPELINE_STALE", "O funil mudou enquanto você editava. Confira a configuração atualizada e tente novamente."],
   ["STAGE_ORDER_MISMATCH", "A lista de etapas mudou. Recarregue a configuração antes de reordenar."],
   ["STAGE_NOT_FOUND", "Esta etapa não está disponível nesta clínica. Recarregue a configuração."],
   ["STAGE_DUPLICATE", "Já existe uma etapa ativa com esse nome."],
@@ -25,7 +28,7 @@ const messages = new Map([
   ["STAGE_HAS_OPEN_LEADS", "Mova os leads em aberto para outra etapa antes de arquivar esta."],
   ["LOSS_REASON_STALE", "Outra pessoa alterou este motivo. Recarregue a configuração para continuar."],
   ["LOSS_REASON_NOT_FOUND", "Este motivo não está disponível nesta clínica. Recarregue a configuração."],
-  ["LOSS_REASON_DUPLICATE", "Já existe um motivo com esse nome. Confira também os arquivados."],
+  ["LOSS_REASON_DUPLICATE", "Já existe um motivo com esse nome. Se estiver arquivado, você pode desarquivá-lo."],
   ["LOSS_REASON_LIMIT", "A clínica atingiu o limite de 50 motivos de perda."],
   ["LOSS_REASON_LAST_ACTIVE", "Mantenha pelo menos um motivo de perda ativo."],
   ["INVALID_INPUT", "Revise os dados informados e tente novamente."],
@@ -41,10 +44,13 @@ function feedback(error: ApiError) {
 }
 
 export function PipelineConfigDialog({ action, onClose, onReload, onSaved }: {
-  action: ConfigDialogAction; onClose: () => void; onReload: () => void; onSaved: (message: string) => void;
+  action: ConfigDialogAction; onClose: () => void; onReload: (message?: string) => void;
+  onSaved: (update: ConfigUpdate, message: string) => void;
 }) {
   const mutation = useLeadMutation("Não foi possível confirmar a alteração. Recarregue a configuração e confira o resultado antes de repetir.", feedback);
-  const [ordered, setOrdered] = useState(action.kind === "order" ? action.stages : []);
+  const [ordered, setOrdered] = useState<readonly Stage[]>(action.kind === "order" ? action.stages : []);
+  const dragSource = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<number>();
   const [orderNotice, setOrderNotice] = useState("");
   const [validation, setValidation] = useState("");
   const nameField = useRef<HTMLInputElement>(null);
@@ -58,19 +64,49 @@ export function PipelineConfigDialog({ action, onClose, onReload, onSaved }: {
     if (nameInvalid && !mutation.pending) nameField.current?.focus();
   }, [nameInvalid, mutation.pending]);
 
-  function move(index: number, direction: -1 | 1) {
-    const next = index + direction;
-    if (next < 0 || next >= ordered.length || locked) return;
-    const updated = [...ordered];
-    [updated[index], updated[next]] = [updated[next], updated[index]];
+  useEffect(() => {
+    if (problem?.code === "PIPELINE_STALE") onReload(problem.message);
+  }, [onReload, problem]);
+
+  function move(from: number, to: number) {
+    if (locked) return;
+    const updated = moveStageInOrder(ordered, from, to);
+    if (updated === ordered) return;
     setOrdered(updated);
-    setOrderNotice(`${updated[next].name}, posição ${next + 1} de ${updated.length}.`);
+    setOrderNotice(`${updated[to].name}, posição ${to + 1} de ${updated.length}.`);
+  }
+
+  function startDrag(event: PointerEvent<HTMLSpanElement>, index: number) {
+    if (locked || dragSource.current !== null || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    dragSource.current = ordered[index].id;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function targetIndex(event: PointerEvent<HTMLSpanElement>) {
+    const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-stage-order-index]");
+    const list = event.currentTarget.closest("ol");
+    return row && list?.contains(row) ? Number(row.dataset.stageOrderIndex) : undefined;
+  }
+
+  function finishDrag(event: PointerEvent<HTMLSpanElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const target = targetIndex(event);
+    if (dragSource.current !== null && target !== undefined) {
+      move(ordered.findIndex(({ id }) => id === dragSource.current), target);
+    }
+    endDrag();
+  }
+
+  function endDrag() {
+    dragSource.current = null;
+    setDropTarget(undefined);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (locked || !changed) return;
-    const done = () => onSaved(action.success);
+    const done = (update: ConfigUpdate) => onSaved(update, action.success);
     if (action.kind === "order") {
       void mutation.run(() => action.save(ordered.map(({ id }) => id)), done);
     } else if (action.kind === "archive") {
@@ -91,7 +127,7 @@ export function PipelineConfigDialog({ action, onClose, onReload, onSaved }: {
   return (
     <Dialog.Root open onOpenChange={(open) => {
       if (!open && !mutation.pending) {
-        if (problem?.needsReload) onReload();
+        if (problem?.needsReload) onReload(problem.message);
         else onClose();
       }
     }}>
@@ -113,13 +149,22 @@ export function PipelineConfigDialog({ action, onClose, onReload, onSaved }: {
               <>
                 <ol className="divide-y rounded-lg border" aria-label="Ordem das etapas abertas">
                   {ordered.map((stage, index) => (
-                    <li key={stage.id} className="flex items-center gap-2 px-3 py-2">
+                    <li key={stage.id} data-stage-order-index={index}
+                      className={`flex items-center gap-2 px-3 py-2 ${dropTarget === index ? "bg-primary/10 outline-2 outline-inset outline-primary" : ""}`}>
+                      <span className="grid size-9 shrink-0 cursor-grab touch-none select-none place-items-center text-muted-foreground active:cursor-grabbing"
+                        aria-hidden="true" onPointerDown={(event) => startDrag(event, index)}
+                        onPointerMove={(event) => {
+                          if (event.currentTarget.hasPointerCapture(event.pointerId)) setDropTarget(targetIndex(event));
+                        }}
+                        onPointerUp={finishDrag} onLostPointerCapture={endDrag}>
+                        <GripVertical className="size-5" />
+                      </span>
                       <span className="w-6 shrink-0 text-sm text-muted-foreground tabular-nums">{index + 1}</span>
                       <span className="min-w-0 flex-1 text-sm font-semibold wrap-anywhere">{stage.name}</span>
-                      <Button type="button" size="icon" variant="outline" className="size-11 shrink-0" aria-label={`Subir ${stage.name}`}
-                        aria-disabled={index === 0 || locked} onClick={() => move(index, -1)}><ArrowUp aria-hidden="true" /></Button>
-                      <Button type="button" size="icon" variant="outline" className="size-11 shrink-0" aria-label={`Descer ${stage.name}`}
-                        aria-disabled={index === ordered.length - 1 || locked} onClick={() => move(index, 1)}><ArrowDown aria-hidden="true" /></Button>
+                      <Button type="button" size="icon" variant="outline" className="size-11 shrink-0 aria-disabled:opacity-45" aria-label={`Subir ${stage.name}`}
+                        aria-disabled={index === 0 || locked} onClick={() => move(index, index - 1)}><ArrowUp aria-hidden="true" /></Button>
+                      <Button type="button" size="icon" variant="outline" className="size-11 shrink-0 aria-disabled:opacity-45" aria-label={`Descer ${stage.name}`}
+                        aria-disabled={index === ordered.length - 1 || locked} onClick={() => move(index, index + 1)}><ArrowDown aria-hidden="true" /></Button>
                     </li>
                   ))}
                 </ol>
@@ -130,7 +175,7 @@ export function PipelineConfigDialog({ action, onClose, onReload, onSaved }: {
             <div className="flex flex-wrap justify-end gap-2">
               <Dialog.Close render={<Button type="button" variant="outline" className="min-h-11" disabled={mutation.pending} />}>Cancelar</Dialog.Close>
               {problem?.needsReload ? (
-                <Button type="button" className="min-h-11" onClick={onReload}>Recarregar configuração</Button>
+                <Button type="button" className="min-h-11" onClick={() => onReload(problem.message)}>Recarregar configuração</Button>
               ) : (
                 <Button type="submit" className="min-h-11" variant={action.kind === "archive" && action.archived ? "destructive" : "default"}
                   disabled={mutation.pending || !changed}>{mutation.pending ? "Salvando…" : submitLabel}</Button>
