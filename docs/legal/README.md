@@ -12,20 +12,14 @@
 
 Os dados da empresa ficam num único arquivo, `frontend/src/components/legal/legal-entity.ts`. As páginas usam `LegalPage`, e o rodapé da landing aponta para as três.
 
-## Antes de publicar ou de informar à Meta
+## Dados da empresa
 
-Substituir em `legal-entity.ts` todos os valores entre colchetes:
+Preenchidos em 12/11/2026 em `frontend/src/components/legal/legal-entity.ts`, com os dados informados pelo responsável:
+- CNPJ, endereço, e-mail de privacidade e de suporte e encarregado;
+- foro em João Pessoa (PB), deduzido do CEP;
+- prazo de exclusão de 90 dias depois do fim do contrato, proposto até a decisão da CRM-073.
 
-| Campo | O que é |
-|---|---|
-| `cnpj` | CNPJ da empresa (a verificação da Meta está em nome de AbeSolutiom) |
-| `address` | Endereço da sede |
-| `privacyEmail` | E-mail para pedidos de titulares e do encarregado |
-| `supportEmail` | E-mail de suporte |
-| `dataOfficer` | Nome do encarregado pelo tratamento de dados (DPO) |
-| `forum` | Comarca do foro dos termos |
-| `retentionDays` | Prazo de exclusão depois do fim do contrato (decisão pendente, CRM-073) |
-| `updatedAt` | Data da versão publicada |
+Os dois últimos precisam de confirmação.
 
 ## Premissas que a revisão jurídica deve confirmar
 
@@ -41,6 +35,6 @@ Substituir em `legal-entity.ts` todos os valores entre colchetes:
 ## Para o painel da Meta
 
 Depois de publicar com os valores preenchidos, informar em Configurações do app → Básico:
-- a URL da política de privacidade: `https://<domínio>/privacidade`;
-- a URL dos termos de serviço: `https://<domínio>/termos`;
-- a URL de instruções de exclusão de dados: `https://<domínio>/exclusao-de-dados`.
+- a URL da política de privacidade: `https://branly-crm.vercel.app/privacidade`;
+- a URL dos termos de serviço: `https://branly-crm.vercel.app/termos`;
+- a URL de instruções de exclusão de dados: `https://branly-crm.vercel.app/exclusao-de-dados`.
