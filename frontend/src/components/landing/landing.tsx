@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { Brand } from "./Brand";
 import { Header } from "./Header";
@@ -49,6 +50,11 @@ export function Landing() {
         </div>
         <div className="shell footer-bottom">
           <span>Branly · CRM para clínicas de estética</span>
+          <nav aria-label="Documentos legais" className="footer-legal">
+            <Link href="/privacidade">Privacidade</Link>
+            <Link href="/termos">Termos</Link>
+            <Link href="/exclusao-de-dados">Exclusão de dados</Link>
+          </nav>
           <span>Uma proposta em construção.</span>
         </div>
       </footer>

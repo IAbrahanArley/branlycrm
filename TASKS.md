@@ -972,6 +972,11 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - **Regras de dados:** retenção, exportação, exclusão e anonimização (antecipa decisões de PAC-11).
 - **Comunicação:** consentimento e política de privacidade; pendências jurídicas.
 **Aceite:** riscos tratados ou formalmente bloqueados antes do piloto; não declarar conformidade jurídica sem avaliação adequada.
+**Adiantado (12/11/2026, branch `feat/paginas-legais`):** rascunhos públicos da política de privacidade, dos termos de uso e das instruções de exclusão de dados em `/privacidade`, `/termos` e `/exclusao-de-dados`, exigidos pela revisão do app da Meta (ADR-034). Premissas e campos a preencher em [docs/legal/README.md](docs/legal/README.md).
+- **Pendente:**
+  - dados da empresa e do encarregado;
+  - prazo de retenção;
+  - revisão jurídica.
 
 ### [ ] CRM-075 — PWA e usabilidade no celular (P2)
 **Depende de:** CRM-083.

@@ -513,6 +513,20 @@
   color: #a9b8ca;
   font-size: 13px;
 }
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.footer-legal a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footer-legal a:hover,
+.footer-legal a:focus-visible {
+  color: #ffffff;
+}
 .revealed {
   animation: reveal 0.65s cubic-bezier(0.2, 0.6, 0.2, 1) both;
 }
@@ -799,6 +813,9 @@
   }
   .footer-bottom span {
     display: block;
+    margin-top: 8px;
+  }
+  .footer-legal {
     margin-top: 8px;
   }
   .site-footer {
