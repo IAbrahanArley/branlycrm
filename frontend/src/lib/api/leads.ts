@@ -23,7 +23,7 @@ export type LeadEvent = {
 export type LeadNote = { id: string; authorId: string; body: string; createdAt: string };
 export type LossReason = { id: string; name: string; archived: boolean; version: number };
 export type LeadPage = { items: LeadSummary[]; total: number; page: number; pageSize: number };
-export type LeadFilters = { status: LeadStatus; stageId?: string; temperature?: Temperature | ""; page: number };
+export type LeadFilters = { status?: LeadStatus; stageId?: string; temperature?: Temperature | ""; contactId?: string; page: number };
 
 const base = "/v1/clinic/leads";
 const headers = { "Content-Type": "application/json" };
@@ -32,10 +32,12 @@ export function getPipeline(signal: AbortSignal) {
   return apiRequest<Pipeline>("/v1/clinic/pipeline", { signal });
 }
 
-export function listLeads({ status, stageId, temperature, page }: LeadFilters, signal: AbortSignal) {
-  const params = new URLSearchParams({ status, page: String(page), pageSize: "20" });
+export function listLeads({ status, stageId, temperature, contactId, page }: LeadFilters, signal: AbortSignal) {
+  const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+  if (status) params.set("status", status);
   if (stageId) params.set("stageId", stageId);
   if (temperature) params.set("temperature", temperature);
+  if (contactId) params.set("contactId", contactId);
   return apiRequest<LeadPage>(`${base}?${params}`, { signal });
 }
 

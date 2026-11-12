@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, ClipboardCheck, Clock3, Columns3, ReceiptText, type LucideIcon } from "lucide-react";
 import { useClinic } from "@/components/panel/clinic-context";
 import { clinicApiError, clinicContextChanged } from "@/components/panel/clinic-resource";
@@ -11,13 +12,14 @@ import type { ApiError } from "@/lib/api/client";
 import { getDashboard, reportProblem, type Dashboard } from "@/lib/api/reports";
 import { formatSaleAmount } from "@/lib/sale-amount";
 import { loginRetryDeadline } from "@/lib/api/retry-after";
+import { taskPath } from "@/lib/api/tasks";
 
 const refreshMs = 60_000;
 const countFormat = new Intl.NumberFormat("pt-BR");
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "UTC" });
 
-function Indicator({ title, value, hint, icon: Icon }: {
-  title: string; value: string; hint?: string; icon: LucideIcon;
+function Indicator({ title, value, hint, href, icon: Icon }: {
+  title: string; value: string; hint?: string; href?: string; icon: LucideIcon;
 }) {
   return (
     <Card className="min-w-0">
@@ -26,7 +28,7 @@ function Indicator({ title, value, hint, icon: Icon }: {
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
             <Icon size={18} aria-hidden="true" />
           </span>
-          <CardTitle>{title}</CardTitle>
+          <CardTitle>{href ? <Link href={href} className="inline-flex min-h-11 items-center rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">{title}</Link> : title}</CardTitle>
         </div>
         <p className="text-2xl font-bold tabular-nums wrap-anywhere">{value}</p>
         {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
@@ -127,8 +129,10 @@ export function ReceptionDashboard() {
             hint={`${countFormat.format(data.salesTodayCount)} ${data.salesTodayCount === 1 ? "venda" : "vendas"} · Faturamento registrado`} icon={ReceiptText} />
           <Indicator title="Vendas do mês" value={formatSaleAmount(data.salesMonthCents)}
             hint={`${countFormat.format(data.salesMonthCount)} ${data.salesMonthCount === 1 ? "venda" : "vendas"} · Faturamento registrado`} icon={CalendarDays} />
-          <Indicator title="Tarefas atrasadas" value={countFormat.format(data.tasksOverdue)} icon={Clock3} />
-          <Indicator title="Tarefas de hoje" value={countFormat.format(data.tasksToday)} icon={ClipboardCheck} />
+          <Indicator title="Tarefas atrasadas" value={countFormat.format(data.tasksOverdue)} icon={Clock3}
+            href={clinic.permissions.TASK_READ === "ALL" ? taskPath("OVERDUE") : undefined} />
+          <Indicator title="Tarefas de hoje" value={countFormat.format(data.tasksToday)} icon={ClipboardCheck}
+            href={clinic.permissions.TASK_READ === "ALL" ? taskPath("TODAY") : undefined} />
         </div>
       )}
     </section>
