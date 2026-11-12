@@ -1,4 +1,6 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
+import { isContactId } from "@/lib/api/contacts";
+import { isOriginType, originSources, type LeadOrigin, type OriginDraft } from "@/lib/lead-origin";
 
 export const temperatures = ["COLD", "WARM", "HOT", "QUALIFIED"] as const;
 export type Temperature = (typeof temperatures)[number];
@@ -6,11 +8,12 @@ export type LeadStatus = "OPEN" | "WON" | "LOST";
 export type Stage = { id: string; name: string; key: string | null; kind: LeadStatus; position: number | null };
 export type Pipeline = { id: string; name: string; stages: Stage[]; archivedStages: Stage[]; version: number };
 export type Lead = {
-  id: string; contactId: string; stageId: string; status: LeadStatus; temperature: Temperature;
+  id: string; contactId: string; stageId: string; status: LeadStatus; temperature: Temperature | null;
   responsibleId: string | null; openedAt: string; version: number;
 };
 export type LeadSummary = Lead & { contactName: string; contactPhone: string };
-export type LeadDetail = Lead & { closedAt: string | null; lossReasonId: string | null };
+export type LeadDetail = Lead & { closedAt: string | null; lossReasonId: string | null; origin: LeadOrigin };
+type OriginTouch = { id: string; leadId: string | null; receivedAt: string; origin: LeadOrigin };
 export type LeadEvent = {
   id: string;
   type: string;
@@ -43,6 +46,49 @@ export function listLeads({ status, stageId, temperature, contactId, page }: Lea
 
 export function getLead(id: string, signal: AbortSignal) {
   return apiRequest<LeadDetail>(`${base}/${id}`, { signal });
+}
+
+function isOrigin(origin: LeadOrigin | null | undefined): origin is LeadOrigin {
+  return Boolean(origin && isOriginType(origin.type) && Object.hasOwn(originSources, origin.source)
+    && (origin.code === null || typeof origin.code === "string")
+    && (origin.title === null || typeof origin.title === "string"));
+}
+
+function matchesOrigin(value: LeadOrigin | null | undefined, draft?: OriginDraft) {
+  if (!isOrigin(value)) return false;
+  return draft
+    ? value.source === "MANUAL" && value.type === draft.type && value.code === draft.code && value.title === draft.title
+    : value.source === "NONE" && value.type === "UNIDENTIFIED" && value.code === null && value.title === null;
+}
+
+export async function openLead(contactId: string, origin?: OriginDraft, temperature?: Temperature) {
+  const result = await apiRequest<LeadDetail | null>(base, {
+    method: "POST", headers, body: JSON.stringify({ contactId, origin, temperature }),
+  });
+  if (!result || !isContactId(result.id) || result.contactId !== contactId || result.status !== "OPEN" || !matchesOrigin(result.origin, origin)) {
+    throw new ApiError(201, "UNEXPECTED_RESPONSE", "A API não confirmou a criação do lead.");
+  }
+  return result;
+}
+
+export async function correctLeadOrigin(lead: LeadDetail, draft: OriginDraft) {
+  const result = await apiRequest<LeadDetail | null>(`${base}/${lead.id}/origin`, {
+    method: "PUT", headers, body: JSON.stringify({ ...draft, version: lead.version }),
+  });
+  if (result?.id !== lead.id || result.contactId !== lead.contactId || !Number.isSafeInteger(result.version)
+      || result.version < lead.version || !matchesOrigin(result.origin, draft)) {
+    throw new ApiError(200, "UNEXPECTED_RESPONSE", "A API não confirmou a correção da origem.");
+  }
+  return result;
+}
+
+export async function listOriginTouches(contactId: string, signal: AbortSignal) {
+  const result = await apiRequest<OriginTouch[]>(`/v1/clinic/contacts/${contactId}/origin-touches`, { signal });
+  if (!Array.isArray(result) || !result.every((touch) => touch && isContactId(touch.id)
+    && (touch.leadId === null || isContactId(touch.leadId)) && Number.isFinite(Date.parse(touch.receivedAt)) && isOrigin(touch.origin))) {
+    throw new ApiError(200, "UNEXPECTED_RESPONSE", "A API não retornou um histórico de chegadas válido.");
+  }
+  return result;
 }
 
 export function listLeadEvents(id: string, signal: AbortSignal) {

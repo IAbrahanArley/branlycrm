@@ -18,8 +18,9 @@ const temperatureStyle: Record<Temperature, string> = {
   COLD: "bg-blue-50 text-blue-800", WARM: "bg-amber-50 text-amber-900", HOT: "bg-rose-50 text-rose-800", QUALIFIED: "bg-emerald-50 text-emerald-800",
 };
 
-export function TemperatureBadge({ temperature }: { temperature: Temperature }) {
-  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${temperatureStyle[temperature] ?? "bg-slate-100 text-slate-800"}`}>{temperatureLabel[temperature] ?? "Indefinida"}</span>;
+export function TemperatureBadge({ temperature }: { temperature: Temperature | null }) {
+  const style = temperature ? temperatureStyle[temperature] : "bg-slate-100 text-slate-800";
+  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${style}`}>{temperature ? temperatureLabel[temperature] : "Sem temperatura"}</span>;
 }
 
 export function FunnelHeading({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {

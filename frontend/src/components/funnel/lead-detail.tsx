@@ -14,6 +14,7 @@ import { getLead, getLossReasons, getPipeline, loseLead, moveLead } from "@/lib/
 import { fieldClass, FunnelHeading, FunnelProblem, statusLabel, TemperatureBadge, useFunnelResource, useLeadMutation } from "./funnel-ui";
 import { LeadHistory } from "./lead-history";
 import { RegisterSaleDialog } from "./register-sale-dialog";
+import { LeadOriginCard } from "./lead-origin-card";
 
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
@@ -53,6 +54,11 @@ function LeadOverview({ leadId, onChanged }: { leadId: string; onChanged: () => 
   const allowOutcome = lead.status === "OPEN" && canRegisterOutcome;
   const disabled = mutation.pending || Boolean(mutation.failure?.needsReload);
   const lossReason = reasons.find((reason) => reason.id === lead.lossReasonId);
+  function refreshOrigin(saved: boolean) {
+    setNotice(saved ? "Origem atualizada." : "");
+    reload();
+    onChanged();
+  }
 
   function submitMove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,6 +110,7 @@ function LeadOverview({ leadId, onChanged }: { leadId: string; onChanged: () => 
           {contact && <Link href={contactPath(contact.id)} className="inline-flex min-h-11 items-center rounded-sm text-sm font-semibold text-[#143e75] underline-offset-4 hover:underline focus-visible:outline-2">Abrir perfil do contato</Link>}
         </CardContent>
       </Card>
+      <LeadOriginCard leadId={leadId} disabled={disabled} refreshed={refreshOrigin} />
       {(allowMove || allowOutcome) && (
         <Card aria-labelledby="lead-actions">
           <CardHeader><CardTitle id="lead-actions">Ações do lead</CardTitle></CardHeader>

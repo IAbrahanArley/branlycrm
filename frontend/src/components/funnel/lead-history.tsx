@@ -7,15 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { funnelErrorMessage } from "@/lib/api/funnel-view";
 import { leadHistoryEntries } from "@/lib/api/lead-history";
+import { isOriginType, originTypeLabel } from "@/lib/lead-origin";
 import { addLeadNote, getLossReasons, getPipeline, listLeadEvents, listLeadNotes, type LeadEvent } from "@/lib/api/leads";
 import { fieldClass, temperatureLabel, useFunnelResource, useLeadMutation } from "./funnel-ui";
 
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 const noteLimit = 2000;
-const originLabel: Record<string, string> = {
-  PAID_TRAFFIC: "Tráfego pago", INSTAGRAM_ORGANIC: "Instagram orgânico",
-  REFERRAL: "Indicação", GOOGLE: "Google", OTHER: "Outra origem", UNKNOWN: "Origem desconhecida",
-};
 
 function eventCopy(event: LeadEvent, stages: Map<string, string>, reasons: Map<string, string>, subjectId: string) {
   const stage = (id: string | null) => id ? stages.get(id) ?? "Etapa indisponível" : null;
@@ -40,7 +37,14 @@ function eventCopy(event: LeadEvent, stages: Map<string, string>, reasons: Map<s
     case "LOST":
       return { title: "Lead perdido", detail: reasons.get(event.lossReasonId ?? "") };
     case "ORIGIN_CHANGED":
-      return { title: "Origem atualizada", detail: toValue && Object.hasOwn(originLabel, toValue) ? originLabel[toValue] : null };
+      return {
+        title: "Origem atualizada",
+        detail: toValue && isOriginType(toValue)
+          ? fromValue && isOriginType(fromValue) && fromValue !== toValue
+            ? `${originTypeLabel(fromValue)} → ${originTypeLabel(toValue)}`
+            : originTypeLabel(toValue)
+          : null,
+      };
     default:
       return { title: "Lead atualizado" };
   }
