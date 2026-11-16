@@ -2,6 +2,7 @@
 
 > Fonte de requisitos: [`docs/planejamento-produto.md`](docs/planejamento-produto.md), baseado no [documento do cliente v1.1](docs/requisitos/requisitos-plataforma-clinicas-v1.1.pdf) (ADR-024). Regras dos agentes: [`AGENTS.md`](AGENTS.md).
 > **Reorganizado em 06/11/2026** para o novo escopo: WhatsApp e origem do lead na Fase 1, agências parceiras e papéis do cliente. Os estados das tarefas já feitas foram mantidos como verificados em 05/11/2026. Marcação sem teste executado não prova funcionamento.
+> **Conferido em 16/11/2026:** estados das telas entregues pelo Codex (até o PR #48) alinhados com a `main`.
 > **Estimativa:** a anterior (12–16 semanas) não vale mais; a reestimativa sai depois de CRM-005 e CRM-080.
 
 ## Como executar
@@ -283,7 +284,29 @@ O frontend acompanha cada API aprovada.
 - **Configurações da clínica:** nome e fuso.
 - **Telas:** login, aceite de convite, seleção de clínica, carteira da agência e acompanhamento do provisionamento.
 **Aceite:** clínica nova entra no sistema sem enxergar registros de outras; convite vencido, reutilizado ou de outra clínica é recusado; perfis têm acessos adequados.
-**Estado:** o provisionador cria banco, papéis e segredo e ativa a clínica com o `OWNER` (ADR-018), ou a deixa `AWAITING_OWNER` (ADR-028). Convites, aceite e reativação de membros entram no PR 2 da CRM-018. **Falta:** nome da clínica, a rota do fuso (o armazenamento entrou na CRM-015, `ClinicSettingsRepository`) e as telas.
+**Estado:** o provisionador cria banco, papéis e segredo e ativa a clínica com o `OWNER` (ADR-018), ou a deixa `AWAITING_OWNER` (ADR-028). Convites, aceite e reativação de membros entram no PR 2 da CRM-018. Login, aceite de convite, seleção de clínica e carteira da agência, com a situação do provisionamento, já estão na `main` (FE-002, FE-004 e FE-005).
+**Estado (16/11/2026):** API de configurações concluída na branch `feat/crm-013-config-clinica`, no modo MVP; falta a tela (Codex), por isso `[-]`.
+- **Módulo `settings`:** só a API. O nome fica no banco central e o fuso no banco da clínica, pelos repositórios do `tenant`. O ArchUnit impede o `identity` de alcançar a persistência da clínica, por isso o módulo é próprio.
+- **Migração central V15:** só `GRANT UPDATE (clinic_name) ON tenants` ao runtime. Rollback: `REVOKE` do mesmo grant.
+- **Rotas:**
+  - `GET /v1/clinic/settings` (`CLINIC_SETTINGS_VIEW`, todos os papéis): `clinicName` e `timeZone`;
+  - `PUT /v1/clinic/settings/name` e `PUT /v1/clinic/settings/time-zone` (`CLINIC_SETTINGS_EDIT`, só o Proprietário), respondendo as configurações completas.
+  - Rotas separadas porque são dois bancos: uma falha nunca deixa metade da mudança aplicada. Vale a última gravação.
+- **Validação:** nome com as regras de `ClinicName` (movido de `onboarding.domain` para `tenant.domain`): sem espaços nas pontas, 1 a 160 caracteres, sem caracteres de controle. Fuso IANA Área/Local, sem deslocamento fixo nem `Etc/` (`ClinicSettings`).
+- **Efeito da troca de fuso:** relatórios, dashboard e janelas de tarefas leem o fuso na hora da consulta e passam a seguir o novo, inclusive em meses anteriores; o dia da venda já gravado não muda ([metricas.md](docs/metricas.md)).
+- **Testes:**
+  - `ClinicSettingsIT`: o Proprietário renomeia (com `trim`) e o nome aparece em `/v1/auth/clinics`; troca o fuso e o dashboard o segue; nome e fuso inválidos dão 400 sem alterar nada; Gestor, Atendente e Somente leitura leem e recebem 403 ao alterar; a clínica B não é afetada; sem CSRF dá 403.
+  - `ControlRuntimeGrantsIT`: o runtime renomeia, mas não muda o vínculo do banco.
+  - `BootstrapIT` passa a esperar a V15.
+  - `clean verify`: 151 testes, um falhou (`MfaLockoutIT.aParallelBurstComparesAtMostTenWrongCodes`, rajada concorrente do segundo fator, que esta tarefa não toca). Ele passou na rodada anterior e duas vezes isolado; parece instável sob carga.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos:
+  - log com código estável (`CLINIC_RENAMED`, `CLINIC_TIME_ZONE_CHANGED`), sem o nome;
+  - o `UPDATE` do nome confere de novo o Proprietário ativo, contra a troca de papel entre a checagem e a gravação;
+  - o nome recusa também caracteres invisíveis de formatação (inversão bidi);
+  - testes de corpo inválido no nome, `CLINIC_NOT_SELECTED` e Proprietário rebaixado.
+  - **Não feito:** erros 403/409/503 na OpenAPI (modo MVP). Aviso na tela antes de trocar o fuso: pedido no brief do Codex.
+- **Implantação:** rodar o `migrate` (V15) antes da API nova.
+- **Pendente:** tela de configurações da clínica (Codex).
 
 ### [ ] CRM-014 — Cadastro público de clínica direta (P2)
 **Depende de:** CRM-013, CRM-016.
@@ -443,11 +466,14 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Aceite:** atendente conclui cadastro e encontra contato no celular e no desktop; acessível por teclado.
 **Estado (11/11/2026):** entregue pelo Codex (`feat(frontend): add clinic contacts and profiles`, na `main`): `/app/contatos`, com perfil, cadastro e edição.
 
-### [ ] CRM-023 — Linha do tempo do contato e do lead (P1)
+### [-] CRM-023 — Linha do tempo do contato e do lead (P1)
 **Depende de:** CRM-021, CRM-032.
 **Atende:** PAC-05, CRM-09, RN-08.
 **Entregas:** notas e timeline unificada (eventos do lead, vendas, tarefas e, depois de CRM-083, mensagens), com autor e horário.
 **Aceite:** eventos aparecem em ordem estável, com autor; usuário de outra clínica não lê notas (A/B).
+**Estado (16/11/2026):** parcial.
+- **Já existe:** notas do lead (migração de clínica V7, `GET`/`POST /v1/clinic/leads/{id}/notes`) e eventos do lead (`GET /v1/clinic/leads/{id}/events`). O histórico do lead foi entregue pelo Codex (`feat(frontend): add lead history and funnel settings`, PR #42).
+- **Falta:** a linha do tempo unificada do contato (eventos de todos os leads, vendas e tarefas, em ordem estável e com autor) e a tela dela no perfil do contato. As mensagens entram com a CRM-083.
 
 ### [ ] CRM-024 — Importação de contatos por planilha (P1)
 **Depende de:** CRM-021.
@@ -632,7 +658,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - ~~tela rápida de registro~~: entregue pelo Codex (registro no detalhe do lead e gestão em `/app/vendas`, na `main`);
   - uso das vendas ativas no dashboard e no relatório (CRM-051).
 
-### [-] CRM-036 — Configuração do funil e dos motivos de perda (P1)
+### [x] CRM-036 — Configuração do funil e dos motivos de perda (P1)
 **Depende de:** CRM-031, CRM-030.
 **Atende:** CRM-01, CRM-06 (ADR-033).
 **Entregas:**
@@ -646,7 +672,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - Pelo menos um motivo ativo sempre; limites de 12 etapas abertas e 50 motivos.
 - Autores validados contra participação ativa; a CRM-036 sempre grava o autor.
 - Matriz de permissões (Atendente e Somente leitura recebem 403) e A/B nas mutações.
-**Estado (10/11/2026):** API concluída na branch `feat/crm-036-config-funil`, no modo MVP; falta a tela (Codex), por isso `[-]`.
+**Estado (10/11/2026):** API concluída na branch `feat/crm-036-config-funil`, no modo MVP; a tela veio depois (ver abaixo).
 - **Migração de clínica V11:** só grants, conforme as entregas acima.
 - **Rotas** (`COMMERCIAL_SETTINGS_EDIT`):
   - `POST /v1/clinic/pipeline/stages`, `PUT /stages/{id}` (nome), `PUT /stages/order` e `PUT /stages/{id}/archived`, sempre com a `version` do funil e respondendo o funil inteiro;
@@ -673,7 +699,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - posição no fim calculada pelo máximo;
   - 404 documentado na OpenAPI.
 - **Implantação:** rodar o `tenant-migrate` (V11) antes da API nova. Sem a V11, o movimento de lead trava a etapa sem permissão e responde 503.
-- **Pendente:** tela de configuração do funil e dos motivos de perda (Codex; brief de 11/11/2026). O catálogo já foi entregue.
+- **Tela (16/11/2026):** entregue pelo Codex em `/app/funil/configuracao` (`feat(frontend): add lead history and funnel settings`, PR #42, e `feat(frontend): improve funnel configuration and stage ordering`, PR #44). Nada pendente.
 
 ## Fase 4 — WhatsApp e caixa de entrada
 
@@ -779,9 +805,8 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - versão desatualizada, Somente leitura 403 e isolamento A/B;
   - grants da V10.
 - **Revisão (`reviewer`):** sem críticos, altos nem médios. Os baixos ficaram registrados na ADR-035 (evento com o mesmo tipo dos dois lados quando só o código ou o título muda; acesso próprio do worker na CRM-091).
-- **Pendente:**
-  - selo e filtros por origem (CRM-092);
-  - tela da origem no detalhe do lead, com correção e histórico de chegadas (Codex; brief de 11/11/2026).
+- **Tela (16/11/2026):** origem no detalhe do lead, com correção, e histórico de chegadas no perfil do contato, entregues pelo Codex (`feat(frontend): capture and display lead origins`, PR #48).
+- **Pendente:** selo e filtros por origem (CRM-092).
 
 ### [ ] CRM-091 — Detecção automática da origem (P0)
 **Depende de:** CRM-082, CRM-090.
@@ -801,12 +826,12 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Entregas:** selo "Tráfego" na lista, no Kanban e na conversa; filtros por origem e campanha; contagem de leads e vendas por origem.
 **Aceite:** só contagens, sem custos; filtros conferem com fixtures.
 
-### [-] CRM-040 — Tarefas e follow-ups (P1)
+### [x] CRM-040 — Tarefas e follow-ups (P1)
 **Depende de:** CRM-021, CRM-032.
 **Atende:** CRM-07.
 **Entregas:** tabela `tasks`, API e telas por responsável, prazo e conclusão, vinculadas a contato e lead.
 **Aceite:** tarefa vincula registros da mesma clínica; filtros de hoje, atrasadas e futuras no fuso da clínica; permissões testadas.
-**Estado (11/11/2026):** API concluída na branch `feat/crm-040-tarefas`, no modo MVP; falta a tela (Codex), por isso `[-]`.
+**Estado (11/11/2026):** API concluída na branch `feat/crm-040-tarefas`, no modo MVP; a tela veio depois (ver abaixo).
 - **Módulo `task`** e migração de clínica V12: tarefa ligada a um contato e, opcionalmente, a um lead do mesmo contato; concluída ou reaberta, nunca excluída; runtime sem `DELETE` e sem mudar o contato, o lead nem a autoria.
 - **Rotas** `/v1/clinic/tasks`:
   - `GET` paginado, com `due=OVERDUE|TODAY|UPCOMING` no fuso da clínica (só abertas), `responsibleId=mine` e filtros de contato, lead e situação;
@@ -830,8 +855,8 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - o responsável só é validado quando muda, para que a tarefa de quem saiu da equipe continue editável;
   - prazo entre 2000 e 2100;
   - `due` combinado com `status` diferente de `OPEN` responde 400.
-- **Pendente:**
-  - tela de tarefas (Codex);
+- **Tela (16/11/2026):** entregue pelo Codex em `/app/tarefas`, também no perfil do contato e no detalhe do lead (`feat(frontend): add clinic tasks and follow-ups`, PR #45).
+- **Fica com outras tarefas:**
   - lembretes de tarefa vencendo (CRM-093);
   - tarefas no histórico do contato (CRM-023).
 
@@ -907,10 +932,11 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - telas (CRM-052, Codex).
 **Aceite:** valores conferem com fixtures conhecidas; nenhuma agregação inclui outra clínica; permissões testadas.
 
-### [ ] CRM-052 — Telas de dashboard e relatório (P1)
+### [-] CRM-052 — Telas de dashboard e relatório (P1)
 **Depende de:** CRM-051.
 **Entregas:** cards do dashboard com atualização periódica, relatório mensal com gráficos e tabelas, e estados vazios.
 **Aceite:** números iguais aos da API; responsivo.
+**Estado (16/11/2026):** dashboard da recepção em `/app` e relatório mensal em `/app/relatorios`, entregues pelo Codex (`feat(frontend): add clinic dashboard and monthly report`, PR #43). Faltam só os cards de conversas, que dependem da CRM-083, como na CRM-051.
 
 ### [ ] CRM-053 — Lista de leads e exportação (P1)
 **Depende de:** CRM-032, CRM-092.
@@ -1007,7 +1033,14 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 
 **Ajustadas em 07/11/2026** depois da CRM-018 (agências): FE-001, FE-002 e FE-004 ganharam itens, e a FE-005 é nova. **Em 09/11/2026**, depois da CRM-016 (segundo fator): FE-002 ajustada e FE-006 nova. Códigos de erro em [api-convencoes.md](docs/api-convencoes.md).
 
-### [ ] FE-001 — Base do painel (P0)
+**Estado (16/11/2026):** FE-001 a FE-006 estão na `main`:
+- FE-001, FE-002, FE-004 e FE-006: `feat(frontend): add authenticated workspace and navigation` (cliente HTTP com CSRF, painel, `/login`, `/convite`, `/seguranca`, testes em `frontend/tests/`);
+- FE-003: `feat(frontend): add clinic team and invitations` (PR #25, `/app/equipe`);
+- FE-005: `feat(frontend): add agency clinic portfolio` (PR #26, `/agencia`).
+
+Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `frontend/tests/` e o `build`. O fluxo completo do dono novo (convite, segundo fator e painel) não foi refeito agora no navegador.
+
+### [x] FE-001 — Base do painel (P0)
 **Depende de:** contrato atual (sessão, CSRF, erros).
 **Entregas:**
 - Cliente HTTP único:
@@ -1027,7 +1060,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - Toda resposta de erro mostra a `message` do servidor ou um texto por `code`.
 - `lint`, `typecheck` e `build` passam.
 
-### [ ] FE-002 — Login, logout e seleção de clínica (P0)
+### [x] FE-002 — Login, logout e seleção de clínica (P0)
 **Depende de:** FE-001.
 **Entregas:**
 - Tela `/login`, com o login como formulário (`email`, `password`).
@@ -1048,7 +1081,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - `CLINIC_NOT_SELECTED` leva à seleção.
 - Acessível por teclado.
 
-### [ ] FE-003 — Equipe e convites (P1)
+### [x] FE-003 — Equipe e convites (P1)
 **Depende de:** FE-002.
 **Entregas:**
 - Lista paginada da equipe com filtros `role` e `active`.
@@ -1060,7 +1093,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - Estados vazio e de erro.
 - Funciona no celular.
 
-### [ ] FE-004 — Aceite de convite (P1)
+### [x] FE-004 — Aceite de convite (P1)
 **Depende de:** FE-001.
 **Entregas:**
 - Página `/convite`:
@@ -1077,7 +1110,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - `INVITATION_INVALID`, `INVITATION_LOGIN_REQUIRED`, `INVITATION_ACCOUNT_MISMATCH` e `MEMBER_ALREADY_ACTIVE` têm mensagens próprias.
 - A senha segue a regra do servidor (12 caracteres a 72 bytes), validada também no servidor.
 
-### [ ] FE-005 — Carteira da agência (P1)
+### [x] FE-005 — Carteira da agência (P1)
 **Depende de:** FE-002.
 **Entregas:**
 - Área `/agencia`:
@@ -1095,7 +1128,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - Estados de carregamento, vazio ("nenhuma clínica na carteira") e erro; funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam.
 
-### [ ] FE-006 — Segundo fator: cadastro, verificação e gestão (P0)
+### [x] FE-006 — Segundo fator: cadastro, verificação e gestão (P0)
 **Depende de:** FE-001, FE-002 e o merge da CRM-016 (rotas `/api/v1/auth/mfa/**` no contrato).
 **Contexto:** desde a CRM-016, dono de clínica e admin de agência só usam o sistema depois de cadastrar e verificar um app autenticador (TOTP). Sem estas telas, essas pessoas ficam paradas no primeiro login. Regras em [autenticacao.md](docs/autenticacao.md), seção "Segundo fator".
 **Entregas:**
@@ -1139,6 +1172,22 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - **Fluxo completo:** um dono de clínica novo consegue aceitar o convite, entrar, cadastrar o fator, guardar os códigos e chegar ao painel; no login seguinte, verifica com o app.
 - **Checks:** `lint`, `typecheck` e `build` passam.
 - **Dependência nova:** um gerador de QR code, por exemplo, exige aprovação do responsável. Sem ela, a tela funciona só com a chave em texto.
+
+### [ ] FE-007 — Configurações da clínica (P1)
+**Depende de:** FE-002 e o merge da CRM-013 (rotas `/api/v1/clinic/settings` no contrato).
+**Entregas:**
+- Página `/app/configuracoes`, no menu do painel para todos os papéis:
+  - `GET /api/v1/clinic/settings` mostra `clinicName` e `timeZone`;
+  - edição só quando `GET /api/v1/auth/clinic` indica `CLINIC_SETTINGS_EDIT` (só o Proprietário); para os outros papéis, leitura. A permissão na tela é só dica; o servidor decide.
+- **Nome:** `PUT /api/v1/clinic/settings/name` com `{clinicName}`; depois do 200, atualizar o nome da clínica no cabeçalho e no seletor de clínica.
+- **Fuso:** `PUT /api/v1/clinic/settings/time-zone` com `{timeZone}`, escolhido numa lista de fusos IANA com rótulo legível (os do Brasil primeiro: `America/Sao_Paulo`, `America/Manaus`, `America/Cuiaba`, `America/Recife`, `America/Belem`, `America/Fortaleza`, `America/Rio_Branco`, `America/Noronha`…), sem campo livre.
+  - Antes de confirmar, avisar que a troca muda o "hoje", os prazos de tarefas e os limites de dia e mês dos relatórios, inclusive de meses anteriores, e que os dias de venda já gravados não mudam.
+- Cada formulário salva sozinho, porque o servidor trata nome e fuso em operações separadas.
+**Aceite:**
+- `INVALID_INPUT` com `fields` `clinicName` ou `timeZone` aparece junto do campo; `CLINIC_ACCESS_DENIED` (403) mostra permissão negada; `CLINIC_NOT_SELECTED` (409) leva à seleção.
+- Nome com no máximo 160 caracteres, validado também no servidor.
+- Estados de carregamento, erro e sucesso; funciona no celular e por teclado, com rótulos.
+- `lint`, `typecheck` e `build` passam.
 
 ## Retirado do MVP
 
