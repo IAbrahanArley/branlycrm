@@ -21,8 +21,9 @@ A JPA central não gerencia nenhuma entidade (`ControlJpaConfiguration`). Entida
 - db/migration: migrações do banco central, executadas pelo Flyway da aplicação.
 - db/tenant-migration: migrações de clínicas, aplicadas pelo provisionador como dono; NÃO são executadas no banco central. Migrações novas chegam às clínicas já existentes pelo comando `tenant-migrate` (ADR-031), rodado a cada deploy depois do `migrate` e antes da API nova. Clínica não migrada falha fechada com `CLINIC_DATA_SCHEMA_OUTDATED`. Migrações de clínica são aditivas (expand/contract), porque a API antiga roda sobre o schema novo durante o deploy.
 - V2 central garante UUID, nomes vinculados, unicidade, campos obrigatórios, estados válidos, participação sem duplicação e imutabilidade do vínculo banco/tenant.
+- V15 central concede ao runtime `UPDATE (clinic_name)` em `tenants`, para o Proprietário renomear a clínica (CRM-013). Vínculo do banco, agência e situação continuam protegidos pelos gatilhos e pela falta de grant.
 - V1 tenant cria vector e tenant_identity com no máximo uma linha. Provisionamento insere a identidade antes de ativar e concede somente SELECT dessa tabela ao papel runtime.
-- V3 tenant cria `clinic_settings` (fuso, linha única), com `SELECT` e `UPDATE (time_zone)` para o runtime.
+- V3 tenant cria `clinic_settings` (fuso, linha única), com `SELECT` e `UPDATE (time_zone)` para o runtime. Nome e fuso são lidos e alterados por `/v1/clinic/settings` (módulo `settings`, CRM-013), em operações separadas porque ficam em bancos diferentes.
 - V4 tenant cria `contacts` (telefone E.164 único, inclusive arquivados), `tags`, `contact_tags` e `contact_consents` (só inserção), com a extensão `pg_trgm` e grants por coluna (ADR-032).
 - V5 tenant cria `pipelines`, `pipeline_stages` e `loss_reasons` com o funil padrão e os motivos iniciais; o runtime só lê (ADR-033).
 - As demais tabelas de negócio (leads, vendas, conversas) definem as próprias constraints nas migrações correspondentes.

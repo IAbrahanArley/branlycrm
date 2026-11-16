@@ -6,7 +6,7 @@
 ## Regras gerais
 
 - **Período por acontecimento.** Cada número conta o que aconteceu dentro do período, e não o que foi criado nele e aconteceu depois. Assim, um mês fechado não muda mais. A data de referência de cada métrica está na tabela.
-- **Fuso da clínica.** Dia e mês são calculados no fuso de `clinic_settings.time_zone`. O mês vai do dia 1, 00:00, até o dia 1 do mês seguinte, 00:00 (fim exclusivo), no fuso da clínica.
+- **Fuso da clínica.** Dia e mês são calculados no fuso de `clinic_settings.time_zone`. O mês vai do dia 1, 00:00, até o dia 1 do mês seguinte, 00:00 (fim exclusivo), no fuso da clínica. O fuso é lido na hora da consulta: se o Proprietário trocá-lo (CRM-013), os limites de dia e de mês passam a seguir o fuso novo, inclusive para meses anteriores. Datas já gravadas, como o dia da venda, não mudam.
 - **Só a clínica selecionada.** Toda consulta roda no banco da clínica, pelo acesso autorizado (ADR-014). Não existe agregado entre clínicas na Fase 1.
 - **Vendas canceladas não contam** em nenhuma métrica, mesmo quando o cancelamento é posterior ao período. O relatório de um mês já passado pode, portanto, diminuir quando uma venda daquele mês é cancelada: é a correção do lançamento, não um novo acontecimento.
 - **Correções de venda** valem pelo valor atual (procedimento, valor e data já corrigidos).

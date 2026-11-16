@@ -67,4 +67,37 @@ public class TenantRegistryRepository {
                 ClinicRole.valueOf(row.getString("role"))),
         subjectId);
   }
+
+  /** Name of an active clinic; the caller has already authorized the access. */
+  public Optional<String> findClinicName(UUID tenantId) {
+    return jdbc
+        .queryForList(
+            "SELECT clinic_name FROM tenants WHERE tenant_id = ? AND status = 'ACTIVE'",
+            String.class,
+            tenantId)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * Renames an active clinic (CRM-013). The caller has already authorized the access; the UPDATE
+   * checks again that the clinic is active and the subject is still its active, verified owner, so
+   * a change between the check and the write returns false.
+   */
+  public boolean renameClinic(UUID tenantId, UUID ownerSubjectId, String clinicName) {
+    return jdbc.update(
+            """
+            UPDATE tenants t SET clinic_name = ?
+            WHERE t.tenant_id = ? AND t.status = 'ACTIVE'
+              AND EXISTS (
+                SELECT 1 FROM tenant_memberships m
+                JOIN user_accounts u ON u.subject_id = m.subject_id
+                WHERE m.tenant_id = t.tenant_id AND m.subject_id = ?
+                  AND m.active AND m.role = 'OWNER' AND u.active AND u.email_verified)
+            """,
+            clinicName,
+            tenantId,
+            ownerSubjectId)
+        == 1;
+  }
 }
