@@ -1079,6 +1079,29 @@
         },
         "type" : "object"
       },
+      "PageViewTimelineEntryView" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TimelineEntryView"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageSize" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PhoneCheckRequest" : {
         "properties" : {
           "phone" : {
@@ -1680,6 +1703,58 @@
       "TimeZoneRequest" : {
         "properties" : {
           "timeZone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TimelineEntryView" : {
+        "properties" : {
+          "actorId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "amountCents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "fromValue" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "leadId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "lossReasonId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "saleId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "taskId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "toValue" : {
+            "type" : "string"
+          },
+          "type" : {
             "type" : "string"
           }
         },
@@ -4273,6 +4348,111 @@
         } ],
         "summary" : "Add a tag to a contact (OWNER, MANAGER, ATTENDANT); idempotent",
         "tags" : [ "Contacts" ]
+      }
+    },
+    "/v1/clinic/contacts/{contactId}/timeline" : {
+      "get" : {
+        "operationId" : "getContactTimeline",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "contactId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewTimelineEntryView"
+                }
+              }
+            },
+            "description" : "Timeline page"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: contactId, page or pageSize"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONTACT_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Lead events, notes, sale events and tasks of the contact, newest first (all roles)",
+        "tags" : [ "Timeline" ]
       }
     },
     "/v1/clinic/dashboard" : {
@@ -9607,5 +9787,8 @@
   }, {
     "description" : "Leads, their transitions, timeline and notes",
     "name" : "Leads"
+  }, {
+    "description" : "Unified timeline of a contact",
+    "name" : "Timeline"
   } ]
 }
