@@ -84,7 +84,7 @@ O frontend acompanha cada API aprovada.
 - **Revisões:** `security` e `reviewer`. Correção aplicada: o login não revela mais por tempo de resposta se um e-mail existe e está inativo.
 - **Pendência:** a dependência de validação continua no `pom.xml` sem uso (ADR-023).
 
-### [ ] CRM-005 — Prova técnica do WhatsApp oficial e da origem (P0)
+### [-] CRM-005 — Prova técnica do WhatsApp oficial e da origem (P0)
 **Depende de:** nenhuma (pode correr em paralelo à fundação).
 **Atende:** risco de ORI-02, WPP-01, WPP-02; decisão do fornecedor (seção 11 do documento do cliente).
 **Entregas:**
@@ -101,6 +101,22 @@ O frontend acompanha cada API aprovada.
 - Nenhum token ou número real versionado.
 **Observação:** usa conta e anúncio reais da Meta; exige aprovação e credenciais fornecidas pelo responsável fora do chat.
 **Decisão (10/11/2026):** Cloud API oficial da Meta, direta, sem provedor intermediário (ADR-034). A prova deixa de comparar fornecedores.
+**Estado (17/11/2026):**
+- **Feito:**
+  - empresa verificada;
+  - app "Branly CRM" com o caso de uso WhatsApp e as URLs legais;
+  - número de teste da Meta reivindicado;
+  - envio pela API aceito (scripts em `scripts/meta/`, roteiro em `docs/meta/revisao-app.md`).
+- **Achados:**
+  - o número de teste americano não entrega para celulares brasileiros (erro 130497, restrição da Meta entre países);
+  - o `wa_id` brasileiro pode vir sem o 9º dígito;
+  - app não publicado só recebe os webhooks de teste do painel;
+  - o token de teste precisa ser gerado para a conta "Test Messaging Account".
+- **Falta:**
+  - `referral` real de anúncio;
+  - latência medida;
+  - número brasileiro para envio de ponta a ponta;
+  - revisão do app (vídeos).
 
 ## Fase 1 — Identidade, agências, clínicas e isolamento
 
@@ -732,7 +748,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 ## Fase 4 — WhatsApp e caixa de entrada
 
-### [ ] CRM-080 — Desenho do canal WhatsApp e da fila de entrada (P0)
+### [x] CRM-080 — Desenho do canal WhatsApp e da fila de entrada (P0)
 **Depende de:** CRM-005.
 **Atende:** WPP-01, WPP-02, requisitos não funcionais de desempenho e disponibilidade (ADR-027).
 **Entregas:** ADR detalhada e plano de implementação:
@@ -745,6 +761,55 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 - atualização da caixa de entrada (consulta periódica ou SSE);
 - limites de custo por clínica.
 **Aceite:** revisado por `architect` e `security`; reestimativa do MVP registrada neste arquivo.
+**Estado (17/11/2026):** concluída. Desenho na **ADR-036**, aceita pelo responsável.
+- **Revisão:**
+  - o aceite pedia `architect` e `security`; no modo MVP, a revisão foi feita pelo `reviewer` também no papel de security, e a `security` dedicada volta na CRM-082;
+  - a primeira versão recebeu 1 achado crítico (acesso de serviço ao banco da clínica), 7 altos e 10 médios, todos incorporados.
+- **Decisões aprovadas pelo responsável em 17/11/2026:**
+  - o acesso de serviço `openForChannel`, que é uma mudança estrutural de tenancy;
+  - a coexistência com o app WhatsApp Business, recusando a importação do histórico;
+  - um canal ativo por clínica no MVP.
+
+**Plano de implementação (ordem):**
+1. **CRM-081a — base do canal:**
+   - acesso de serviço `openForChannel` com regra no ArchUnit;
+   - migração central `whatsapp_channels` e `whatsapp_onboarding_tasks` e o papel `crm_whatsapp_worker`;
+   - cifra híbrida com chave pública na API e privada no worker, e regra no ArchUnit;
+   - processo `APP_MODE=whatsapp-worker` no Compose.
+2. **CRM-082a — webhook:**
+   - `GET` de verificação e `POST` com assinatura conferida antes de interpretar o corpo;
+   - gravação em `whatsapp_inbound_events` (migração de clínica) e `NOTIFY`;
+   - rota no Nginx e testes de assinatura, de tamanho e de roteamento A/B.
+3. **CRM-082b — worker de entrada:** contato, lead com origem (CRM-091), mensagem, tentativas e varredura.
+4. **CRM-081b — conexão:** Embedded Signup v4 no frontend; troca do código, registro do número e assinatura dos webhooks no worker; situação do canal para o gestor e para a agência.
+5. **CRM-083 — caixa de entrada:** conversas, assumir e consulta periódica.
+6. **CRM-084:** envio com `whatsapp_outbox` e conciliação; mídias no S3 (dependência para aprovação).
+7. **CRM-085:** janela de 24 horas e modelos. **CRM-086:** respostas rápidas.
+8. **CRM-093 e CRM-094:** notificações.
+
+**Caminho crítico:** fazer o deploy (CRM-072) logo depois do bloco 3 e enviar a revisão do app logo depois do bloco 6, porque os vídeos usam o próprio Branly CRM.
+
+**Pré-requisitos externos:**
+- app publicado na Meta;
+- URL pública do backend (túnel aprovado ou CRM-072);
+- número brasileiro para os testes de envio;
+- revisão do app antes de clínicas reais.
+
+**Reestimativa do MVP (backend, uma pessoa com agentes):**
+
+| Bloco | Tamanho |
+|---|---|
+| 1 e 2 | 4 a 5 dias |
+| 3 | 2 dias |
+| 4 | 2 a 3 dias, mais o tempo da Meta |
+| 5 | 3 dias |
+| 6 | 3 a 4 dias |
+| 7 | 2 dias |
+| 8 | 2 dias |
+| Deploy (CRM-072) | 2 a 3 dias |
+| Lançamento (CRM-070, 071, 073 e piloto) | 4 a 5 dias |
+
+Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas do Codex em paralelo. Os tempos da Meta (revisão do app e restrição do Brasil) podem alongar o prazo.
 
 ### [ ] CRM-081 — Conexão do número da clínica (P0)
 **Depende de:** CRM-080, CRM-018.
