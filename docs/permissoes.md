@@ -38,7 +38,7 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Contatos: importar planilha | ✓ | ✓ | — | — |
 | Leads: ver, Kanban e linha do tempo | ✓ | ✓ | ✓ | ✓ |
 | Leads: criar, mover etapa, temperatura, notas | ✓ | ✓ | ✓ | — |
-| Leads: assumir como responsável | ✓ | ✓ | Si | — |
+| Leads: assumir como responsável | ✓ | ✓ | Só para si | — |
 | Leads: atribuir ou reatribuir a outro, ou soltar o próprio lead | ✓ | ✓ | — | — |
 | Leads: corrigir origem manualmente | ✓ | ✓ | ✓ | — |
 | Vendas e perdas: registrar | ✓ | ✓ | ✓ | — |
