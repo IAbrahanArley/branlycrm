@@ -92,7 +92,8 @@ public class OpenApiConfiguration {
                                 merge(responses, "403", "MFA_ENROLLMENT_REQUIRED");
                               }
                             }
-                            if (method != PathItem.HttpMethod.GET) {
+                            if (method != PathItem.HttpMethod.GET
+                                && !SecurityConfiguration.WHATSAPP_WEBHOOK_PATH.equals(path)) {
                               merge(responses, "403", "CSRF_INVALID");
                             }
                             merge(responses, "500", "INTERNAL_ERROR");
@@ -119,7 +120,10 @@ public class OpenApiConfiguration {
   }
 
   private static final Set<String> PUBLIC_PATHS =
-      Set.of("/v1/auth/csrf", SecurityConfiguration.LOGIN_PATH);
+      Set.of(
+          "/v1/auth/csrf",
+          SecurityConfiguration.LOGIN_PATH,
+          SecurityConfiguration.WHATSAPP_WEBHOOK_PATH);
 
   /**
    * True when the operation declared its own error schema, an {@code *Error} type other than

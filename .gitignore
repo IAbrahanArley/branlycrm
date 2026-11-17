@@ -7,3 +7,5 @@
 /.taste-skill/
 # WhatsApp channel key pair (ADR-036): never versioned.
 .whatsapp-keys/
+# WhatsApp webhook app secret and verification token (ADR-036): never versioned.
+.whatsapp-webhook/

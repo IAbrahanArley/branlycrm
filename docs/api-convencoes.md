@@ -144,6 +144,11 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `SALE_STALE` | 409 | A venda mudou desde a leitura (`version`) | Vendas |
 | `SALE_CANCELLED` | 409 | A venda está cancelada e não muda mais | Vendas |
 | `SALE_PROCEDURE_UNAVAILABLE` / `SALE_PROFESSIONAL_UNAVAILABLE` | 409 | Item inexistente, ou inativo numa escolha nova | Vendas |
+| `WHATSAPP_WEBHOOK_SIGNATURE_INVALID` | 401 | `X-Hub-Signature-256` ausente ou errada; nada foi gravado | Webhook do WhatsApp |
+| `WHATSAPP_WEBHOOK_VERIFICATION_FAILED` | 403 | Modo, token de verificação ou desafio inválido no `GET` | Webhook do WhatsApp |
+| `WHATSAPP_WEBHOOK_MALFORMED` | 400 | Corpo assinado que não é um objeto JSON | Webhook do WhatsApp |
+| `WHATSAPP_WEBHOOK_TOO_LARGE` | 413 | Corpo acima de 3 MiB | Webhook do WhatsApp |
+| `WHATSAPP_WEBHOOK_NOT_CONFIGURED` / `_BUSY` / `_STORAGE_FAILED` | 503 | Sem os arquivos de segredo, muitas entregas simultâneas ou falha ao gravar numa clínica; a Meta reenvia | Webhook do WhatsApp |
 | `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02), ou uma escrita concorrente no banco da clínica | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
 | `METHOD_NOT_ALLOWED` | 405 | Método HTTP não suportado pela rota | `GlobalErrorHandler` |

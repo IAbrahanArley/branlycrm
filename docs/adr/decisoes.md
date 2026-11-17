@@ -806,6 +806,7 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
     6. depois do commit, marca `inbound_pending_since` do canal e dispara `NOTIFY whatsapp_inbound` só com o id do canal;
     7. responde 200.
   - **Pool:** o webhook tem um pool de conexões próprio e pequeno, para não disputar com os usuários, e o tempo de resposta é medido.
+    - **Ajuste na implementação (CRM-082a, 17/11/2026):** em vez de um pool próprio, um limite de entregas simultâneas (padrão 8) sobre o pool por clínica que já existe. Acima do limite, o webhook responde 503 e a Meta reenvia. O efeito é o mesmo, sem um segundo pool por clínica.
   - **Segurança da rota:** `SecurityFilterChain` própria, com `permitAll` e CSRF desligado só nela, sem `web.ignoring()`. Nenhum filtro registra o corpo. O limite de taxa no Nginx é folgado e não é por IP, porque a Meta envia em rajadas de vários IPs.
 
 - **Fila de entrada (worker):**

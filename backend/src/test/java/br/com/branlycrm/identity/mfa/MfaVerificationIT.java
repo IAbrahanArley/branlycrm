@@ -67,7 +67,10 @@ class MfaVerificationIT {
   @Autowired PasswordEncoder encoder;
   @Autowired MutableClock clock;
 
-  @Autowired SecurityFilterChain filterChain;
+  /** The session chain; the WhatsApp webhook has its own (ADR-036). */
+  @Autowired
+  @Qualifier("securityFilterChain")
+  SecurityFilterChain filterChain;
 
   @Autowired
   @Qualifier("requestMappingHandlerMapping")
@@ -110,6 +113,8 @@ class MfaVerificationIT {
         String path = pattern.replaceAll("\\{[^}]*}", uuid).replace("**", "x");
         for (RequestMethod method : methods.isEmpty() ? Set.of(RequestMethod.GET) : methods) {
           if (MfaGateFilter.allows(MfaState.MFA_PENDING, method.name(), path)) continue;
+          // The WhatsApp webhook has its own chain, without session (ADR-036): no gate there.
+          if (path.equals(SecurityConfiguration.WHATSAPP_WEBHOOK_PATH)) continue;
           HttpResponse<String> response =
               method == RequestMethod.GET
                   ? pending.get(path)
@@ -181,6 +186,8 @@ class MfaVerificationIT {
         String path = pattern.replaceAll("\\{[^}]*}", uuid).replace("**", "x");
         for (RequestMethod method : methods.isEmpty() ? Set.of(RequestMethod.GET) : methods) {
           if (MfaGateFilter.allows(state, method.name(), path)) continue;
+          // The WhatsApp webhook has its own chain, without session (ADR-036): no gate there.
+          if (path.equals(SecurityConfiguration.WHATSAPP_WEBHOOK_PATH)) continue;
           HttpResponse<String> response =
               method == RequestMethod.GET
                   ? browser.get(path)

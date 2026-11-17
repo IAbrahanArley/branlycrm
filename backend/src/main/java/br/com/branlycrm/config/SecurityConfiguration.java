@@ -15,6 +15,8 @@ import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -41,6 +43,47 @@ public class SecurityConfiguration {
   public static final String LOGOUT_PATH = "/v1/auth/logout";
   public static final String INVITATION_PREVIEW_PATH = "/v1/invitations/preview";
   public static final String INVITATION_ACCEPT_PATH = "/v1/invitations/accept";
+
+  /** Public WhatsApp Cloud API webhook (ADR-036), authenticated only by its signature. */
+  public static final String WHATSAPP_WEBHOOK_PATH = "/v1/webhooks/whatsapp";
+
+  /**
+   * The webhook's own chain, matched before the session chain: no session, cookie, CSRF nor request
+   * cache, and nothing else is reachable through it. The signature is checked by the controller
+   * before the body is parsed.
+   */
+  @Bean
+  @Order(1)
+  SecurityFilterChain whatsappWebhookFilterChain(HttpSecurity http) throws Exception {
+    return http.securityMatcher(WHATSAPP_WEBHOOK_PATH)
+        .csrf(csrf -> csrf.disable())
+        .requestCache(cache -> cache.disable())
+        .securityContext(context -> context.disable())
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .anonymous(Customizer.withDefaults())
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(HttpMethod.GET, WHATSAPP_WEBHOOK_PATH)
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, WHATSAPP_WEBHOOK_PATH)
+                    .permitAll()
+                    .anyRequest()
+                    .denyAll())
+        .exceptionHandling(
+            // Anonymous denials (other methods) go to the entry point: same 403 body.
+            errors ->
+                errors
+                    .authenticationEntryPoint(
+                        (request, response, error) ->
+                            ApiErrors.write(
+                                response, 403, ApiErrors.ACCESS_DENIED, "Acesso negado."))
+                    .accessDeniedHandler(
+                        (request, response, error) ->
+                            ApiErrors.write(
+                                response, 403, ApiErrors.ACCESS_DENIED, "Acesso negado.")))
+        .build();
+  }
 
   @Bean
   PasswordEncoder passwordEncoder() {
