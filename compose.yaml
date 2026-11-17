@@ -66,10 +66,15 @@ services:
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Defina MFA_ENCRYPTION_KEY}
       # ADR-036: the API seals WhatsApp tokens with the public key only; it can never open them.
       APP_WHATSAPP_KEYS_PUBLIC_DIRECTORY: /run/branly/whatsapp-keys/public
+      # ADR-036: webhook app secret and verification token come from mounted files, never env.
+      # Without them the webhook answers 503 and the rest of the API works.
+      APP_WHATSAPP_WEBHOOK_APP_SECRET_FILE: /run/branly/whatsapp-webhook/app-secret
+      APP_WHATSAPP_WEBHOOK_VERIFY_TOKEN_FILE: /run/branly/whatsapp-webhook/verify-token
     volumes:
       # Read-only: only the future provisioner writes clinic credentials (ADR-016).
       - tenant_secrets:/run/branly/tenant-secrets:ro
       - ${WHATSAPP_KEYS_DIR:-./.whatsapp-keys}/public:/run/branly/whatsapp-keys/public:ro
+      - ${WHATSAPP_WEBHOOK_DIR:-./.whatsapp-webhook}:/run/branly/whatsapp-webhook:ro
     depends_on:
       postgres:
         condition: service_healthy

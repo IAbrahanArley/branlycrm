@@ -845,7 +845,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - na 081b, o caminho de reconexão de um canal `FAILED` (o worker desconecta, e só então a API cria outro);
   - conferir no Compose que o container do worker fica estável.
 
-### [ ] CRM-082 — Webhook de entrada e criação automática de contato e lead (P0)
+### [-] CRM-082 — Webhook de entrada e criação automática de contato e lead (P0)
 **Depende de:** CRM-081, CRM-021, CRM-031.
 **Atende:** WPP-02, PAC-02, CRM-03, RN-01.
 **Entregas:**
@@ -858,6 +858,32 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Roteamento:** `phone_number_id` desconhecido é descartado com log sanitizado; evento da clínica A nunca grava na B.
 - **Latência:** a mensagem vira lead em até 5 s em teste local medido.
 - **Revisão:** `security` obrigatória.
+**Estado (17/11/2026):** parte **082a (webhook)** concluída na branch `feat/crm-082a-webhook`, detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md).
+- **Rota:** `GET` e `POST /v1/webhooks/whatsapp`, com `SecurityFilterChain` própria, sem sessão nem CSRF.
+- **Ordem do `POST`:** corpo bruto até 3 MiB, assinatura `X-Hub-Signature-256` em tempo constante, parse, roteamento pelo registro central, gravação por clínica, sinal `inbound_pending_since` e `NOTIFY`, e só então 200. Qualquer falha de gravação responde 503.
+- **Migração de clínica V14:** `whatsapp_inbound_events`, com deduplicação única, sem DELETE para ninguém e UPDATE só nas colunas de processamento.
+- **Segredos:** o segredo do app e o token de verificação vêm de arquivos montados, relidos quando mudam.
+- **Infra:** `location` exata no Nginx (3 MiB, limite compartilhado para entregas assinadas e estrito por IP para as sem assinatura, logs sem a query) e a pasta `.whatsapp-webhook` no Compose.
+- **Ajuste na ADR-036:** um limite de entregas simultâneas no lugar do pool próprio.
+- **Testes:**
+  - `WebhookPayloadParserTest`: separação, chaves de deduplicação, `history` ignorado, NUL removido, assinatura;
+  - `WhatsappWebhookIT`: desafio, assinatura ausente ou errada sem gravar, roteamento A/B, reenvio sem duplicar, número de outra conta, canal pendente ou com falha, clínica suspensa, conta compartilhada, 503 com nova tentativa segura, outros métodos, JSON inválido e tamanho.
+  - ajustados: `TenantMigrationRolloutIT` (a V14 entra no rebaixamento), `MfaVerificationIT` (a rota do webhook fica fora do portão de MFA, porque não tem sessão);
+  - `clean verify`: 251 unitários e 154 de integração, sem falhas. Numa execução anterior, o `MfaLockoutIT` falhou uma vez por tempo (todas as respostas 429) e passou ao repetir; não tem relação com esta mudança.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico nem alto. Corrigidos:
+  - evento de conta de uma WABA compartilhada por clínicas só vai para a clínica do número citado; sem número, é descartado;
+  - o caractere NUL, que o `jsonb` recusa, é removido, para não travar a entrega para sempre;
+  - eventos de conta repetidos em outra entrega não são mais tratados como duplicatas (`entry.time` no hash);
+  - requisições sem assinatura têm limite próprio por IP no Nginx, e o error log dessa rota não registra a query;
+  - o segredo é relido quando o arquivo muda;
+  - falha no banco central responde 503, e outros métodos recebem 403 com corpo.
+- **Riscos aceitos:**
+  - a regra "o webhook só insere" é garantida pelo código, porque o papel da clínica é o mesmo da API e do worker (ADR-036);
+  - a leitura e a assinatura do corpo acontecem antes do limite de concorrência; o Nginx e as threads do Tomcat limitam a memória;
+  - um evento que o banco recuse por outro motivo de dado ainda trava a entrega até ser corrigido. Ele aparece no log como `storage failed`.
+- **Falta:**
+  - a **082b** (worker): contato, lead com origem, mensagem, tentativas, varredura e retenção de 30 dias;
+  - testar com a Meta real, o que depende da URL pública (CRM-072 ou túnel) e do app publicado.
 
 ### [ ] CRM-083 — Caixa de entrada compartilhada (P1)
 **Depende de:** CRM-082.

@@ -9737,6 +9737,152 @@
         "summary" : "What an invitation grants, for its token holder",
         "tags" : [ "Invitations" ]
       }
+    },
+    "/v1/webhooks/whatsapp" : {
+      "get" : {
+        "operationId" : "verifyWhatsappWebhook",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "hub.mode",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "hub.verify_token",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "hub.challenge",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "The challenge, as text"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "WHATSAPP_WEBHOOK_VERIFICATION_FAILED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "summary" : "Verification handshake: echoes hub.challenge when hub.verify_token matches",
+        "tags" : [ "WhatsApp webhook" ]
+      },
+      "post" : {
+        "operationId" : "receiveWhatsappWebhook",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Hub-Signature-256",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "Stored, duplicated or discarded"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "WHATSAPP_WEBHOOK_MALFORMED"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "WHATSAPP_WEBHOOK_SIGNATURE_INVALID"
+          },
+          "413" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "WHATSAPP_WEBHOOK_TOO_LARGE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "summary" : "Signed delivery (X-Hub-Signature-256): stored in the clinic before answering 200; any storage failure answers 5xx so Meta retries",
+        "tags" : [ "WhatsApp webhook" ]
+      }
     }
   },
   "tags" : [ {
@@ -9787,6 +9933,9 @@
   }, {
     "description" : "Leads, their transitions, timeline and notes",
     "name" : "Leads"
+  }, {
+    "description" : "Deliveries from the WhatsApp Cloud API (Meta)",
+    "name" : "WhatsApp webhook"
   }, {
     "description" : "Unified timeline of a contact",
     "name" : "Timeline"
