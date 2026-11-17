@@ -82,7 +82,11 @@ class ClinicPersistenceTest {
   @Test
   void tenantKeepsTheSubjectOutOfItsText() {
     UUID subject = UUID.randomUUID();
-    assertThat(new ClinicTenant(UUID.randomUUID(), subject).toString())
+    assertThatThrownBy(() -> new ClinicTenant(UUID.randomUUID(), null, null))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new ClinicTenant(UUID.randomUUID(), subject, UUID.randomUUID()))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(new ClinicTenant(UUID.randomUUID(), subject, null).toString())
         .doesNotContain(subject.toString());
   }
 

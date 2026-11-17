@@ -5,3 +5,5 @@
 /work/
 
 /.taste-skill/
+# WhatsApp channel key pair (ADR-036): never versioned.
+.whatsapp-keys/

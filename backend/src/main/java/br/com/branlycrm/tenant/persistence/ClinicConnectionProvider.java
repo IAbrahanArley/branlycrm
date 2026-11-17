@@ -31,7 +31,9 @@ final class ClinicConnectionProvider implements MultiTenantConnectionProvider<Cl
   @Override
   public Connection getConnection(ClinicTenant tenant) throws SQLException {
     if (tenant == null) throw new SQLException("Clinic connections require an explicit tenant");
-    return connections.open(tenant.tenantId(), tenant.subjectId());
+    return tenant.service()
+        ? connections.openForChannel(tenant.tenantId(), tenant.channelId())
+        : connections.open(tenant.tenantId(), tenant.subjectId());
   }
 
   @Override
