@@ -46,9 +46,8 @@ O frontend acompanha cada API aprovada.
   - persistência (ADR-017, ADR-018), sessão (ADR-015), banco por clínica (ADR-014) e fuso;
   - escopo pelo documento do cliente (ADR-024), papéis (ADR-025) e agências (ADR-026);
   - e-mail com Resend (ADR-021) e hospedagem Lightsail São Paulo + Vercel (ADR-022 revisada).
-- **Falta:**
-  - fornecedor do WhatsApp (depois de CRM-005) e desenho do canal (CRM-080);
-  - segredos na VM e proxy confiável (CRM-072).
+- **Decididos depois:** fornecedor do WhatsApp, a Cloud API oficial da Meta (ADR-034), e desenho do canal (ADR-036, CRM-080).
+- **Falta:** segredos na VM e proxy confiável (CRM-072).
 
 ### [x] CRM-002 — Criar estrutura do repositório e CI (P0)
 **Depende de:** CRM-001.
@@ -301,7 +300,7 @@ O frontend acompanha cada API aprovada.
 - **Telas:** login, aceite de convite, seleção de clínica, carteira da agência e acompanhamento do provisionamento.
 **Aceite:** clínica nova entra no sistema sem enxergar registros de outras; convite vencido, reutilizado ou de outra clínica é recusado; perfis têm acessos adequados.
 **Estado:** o provisionador cria banco, papéis e segredo e ativa a clínica com o `OWNER` (ADR-018), ou a deixa `AWAITING_OWNER` (ADR-028). Convites, aceite e reativação de membros entram no PR 2 da CRM-018. Login, aceite de convite, seleção de clínica e carteira da agência, com a situação do provisionamento, já estão na `main` (FE-002, FE-004 e FE-005).
-**Estado (16/11/2026):** API de configurações concluída na branch `feat/crm-013-config-clinica`, no modo MVP; falta a tela (Codex), por isso `[-]`.
+**Estado (16/11/2026):** API de configurações concluída na branch `feat/crm-013-config-clinica`, no modo MVP; falta a tela (Codex), por isso `[-]`. Na `main` desde o PR #49; a tela é a **FE-007**, já desbloqueada.
 - **Módulo `settings`:** só a API. O nome fica no banco central e o fuso no banco da clínica, pelos repositórios do `tenant`. O ArchUnit impede o `identity` de alcançar a persistência da clínica, por isso o módulo é próprio.
 - **Migração central V15:** só `GRANT UPDATE (clinic_name) ON tenants` ao runtime. Rollback: `REVOKE` do mesmo grant.
 - **Rotas:**
@@ -489,7 +488,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Aceite:** eventos aparecem em ordem estável, com autor; usuário de outra clínica não lê notas (A/B).
 **Estado (16/11/2026):** parcial.
 - **Já existe:** notas do lead (migração de clínica V7, `GET`/`POST /v1/clinic/leads/{id}/notes`) e eventos do lead (`GET /v1/clinic/leads/{id}/events`). O histórico do lead foi entregue pelo Codex (`feat(frontend): add lead history and funnel settings`, PR #42).
-- **API da linha do tempo do contato (16/11/2026):** concluída na branch `feat/crm-023-linha-do-tempo`, no modo MVP.
+- **API da linha do tempo do contato (16/11/2026):** concluída na branch `feat/crm-023-linha-do-tempo`, no modo MVP. Na `main` desde o PR #50; a tela é a **FE-008**, já desbloqueada.
   - **Módulo `timeline`:** só leitura, com SQL nativo numa transação por leitura, como o `report`. Sem migração: o runtime já lê as tabelas e os índices por lead, venda e contato bastam.
   - **Rota:** `GET /v1/clinic/contacts/{id}/timeline?page=&pageSize=` (`LEAD_READ`, todos os papéis), paginada em `PageView`. Cada item tem `kind`:
     - `LEAD_EVENT`, com `type`, `fromValue`, `toValue` e `lossReasonId`;
@@ -820,7 +819,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Isolamento:** a agência só conecta números de clínicas da própria carteira.
 - **Tokens:** nunca aparecem em respostas ou logs.
 - **Revisão:** `security`.
-**Estado (17/11/2026):** parte **081a (base do canal)** concluída na branch `feat/crm-081a-base-canal`, detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md).
+**Estado (17/11/2026):** parte **081a (base do canal)** concluída na branch `feat/crm-081a-base-canal` (na `main` pelo PR #52), detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md).
 - **Migração central V16:** `whatsapp_channels` e `whatsapp_onboarding_tasks`, com um canal vivo por número e por clínica. A API não lê as colunas cifradas, e nenhum papel exclui.
 - **Papel e processo:** `crm_whatsapp_worker` no bootstrap; `APP_MODE=whatsapp-worker` com `LISTEN` numa conexão própria e varredura a cada 30 segundos, ainda sem processar eventos.
 - **Cifra:** RSA-OAEP 3072 + AES-256-GCM da JDK. A chave pública fica na API; a privada, só no worker. O contexto (canal e finalidade) é autenticado, e há rotação por versão. O script `infra/whatsapp/generate-keys.sh` gera as chaves.
@@ -858,7 +857,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Roteamento:** `phone_number_id` desconhecido é descartado com log sanitizado; evento da clínica A nunca grava na B.
 - **Latência:** a mensagem vira lead em até 5 s em teste local medido.
 - **Revisão:** `security` obrigatória.
-**Estado (17/11/2026):** parte **082a (webhook)** concluída na branch `feat/crm-082a-webhook`, detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md).
+**Estado (17/11/2026):** parte **082a (webhook)** concluída na branch `feat/crm-082a-webhook` (na `main` pelo PR #53), detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md).
 - **Rota:** `GET` e `POST /v1/webhooks/whatsapp`, com `SecurityFilterChain` própria, sem sessão nem CSRF.
 - **Ordem do `POST`:** corpo bruto até 3 MiB, assinatura `X-Hub-Signature-256` em tempo constante, parse, roteamento pelo registro central, gravação por clínica, sinal `inbound_pending_since` e `NOTIFY`, e só então 200. Qualquer falha de gravação responde 503.
 - **Migração de clínica V14:** `whatsapp_inbound_events`, com deduplicação única, sem DELETE para ninguém e UPDATE só nas colunas de processamento.
@@ -1184,6 +1183,8 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 
 Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `frontend/tests/` e o `build`. O fluxo completo do dono novo (convite, segundo fator e painel) não foi refeito agora no navegador.
 
+**Próximas para o Codex (17/11/2026):** **FE-007** (configurações da clínica) e **FE-008** (linha do tempo do contato). As APIs estão na `main` e no `docs/api/openapi.json` (PRs #49 e #50), e as duas tarefas são independentes. As telas do WhatsApp (situação do canal, conexão e caixa de entrada) só entram depois da CRM-081b e da CRM-083.
+
 ### [x] FE-001 — Base do painel (P0)
 **Depende de:** contrato atual (sessão, CSRF, erros).
 **Entregas:**
@@ -1318,7 +1319,7 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - **Dependência nova:** um gerador de QR code, por exemplo, exige aprovação do responsável. Sem ela, a tela funciona só com a chave em texto.
 
 ### [ ] FE-007 — Configurações da clínica (P1)
-**Depende de:** FE-002 e o merge da CRM-013 (rotas `/api/v1/clinic/settings` no contrato).
+**Depende de:** FE-002 e o merge da CRM-013 (rotas `/api/v1/clinic/settings` no contrato). Desbloqueada: a CRM-013 está na `main` (PR #49).
 **Entregas:**
 - Página `/app/configuracoes`, no menu do painel para todos os papéis:
   - `GET /api/v1/clinic/settings` mostra `clinicName` e `timeZone`;
@@ -1334,7 +1335,7 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - `lint`, `typecheck` e `build` passam.
 
 ### [ ] FE-008 — Linha do tempo do contato (P1)
-**Depende de:** CRM-022 (perfil do contato) e o merge da CRM-023 (rota `/api/v1/clinic/contacts/{id}/timeline` no contrato).
+**Depende de:** CRM-022 (perfil do contato) e o merge da CRM-023 (rota `/api/v1/clinic/contacts/{contactId}/timeline` no contrato). Desbloqueada: a CRM-023 está na `main` (PR #50).
 **Entregas:**
 - Seção "Histórico" no perfil do contato (`/app/contatos/{id}`), para todos os papéis, com `GET /api/v1/clinic/contacts/{id}/timeline`, 25 por página e botão "carregar mais" (página seguinte, somando ao fim e descartando repetidos pela chave `kind` + `id`, porque itens novos deslocam as páginas).
 - Um item por `kind`, com data e hora no fuso da clínica (`GET /api/v1/clinic/settings`) e o autor pelo `actorId`. Quando o nome não estiver disponível ao papel, mostrar "Membro da equipe"; `actorId` nulo é "Automação".
