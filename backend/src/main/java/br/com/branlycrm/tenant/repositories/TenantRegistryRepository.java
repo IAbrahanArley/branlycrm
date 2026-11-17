@@ -1,5 +1,6 @@
 package br.com.branlycrm.tenant.repositories;
 
+import br.com.branlycrm.tenant.domain.ChannelAccess;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicMembership;
 import br.com.branlycrm.tenant.domain.ClinicRole;
@@ -20,6 +21,33 @@ public class TenantRegistryRepository {
 
   public TenantRegistryRepository(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
+  }
+
+  /**
+   * Service access through an active WhatsApp channel of an active clinic (ADR-036). The tenant
+   * comes from the channel registry row; there is no user, no membership and no fallback.
+   */
+  public Optional<ChannelAccess> findChannelAccess(UUID channelId) {
+    if (channelId == null) return Optional.empty();
+    return jdbc
+        .query(
+            """
+            SELECT t.tenant_id, t.database_name, t.database_user, t.credential_reference
+            FROM whatsapp_channels c
+            JOIN tenants t ON t.tenant_id = c.tenant_id
+            WHERE c.id = ? AND c.status = 'ACTIVE' AND t.status = 'ACTIVE'
+            """,
+            (row, index) ->
+                new ChannelAccess(
+                    new TenantDatabase(
+                        row.getObject("tenant_id", UUID.class),
+                        row.getString("database_name"),
+                        row.getString("database_user"),
+                        row.getString("credential_reference")),
+                    channelId),
+            channelId)
+        .stream()
+        .findFirst();
   }
 
   /** Access with the role, read in the same query that checks clinic, membership and account. */

@@ -811,7 +811,7 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas do Codex em paralelo. Os tempos da Meta (revisão do app e restrição do Brasil) podem alongar o prazo.
 
-### [ ] CRM-081 — Conexão do número da clínica (P0)
+### [-] CRM-081 — Conexão do número da clínica (P0)
 **Depende de:** CRM-080, CRM-018.
 **Atende:** WPP-01.
 **Entregas:** registro do canal pela agência ou pela plataforma, conforme o fornecedor; teste de conexão; estado do canal visível ao gestor e à agência.
@@ -820,6 +820,30 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Isolamento:** a agência só conecta números de clínicas da própria carteira.
 - **Tokens:** nunca aparecem em respostas ou logs.
 - **Revisão:** `security`.
+**Estado (17/11/2026):** parte **081a (base do canal)** concluída na branch `feat/crm-081a-base-canal`, detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md).
+- **Migração central V16:** `whatsapp_channels` e `whatsapp_onboarding_tasks`, com um canal vivo por número e por clínica. A API não lê as colunas cifradas, e nenhum papel exclui.
+- **Papel e processo:** `crm_whatsapp_worker` no bootstrap; `APP_MODE=whatsapp-worker` com `LISTEN` numa conexão própria e varredura a cada 30 segundos, ainda sem processar eventos.
+- **Cifra:** RSA-OAEP 3072 + AES-256-GCM da JDK. A chave pública fica na API; a privada, só no worker. O contexto (canal e finalidade) é autenticado, e há rotação por versão. O script `infra/whatsapp/generate-keys.sh` gera as chaves.
+- **Acesso de serviço:** `openForChannel` e `ClinicTenant.ofChannel`, com regras no ArchUnit.
+- **Dependência:** o driver do PostgreSQL passou de `runtime` para `compile` (`PGConnection` para o `LISTEN`). Não é dependência nova.
+- **Testes:**
+  - `ChannelSealingTest`: ida e volta, outro canal ou finalidade, adulteração, versão errada, chave antiga, sem chave, chave fraca;
+  - `WhatsappChannelIT`: permissões da API e do worker, unicidade, acesso só ao próprio banco pela API e pelo worker, e recusa com clínica suspensa e canal com falha ou desconectado;
+  - ArchUnit com três regras novas.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico. Corrigidos:
+  - o worker não ficava de pé (`spring.main.keep-alive`);
+  - o worker só atualiza as colunas de estado;
+  - a API só cria tarefas pendentes;
+  - limite de tamanho dos valores cifrados;
+  - o listener sobrevive a qualquer erro, com tempos de conexão definidos;
+  - o worker confere o par de chaves ao subir;
+  - ArchUnit também pega referências de método e restringe o driver ao worker;
+  - documentadas as permissões das chaves na VM Linux;
+  - testes de privilégio, de valor truncado e de `ClinicTenant`.
+- **Falta:**
+  - a **081b**: Embedded Signup, troca do código, registro do número, assinatura dos webhooks e tela de situação do canal;
+  - na 081b, o caminho de reconexão de um canal `FAILED` (o worker desconecta, e só então a API cria outro);
+  - conferir no Compose que o container do worker fica estável.
 
 ### [ ] CRM-082 — Webhook de entrada e criação automática de contato e lead (P0)
 **Depende de:** CRM-081, CRM-021, CRM-031.

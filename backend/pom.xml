@@ -69,7 +69,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
+      <!-- Compile scope since CRM-081a: the WhatsApp worker reads LISTEN/NOTIFY via PGConnection. -->
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

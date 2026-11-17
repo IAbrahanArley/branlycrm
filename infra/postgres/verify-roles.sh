@@ -22,6 +22,17 @@ BEGIN
  IF has_table_privilege(current_user,'flyway_schema_history','UPDATE') THEN RAISE EXCEPTION 'Runtime can alter migration history'; END IF;
  IF has_database_privilege('crm_tenant_provisioner',current_database(),'CONNECT') THEN RAISE EXCEPTION 'Provisioner can access control database'; END IF;
  IF has_column_privilege('crm_provisioning_worker','user_accounts','password_hash','SELECT') THEN RAISE EXCEPTION 'Worker can read password hashes'; END IF;
+ IF has_column_privilege('crm_control_runtime','whatsapp_channels','sealed_token','SELECT')
+    OR has_column_privilege('crm_control_runtime','whatsapp_channels','sealed_pin','SELECT') THEN
+   RAISE EXCEPTION 'API can read sealed WhatsApp secrets';
+ END IF;
+ IF has_table_privilege('crm_whatsapp_worker','user_accounts','SELECT')
+    OR has_table_privilege('crm_whatsapp_worker','tenant_memberships','SELECT')
+    OR has_table_privilege('crm_whatsapp_worker','whatsapp_channels','DELETE')
+    OR has_column_privilege('crm_whatsapp_worker','whatsapp_channels','tenant_id','UPDATE')
+    OR EXISTS (SELECT FROM pg_roles WHERE rolname='crm_whatsapp_worker' AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls)) THEN
+   RAISE EXCEPTION 'WhatsApp worker has excess privileges';
+ END IF;
  IF has_database_privilege('public','postgres','CONNECT') OR has_database_privilege('public','template1','CONNECT') THEN
    RAISE EXCEPTION 'PUBLIC can connect to maintenance databases';
  END IF;
