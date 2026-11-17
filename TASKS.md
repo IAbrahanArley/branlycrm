@@ -473,7 +473,36 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 **Aceite:** eventos aparecem em ordem estável, com autor; usuário de outra clínica não lê notas (A/B).
 **Estado (16/11/2026):** parcial.
 - **Já existe:** notas do lead (migração de clínica V7, `GET`/`POST /v1/clinic/leads/{id}/notes`) e eventos do lead (`GET /v1/clinic/leads/{id}/events`). O histórico do lead foi entregue pelo Codex (`feat(frontend): add lead history and funnel settings`, PR #42).
-- **Falta:** a linha do tempo unificada do contato (eventos de todos os leads, vendas e tarefas, em ordem estável e com autor) e a tela dela no perfil do contato. As mensagens entram com a CRM-083.
+- **API da linha do tempo do contato (16/11/2026):** concluída na branch `feat/crm-023-linha-do-tempo`, no modo MVP.
+  - **Módulo `timeline`:** só leitura, com SQL nativo numa transação por leitura, como o `report`. Sem migração: o runtime já lê as tabelas e os índices por lead, venda e contato bastam.
+  - **Rota:** `GET /v1/clinic/contacts/{id}/timeline?page=&pageSize=` (`LEAD_READ`, todos os papéis), paginada em `PageView`. Cada item tem `kind`:
+    - `LEAD_EVENT`, com `type`, `fromValue`, `toValue` e `lossReasonId`;
+    - `NOTE`;
+    - `SALE_EVENT`, com `type`, `amountCents` e o motivo em `text`;
+    - `TASK_CREATED` e `TASK_COMPLETED`, com o título em `text`.
+
+    Também traz `occurredAt`, `actorId` (subject global; nulo só na automação do WhatsApp) e `leadId`, `saleId` ou `taskId`.
+  - **Ordem:** do mais recente para o mais antigo; nos empates, pela origem e pela ordem de gravação, então a ordem não muda entre páginas.
+  - **Limitação:** tarefa reaberta perde o item de conclusão, porque a tarefa guarda só a conclusão atual.
+  - **Chave única:** `kind` + `id` (as duas entradas de uma tarefa usam o id da tarefa). O total sai da mesma consulta da página (`count(*) OVER ()`).
+  - **Contato inexistente ou de outra clínica:** 404 `CONTACT_NOT_FOUND`. Arquivados continuam com a linha do tempo.
+  - **Testes:** `ContactTimelineIT`:
+    - dois leads, nota, perda, venda cancelada e tarefa concluída, conferindo ordem, autores e campos;
+    - páginas de 3 refazem a mesma lista;
+    - contato sem histórico;
+    - Somente leitura lê;
+    - a clínica B recebe 404 no contato de A, e o contato com o mesmo número em B vem vazio;
+    - tarefa sem lead e tarefa reaberta, sem o item de conclusão;
+    - id desconhecido, id malformado e `pageSize` inválido.
+- **Revisão (`reviewer`):** sem críticos nem altos. Corrigidos:
+  - total e página na mesma consulta, sem divergir;
+  - chave única documentada no contrato e no FE-008;
+  - ordem dentro do mesmo instante documentada;
+  - testes de tarefa sem lead e reaberta.
+  - **Não feito:** paginação por keyset (por enquanto o cliente deduplica) e renomear `TimelineException`.
+- **Pendente:**
+  - tela no perfil do contato (FE-008, Codex);
+  - mensagens (CRM-083).
 
 ### [ ] CRM-024 — Importação de contatos por planilha (P1)
 **Depende de:** CRM-021.
@@ -1187,6 +1216,23 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - `INVALID_INPUT` com `fields` `clinicName` ou `timeZone` aparece junto do campo; `CLINIC_ACCESS_DENIED` (403) mostra permissão negada; `CLINIC_NOT_SELECTED` (409) leva à seleção.
 - Nome com no máximo 160 caracteres, validado também no servidor.
 - Estados de carregamento, erro e sucesso; funciona no celular e por teclado, com rótulos.
+- `lint`, `typecheck` e `build` passam.
+
+### [ ] FE-008 — Linha do tempo do contato (P1)
+**Depende de:** CRM-022 (perfil do contato) e o merge da CRM-023 (rota `/api/v1/clinic/contacts/{id}/timeline` no contrato).
+**Entregas:**
+- Seção "Histórico" no perfil do contato (`/app/contatos/{id}`), para todos os papéis, com `GET /api/v1/clinic/contacts/{id}/timeline`, 25 por página e botão "carregar mais" (página seguinte, somando ao fim e descartando repetidos pela chave `kind` + `id`, porque itens novos deslocam as páginas).
+- Um item por `kind`, com data e hora no fuso da clínica (`GET /api/v1/clinic/settings`) e o autor pelo `actorId`. Quando o nome não estiver disponível ao papel, mostrar "Membro da equipe"; `actorId` nulo é "Automação".
+  - `LEAD_EVENT`: reaproveitar os textos do histórico do lead (criação, etapa, temperatura, responsável, origem, ganho, perda com motivo).
+  - `NOTE`: o texto da nota, preservando quebras de linha e sem interpretar HTML.
+  - `SALE_EVENT`: venda registrada, corrigida ou cancelada, com o valor (`amountCents`, em reais) e o motivo do cancelamento.
+  - `TASK_CREATED` e `TASK_COMPLETED`: o título da tarefa.
+  - Link para o lead (`/app/funil/{leadId}`), a venda (`/app/vendas/{saleId}`) ou a lista de tarefas, quando houver.
+**Aceite:**
+- A ordem é a da API; nada é reordenado no navegador.
+- Estados de carregamento, vazio ("nenhum registro ainda") e erro; `CONTACT_NOT_FOUND` mostra contato não encontrado.
+- Notas e motivos não vão para storage, URL nem console.
+- Funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam.
 
 ## Retirado do MVP
