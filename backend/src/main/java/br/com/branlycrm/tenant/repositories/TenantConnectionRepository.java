@@ -45,6 +45,25 @@ public class TenantConnectionRepository {
             .findAuthorized(tenantId, authenticatedSubject)
             .orElseThrow(TenantAccessException::new)
             .database();
+    return connect(database, tenantId);
+  }
+
+  /**
+   * Service connection for the WhatsApp webhook and worker (ADR-036): authorized by the channel,
+   * which must still be ACTIVE for an ACTIVE clinic of the same tenant at every connection.
+   */
+  public Connection openForChannel(UUID tenantId, UUID channelId) throws SQLException {
+    if (tenantId == null || channelId == null) throw new TenantAccessException();
+    TenantDatabase database =
+        registry
+            .findChannelAccess(channelId)
+            .filter(access -> access.tenantId().equals(tenantId))
+            .orElseThrow(TenantAccessException::new)
+            .database();
+    return connect(database, tenantId);
+  }
+
+  private Connection connect(TenantDatabase database, UUID tenantId) throws SQLException {
     TenantSecret secret =
         secrets
             .read(database)

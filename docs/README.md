@@ -45,5 +45,6 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 - [Próxima etapa: credenciais por clínica e isolamento](plano-isolamento-clinicas.md)
 
 - [Segredos das clínicas](segredos-clinicas.md)
+- [Canal WhatsApp: base, permissões e chaves](whatsapp-canal.md)
 
 - [Provisionamento de clínicas e pools](provisionamento-clinicas.md)

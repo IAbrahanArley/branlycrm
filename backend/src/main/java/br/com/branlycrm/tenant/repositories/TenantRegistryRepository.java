@@ -1,5 +1,6 @@
 package br.com.branlycrm.tenant.repositories;
 
+import br.com.branlycrm.tenant.domain.ChannelAccess;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicMembership;
 import br.com.branlycrm.tenant.domain.ClinicRole;
@@ -20,6 +21,33 @@ public class TenantRegistryRepository {
 
   public TenantRegistryRepository(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
+  }
+
+  /**
+   * Service access through an active WhatsApp channel of an active clinic (ADR-036). The tenant
+   * comes from the channel registry row; there is no user, no membership and no fallback.
+   */
+  public Optional<ChannelAccess> findChannelAccess(UUID channelId) {
+    if (channelId == null) return Optional.empty();
+    return jdbc
+        .query(
+            """
+            SELECT t.tenant_id, t.database_name, t.database_user, t.credential_reference
+            FROM whatsapp_channels c
+            JOIN tenants t ON t.tenant_id = c.tenant_id
+            WHERE c.id = ? AND c.status = 'ACTIVE' AND t.status = 'ACTIVE'
+            """,
+            (row, index) ->
+                new ChannelAccess(
+                    new TenantDatabase(
+                        row.getObject("tenant_id", UUID.class),
+                        row.getString("database_name"),
+                        row.getString("database_user"),
+                        row.getString("credential_reference")),
+                    channelId),
+            channelId)
+        .stream()
+        .findFirst();
   }
 
   /** Access with the role, read in the same query that checks clinic, membership and account. */
@@ -66,5 +94,38 @@ public class TenantRegistryRepository {
                 row.getString("clinic_name"),
                 ClinicRole.valueOf(row.getString("role"))),
         subjectId);
+  }
+
+  /** Name of an active clinic; the caller has already authorized the access. */
+  public Optional<String> findClinicName(UUID tenantId) {
+    return jdbc
+        .queryForList(
+            "SELECT clinic_name FROM tenants WHERE tenant_id = ? AND status = 'ACTIVE'",
+            String.class,
+            tenantId)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * Renames an active clinic (CRM-013). The caller has already authorized the access; the UPDATE
+   * checks again that the clinic is active and the subject is still its active, verified owner, so
+   * a change between the check and the write returns false.
+   */
+  public boolean renameClinic(UUID tenantId, UUID ownerSubjectId, String clinicName) {
+    return jdbc.update(
+            """
+            UPDATE tenants t SET clinic_name = ?
+            WHERE t.tenant_id = ? AND t.status = 'ACTIVE'
+              AND EXISTS (
+                SELECT 1 FROM tenant_memberships m
+                JOIN user_accounts u ON u.subject_id = m.subject_id
+                WHERE m.tenant_id = t.tenant_id AND m.subject_id = ?
+                  AND m.active AND m.role = 'OWNER' AND u.active AND u.email_verified)
+            """,
+            clinicName,
+            tenantId,
+            ownerSubjectId)
+        == 1;
   }
 }

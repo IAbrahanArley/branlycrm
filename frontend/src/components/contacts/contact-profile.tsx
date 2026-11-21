@@ -16,6 +16,8 @@ import {
   asContactError, clinicNeedsRefresh, ContactHeading, ContactLink, ContactProblem, contactInput,
   mutationResultUncertain, PatientBadge, useContactResource,
 } from "./contact-ui";
+import { ContactLeadAction } from "./contact-lead-action";
+import { ContactOriginHistory } from "./contact-origin-history";
 
 const channels = { WHATSAPP: "WhatsApp", EMAIL: "E-mail" } as const;
 const statuses = { OPT_IN: "Autorizado", OPT_OUT: "Recusado", NONE: "Sem registro" } as const;
@@ -188,7 +190,10 @@ function ProfileDetails({ contact, consents, onRefresh }: {
   return (
     <>
       <ContactHeading title={contact.name} description={archived ? "Contato arquivado" : "Contato ativo"} back
-        action={canWrite && !archived && <ContactLink href={`${contactPath(contact.id)}/editar`}><Pencil size={16} aria-hidden="true" />Editar contato</ContactLink>} />
+        action={!archived && <div className="flex flex-wrap gap-2">
+          {canWrite && <ContactLink href={`${contactPath(contact.id)}/editar`}><Pencil size={16} aria-hidden="true" />Editar contato</ContactLink>}
+          {clinic.permissions.LEAD_WRITE === "ALL" && <ContactLeadAction contactId={contact.id} contactName={contact.name} />}
+        </div>} />
       {contact.patient && <PatientBadge />}
       {pending && <p role="status" className="text-sm text-slate-600">Salvando alteração…</p>}
       {failure && (
@@ -251,6 +256,7 @@ function ProfileDetails({ contact, consents, onRefresh }: {
         </Card>
       </div>
       <ConsentCard contact={contact} consents={consents} canWrite={canWrite} pending={locked} run={run} />
+      {clinic.permissions.LEAD_READ === "ALL" && <ContactOriginHistory contactId={contact.id} />}
       {clinic.permissions.TASK_READ === "ALL" && <TaskWorkspace binding={{ contactId: contact.id, contactName: contact.name, archived }} />}
     </>
   );

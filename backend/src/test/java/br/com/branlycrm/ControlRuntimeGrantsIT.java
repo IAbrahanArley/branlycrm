@@ -119,11 +119,28 @@ class ControlRuntimeGrantsIT {
         () ->
             runtime.update(
                 "UPDATE tenants SET agency_id = ? WHERE tenant_id = ?", agency(), tenant));
-    assertDenied(
-        () ->
-            runtime.update("UPDATE tenants SET clinic_name = 'Outra' WHERE tenant_id = ?", tenant));
     assertDenied(() -> runtime.update("DELETE FROM tenants WHERE tenant_id = ?", tenant));
     assertThat(status(tenant)).isEqualTo("ACTIVE");
+  }
+
+  @Test
+  void runtimeRenamesClinicsButNeverRebindsTheirDatabase() {
+    UUID tenant = clinic("ACTIVE", null);
+    runtime.update("UPDATE tenants SET clinic_name = 'Outra' WHERE tenant_id = ?", tenant);
+    assertThat(
+            superuser.queryForObject(
+                "SELECT clinic_name FROM tenants WHERE tenant_id = ?", String.class, tenant))
+        .isEqualTo("Outra");
+    assertDenied(
+        () ->
+            runtime.update(
+                "UPDATE tenants SET database_name = 'clinic_other' WHERE tenant_id = ?", tenant));
+    assertDenied(
+        () ->
+            runtime.update(
+                "UPDATE tenants SET clinic_name = 'Sem nome válido', credential_reference = 'X'"
+                    + " WHERE tenant_id = ?",
+                tenant));
   }
 
   @Test

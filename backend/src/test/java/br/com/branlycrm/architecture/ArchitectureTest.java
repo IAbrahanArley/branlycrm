@@ -9,10 +9,15 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import br.com.branlycrm.provisioning.repositories.TenantInfrastructureRepository;
+import br.com.branlycrm.tenant.domain.ChannelAccess;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicRole;
 import br.com.branlycrm.tenant.domain.TenantDatabase;
 import br.com.branlycrm.tenant.persistence.ClinicTenant;
+import br.com.branlycrm.tenant.repositories.TenantConnectionRepository;
+import br.com.branlycrm.tenant.repositories.TenantRegistryRepository;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -200,7 +205,73 @@ class ArchitectureTest {
         .that()
         .doNotHaveFullyQualifiedName(ClinicTenant.class.getName())
         .should()
-        .callConstructor(ClinicTenant.class, UUID.class, UUID.class)
+        .callConstructor(ClinicTenant.class, UUID.class, UUID.class, UUID.class)
+        .check(CODE);
+  }
+
+  /**
+   * Service access to a clinic database through a WhatsApp channel (ADR-036) is for the WhatsApp
+   * module only: the webhook and the worker. No other module may open clinics without a user.
+   */
+  @Test
+  void onlyTheWhatsappModuleUsesChannelAccess() {
+    // Accesses include method references, not only calls.
+    noClasses()
+        .that()
+        .resideOutsideOfPackage("br.com.branlycrm.whatsapp..")
+        .and()
+        .doNotHaveSimpleName("ClinicTenant")
+        .and()
+        .doNotHaveSimpleName("ClinicConnectionProvider")
+        .and()
+        .doNotHaveSimpleName("TenantConnectionRepository")
+        .and()
+        .doNotHaveSimpleName("TenantRegistryRepository")
+        .should()
+        .accessTargetWhere(accessTo(ClinicTenant.class, "ofChannel"))
+        .orShould()
+        .accessTargetWhere(accessTo(TenantRegistryRepository.class, "findChannelAccess"))
+        .orShould()
+        .accessTargetWhere(accessTo(TenantConnectionRepository.class, "openForChannel"))
+        .orShould()
+        .dependOnClassesThat()
+        .belongToAnyOf(ChannelAccess.class)
+        .check(CODE);
+  }
+
+  /** The JDBC driver is compile scope only for the worker's LISTEN connection (ADR-036). */
+  @Test
+  void onlyTheWhatsappWorkerUsesTheDriverDirectly() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackage("br.com.branlycrm.whatsapp.worker..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("org.postgresql..")
+        .check(CODE);
+  }
+
+  /** A channel access is built only by the registry query that checks channel and clinic. */
+  @Test
+  void channelAccessIsBuiltOnlyFromTheRegistry() {
+    noClasses()
+        .that()
+        .doNotHaveSimpleName("TenantRegistryRepository")
+        .should()
+        .callConstructor(ChannelAccess.class, TenantDatabase.class, UUID.class)
+        .check(CODE);
+  }
+
+  /** The private key opens every channel token: only the WhatsApp worker may use it (ADR-036). */
+  @Test
+  void onlyTheWhatsappWorkerOpensChannelSecrets() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackages(
+            "br.com.branlycrm.whatsapp.worker..", "br.com.branlycrm.whatsapp.secrets..")
+        .should()
+        .dependOnClassesThat()
+        .haveSimpleName("ChannelUnsealer")
         .check(CODE);
   }
 
@@ -353,5 +424,14 @@ class ArchitectureTest {
             "..dto..",
             "org.springframework..")
         .check(CODE);
+  }
+
+  /** Any access to the method, including method references. */
+  private static DescribedPredicate<JavaAccess<?>> accessTo(Class<?> owner, String method) {
+    return DescribedPredicate.describe(
+        "access to " + owner.getSimpleName() + "." + method,
+        access ->
+            access.getTarget().getName().equals(method)
+                && access.getTargetOwner().isEquivalentTo(owner));
   }
 }

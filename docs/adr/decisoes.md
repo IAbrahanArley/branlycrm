@@ -411,6 +411,8 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 
 **Data:** 06/11/2026. **Status:** Aceita como direção; detalhes em CRM-080, depois da prova CRM-005. **Detalha:** ADR-005.
 
+> **Revisão de 17/11/2026 (ADR-036):** a API não lê os tokens dos canais; só o worker os abre.
+
 **Decisão:**
 - **Canal:** só API oficial da WhatsApp Business Platform. O fornecedor (Cloud API direta ou provedor parceiro) é escolhido depois da prova CRM-005, que precisa mostrar o `referral` de um anúncio de teste chegando ao webhook.
 - **Entrada:**
@@ -722,9 +724,155 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - O evento guarda só o tipo anterior e o novo; um evento com o mesmo tipo dos dois lados significa que o código ou o título foi corrigido.
 - O worker da CRM-091 precisa de um acesso próprio para gravar toques, sem reaproveitar o acesso de leitura de um usuário.
 
-## ADR-037 — Hospedagem do backend na Oracle Cloud (OCI Always Free)
+## ADR-036 — Canal WhatsApp: conexão, webhook, fila de entrada e saída
 
-> Numeração: a ADR-036 está reservada pelo desenho do canal do WhatsApp (CRM-080), ainda fora da `main`.
+**Data:** 17/11/2026. **Status:** Aceita pelo responsável em 17/11/2026, inclusive o acesso de serviço `openForChannel`, a coexistência sem importação de histórico e um canal ativo por clínica (CRM-080). **Revisão:** `reviewer`, também no papel de `security` (modo MVP), com 1 achado crítico, 7 altos e 10 médios incorporados nesta versão. **Detalha:** ADR-027 e ADR-034. **Complementa:** ADR-014, ADR-016, ADR-018, ADR-022 e ADR-030. **Substitui:** na ADR-027, o trecho "a API pode lê-los para enviar".
+
+**Contexto:**
+- **Prova (CRM-005, parcial):**
+  - o número de teste da Meta envia e recebe pela Cloud API;
+  - um número americano não entrega a celulares brasileiros (erro 130497); o teste de envio de ponta a ponta precisa de um número brasileiro;
+  - o `wa_id` brasileiro pode vir sem o 9º dígito;
+  - com o app não publicado, só chegam os webhooks de teste do painel;
+  - o `referral` real de anúncio ainda não foi provado e continua sendo risco da CRM-091.
+- **Restrições:**
+  - a API só tem credenciais runtime e não tem o gravador de segredos;
+  - os dados de negócio ficam no banco da clínica;
+  - o acesso ao banco da clínica exige hoje uma participação de usuário (`TenantConnectionRepository.open`).
+
+**Decisão:**
+
+- **Processos:**
+  - A **API** ganha a rota pública do webhook, as rotas autenticadas do canal e as da caixa de entrada.
+  - Um processo novo, **`APP_MODE=whatsapp-worker`**, da mesma imagem e sem HTTP, faz o registro do número, a fila de entrada, o envio e as mídias.
+  - No banco central, o worker usa um papel próprio, **`crm_whatsapp_worker`**, só com as tabelas de canal.
+
+- **Acesso de serviço ao banco da clínica** (mudança estrutural de tenancy; aprovação do responsável, AGENTS §10):
+  - Nova operação **`openForChannel(channelId)`**. Ela autoriza pelo **canal** e não por um usuário:
+    - o canal precisa estar `ACTIVE` e a clínica `ACTIVE`;
+    - o `tenant_id` sai de `whatsapp_channels`, **nunca do payload**;
+    - não existe participação de usuário nem fallback.
+  - O ArchUnit libera essa operação só aos pacotes do webhook e do worker.
+  - **No webhook**, ela só permite `INSERT` em `whatsapp_inbound_events`.
+  - **Canal `PENDING` ou `DISCONNECTED`, ou clínica não `ACTIVE`:** o evento é descartado com resposta 200, com métrica e log sanitizado.
+  - **Papel no banco:** o worker grava com o papel runtime da clínica, o mesmo da API. A autoria vazia ("veio do WhatsApp") é garantida pela aplicação, não por papel (risco aceito).
+
+- **Tabelas centrais:**
+  - **`whatsapp_channels`:**
+    - colunas: `tenant_id`, `waba_id`, `phone_number_id`, número exibido, situação (`PENDING`, `ACTIVE`, `FAILED`, `DISCONNECTED`), token selado e versão da chave, PIN selado, `inbound_pending_since`, autoria e datas;
+    - unicidade: `phone_number_id` único entre os canais não desconectados; **no MVP, um canal ativo por clínica** (índice parcial em `tenant_id`);
+    - permissões: `crm_control_runtime` **sem `SELECT`** nas colunas seladas.
+  - **`whatsapp_onboarding_tasks`:** os passos de conexão depois da troca do código, com idempotência.
+  - Nenhuma das duas guarda mensagens nem dados de pacientes.
+
+- **Conexão (Embedded Signup v4):**
+  1. **Quem conecta:** Proprietário ou Gestor da clínica, ou administrador da agência dona da carteira (CRM-081). Fica registrado quem fez.
+  2. **Troca do código:** a API recebe do navegador o `code` e **troca na hora**, porque o código vale cerca de 30 segundos e é de uso único. O token é **selado imediatamente**, nunca gravado nem registrado em claro, e o código é descartado.
+  3. **IDs:** a conta (`waba_id`) e o número (`phone_number_id`) **não são aceitos do navegador**. O worker os obtém do próprio token (`debug_token` e `GET /<waba>/phone_numbers`) e recusa divergências. O `tenant_id` vem da participação autorizada no pedido.
+  4. **Registro:** o worker registra o número com um PIN de dois fatores que ele mesmo gera e guarda selado, assina os webhooks da conta (`subscribed_apps`) e ativa o canal.
+  5. **Coexistência com o app WhatsApp Business (recomendada):**
+     - a clínica mantém o app no celular;
+     - recebemos os ecos (`smb_message_echoes`);
+     - **recusamos a importação do histórico** (minimização de dados).
+     - Confirmado pelo responsável em 17/11/2026.
+- **Desconexão:** cancela a assinatura dos webhooks, apaga o token e o PIN selados e marca `DISCONNECTED`. Eventos que chegarem depois são descartados.
+
+- **Chaves e segredos:**
+  - **Cifra:** híbrida da JDK (RSA-OAEP 3072 + AES-256-GCM), sem dependência nova, com versão por chave.
+  - **Onde ficam:**
+    - a **chave privada** fica num arquivo montado **só no worker**, fora do volume de segredos das clínicas, que a API lê;
+    - a API recebe só a chave pública;
+    - backup da chave privada fora da VM e separado do backup do banco. Sem ela, todas as clínicas teriam de reconectar.
+  - **Rotação:** o worker mantém as chaves privadas antigas e ressela as linhas com a chave pública nova; a API usa só a versão atual.
+  - **Garantia real:** a cifra protege os tokens **guardados**, em caso de vazamento do banco ou do backup, ou de uma API comprometida depois de as clínicas conectarem. **Risco residual:** uma API comprometida *durante* uma conexão vê aquele token, porque é ela que faz a troca.
+    - **Mitigação:** ligar **"Require App Secret"** (`appsecret_proof`) no app, para que um token vazado não sirva sozinho.
+  - **Segredo do app e token de verificação:** vão por **arquivo montado**, não por variável de ambiente. O segredo vai para a API e o worker; o token de verificação, só para a API. Nunca aparecem em log, resposta ou `toString`.
+  - **Token revogado** (erro 190 ou `account_update`): o canal vai para `FAILED` e o gestor é avisado.
+
+- **Webhook** (`/v1/webhooks/whatsapp`):
+  - **`GET`:**
+    - confere o token de verificação em tempo constante;
+    - devolve `hub.challenge` como `text/plain`, com tamanho limitado;
+    - o access log do Nginx dessa rota não registra a query.
+  - **`POST`:**
+    1. lê o corpo bruto, com limite de **3 MiB** no Nginx e na aplicação (tamanho máximo documentado pela Meta, a confirmar na CRM-082);
+    2. confere `X-Hub-Signature-256` (HMAC-SHA256 com o segredo do app, em tempo constante) **antes de interpretar o JSON**; sem assinatura válida, 401 sem gravar nada;
+    3. **roteia:**
+       - mensagens e atualizações de entrega pelo `phone_number_id`;
+       - eventos da conta (modelo, qualidade, `account_update`) pelo `entry.id`, que precisa bater com o `waba_id` do canal;
+    4. grava em `whatsapp_inbound_events` de cada clínica, com `ON CONFLICT DO NOTHING` pela chave de deduplicação:
+       - mensagem: `wamid`;
+       - entrega: `wamid` mais a situação;
+       - evento sem `wamid`: hash do `change`;
+    5. **qualquer falha de gravação responde 5xx**, sem 200 parcial. A Meta reenvia, e a deduplicação torna a reentrega segura;
+    6. depois do commit, marca `inbound_pending_since` do canal e dispara `NOTIFY whatsapp_inbound` só com o id do canal;
+    7. responde 200.
+  - **Pool:** o webhook tem um pool de conexões próprio e pequeno, para não disputar com os usuários, e o tempo de resposta é medido.
+    - **Ajuste na implementação (CRM-082a, 17/11/2026):** em vez de um pool próprio, um limite de entregas simultâneas (padrão 8) sobre o pool por clínica que já existe. Acima do limite, o webhook responde 503 e a Meta reenvia. O efeito é o mesmo, sem um segundo pool por clínica.
+  - **Segurança da rota:** `SecurityFilterChain` própria, com `permitAll` e CSRF desligado só nela, sem `web.ignoring()`. Nenhum filtro registra o corpo. O limite de taxa no Nginx é folgado e não é por IP, porque a Meta envia em rajadas de vários IPs.
+
+- **Fila de entrada (worker):**
+  - **Sinais:**
+    - o `NOTIFY` é só uma dica, porque qualquer papel do banco central pode emiti-lo; o `LISTEN` usa uma conexão dedicada, fora do Hikari;
+    - a varredura de 30 segundos olha **só o sinal central** `inbound_pending_since`, sem abrir conexão em todas as clínicas.
+  - **Reserva:** `FOR UPDATE SKIP LOCKED`, **serializada por contato** (advisory lock sobre o telefone canônico) e em ordem pelo `timestamp` da Meta.
+  - **Processamento:**
+    - contato pelo telefone canônico (ADR-032, que trata o 9º dígito);
+    - lead (RN-01) com a origem (CRM-091) ou um toque de origem (ADR-035);
+    - mensagem na conversa (CRM-083);
+    - atualizações de entrega.
+  - **Falhas:** tentativas com espera crescente (até 8). `FAILED` nunca perde o evento: tem métrica, alerta e um comando de reprocessamento.
+  - **Meta de desempenho:** a mensagem vira lead em até 5 segundos, medido localmente.
+
+- **Fila de saída** (`whatsapp_outbox`, no banco da clínica):
+  - **Pedido:** a API grava o pedido com uma chave de idempotência gerada pelo cliente. Cada envio leva `biz_opaque_callback_data` igual ao id da linha na fila.
+  - **Timeout:** é resultado incerto (ADR-005). A linha fica `UNCERTAIN` e nunca é reenviada automaticamente, nem quando o worker cai entre o envio e a gravação.
+  - **Conciliação:** pelo `biz_opaque_callback_data` que volta nos webhooks de status. Um status com `wamid` desconhecido fica pendente para nova tentativa.
+  - **Regras de envio:** a janela de 24 horas e os modelos (CRM-085) são conferidos na API e de novo no worker.
+  - **Limite diário de modelos:** 200 por clínica, configurável, com contador atômico. Acima dele, a mensagem fica `BLOCKED_LIMIT`.
+  - **Pagamento:** a clínica paga a Meta na própria conta (termos de uso); sem meio de pagamento, os modelos falham, e a tela avisa.
+
+- **Mídias:**
+  - **Download:** o worker baixa em streaming, com teto de bytes (sem confiar no `Content-Length`).
+  - **Validação:** tipo detectado pelos primeiros bytes do arquivo, numa lista permitida. Limites da Meta: imagem até 5 MB, áudio e vídeo até 16 MB, documento até 100 MB.
+  - **Armazenamento:** OCI Object Storage em São Paulo, pela API compatível com S3 (ADR-037). A **chave do objeto vem sempre do registro no banco da clínica**, nunca do cliente.
+  - **Entrega:** link pré-assinado de até 5 minutos, com `Content-Disposition: attachment` e `Content-Type` fixado.
+  - **Dependência:** o SDK S3 entra para aprovação na CRM-084.
+
+- **Caixa de entrada:** consulta periódica a cada 5 segundos, com cursor, enquanto a aba está visível. Server-sent events (SSE) ficam para depois.
+
+- **LGPD:**
+  - As conversas vão trazer **dados de saúde** (pacientes descrevem sintomas).
+  - **Retenção:** o JSONB bruto de `whatsapp_inbound_events` é apagado 30 dias depois de processado. Mensagens e mídias seguem a retenção e a exclusão do contato.
+  - Tudo isso entra no inventário da CRM-073.
+
+**Alternativas:**
+- Token legível pela API: a superfície exposta teria todos os tokens.
+- Troca do código no worker: o código expiraria esperando a fila.
+- Aceitar os IDs da conta e do número vindos do navegador: permitiria reivindicar o número de outro negócio.
+- Fila central com conteúdo: dados de pacientes no banco central.
+- Processar dentro do webhook: perde mensagens em falhas e estoura o tempo de resposta.
+- SSE agora.
+- Provedor parceiro: descartado pela ADR-034.
+
+**Consequências:**
+- Um processo, um papel central, chaves e um pool novos. O Compose e o bootstrap mudam.
+- **Migrações:**
+  - central: `whatsapp_channels` e `whatsapp_onboarding_tasks`;
+  - de clínica: eventos, conversas, mensagens e fila de saída, com grants mínimos.
+- **Testes com mensagens reais:**
+  - o app precisa estar publicado na Meta;
+  - o backend precisa de URL pública (túnel aprovado ou CRM-072);
+  - o teste de envio para o Brasil precisa de um número brasileiro.
+- Clínicas reais só conectam depois da revisão do app. Os vídeos dela usam o próprio Branly CRM (blocos 4 e 6 do plano).
+- **Revisão de segurança:** a ADR-027 pedia `security`. No modo MVP, foi feita pelo `reviewer`, e a `security` dedicada volta na CRM-082.
+- **Detalhes da Meta a confirmar na implementação:**
+  - a validade do código;
+  - o tamanho máximo do payload;
+  - o `biz_opaque_callback_data` nos status;
+  - os campos da coexistência.
+
+## ADR-037 — Hospedagem do backend na Oracle Cloud (OCI Always Free)
 
 **Data:** 21/11/2026. **Status:** Aceita pelo usuário; preparação operacional em CRM-072. **Substitui:** ADR-022 quanto à VM do backend. **Mantém:** ADR-022 quanto à Vercel, ao rewrite, ao IP real, ao HTTPS e à operação.
 
@@ -754,6 +902,6 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - **Custo:** qualquer recurso fora do Always Free é cobrado. O alerta de orçamento e a conferência da primeira fatura fazem parte de CRM-072. O custo das mensagens do WhatsApp é da conta Meta da clínica ou da agência (conversas de serviço respondidas na janela de 24 horas são gratuitas; modelos iniciados pela empresa são pagos), independente da hospedagem.
 - **Sem SLA nem suporte** no nível gratuito. A VM única continua sendo ponto único de falha (risco aceito em ADR-022). Reavaliar a hospedagem antes de passar do piloto para clínicas pagantes.
 - **Backup:** dumps diários criptografados antes do envio ao Object Storage, com política de retenção que caiba no limite gratuito, e restauração testada na segunda VM.
-- **Links temporários de mídia:** confirmar em CRM-080 que as URLs pré-assinadas pela compatibilidade com S3 funcionam. Se não funcionarem, usar as Pre-Authenticated Requests nativas da OCI.
+- **Links temporários de mídia:** confirmar em CRM-084 que as URLs pré-assinadas pela compatibilidade com S3 funcionam. Se não funcionarem, usar as Pre-Authenticated Requests nativas da OCI.
 - **E-mail:** a porta 25 é bloqueada na OCI; o Resend usa HTTPS (ADR-021), sem impacto.
 - **Limites:** os números do Always Free citados aqui devem ser conferidos na página oficial da Oracle ao criar a conta, porque mudam com o tempo.

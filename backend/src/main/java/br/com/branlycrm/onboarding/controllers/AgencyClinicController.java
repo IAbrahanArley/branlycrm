@@ -2,13 +2,13 @@ package br.com.branlycrm.onboarding.controllers;
 
 import br.com.branlycrm.common.exceptions.InvalidInputException;
 import br.com.branlycrm.identity.security.CrmPrincipal;
-import br.com.branlycrm.onboarding.domain.ClinicName;
 import br.com.branlycrm.onboarding.domain.InvitationEmail;
 import br.com.branlycrm.onboarding.dto.request.AgencyClinicRequest;
 import br.com.branlycrm.onboarding.dto.request.OwnerInvitationRequest;
 import br.com.branlycrm.onboarding.dto.response.AgencyClinicView;
 import br.com.branlycrm.onboarding.dto.response.IssuedInvitationView;
 import br.com.branlycrm.onboarding.services.AgencyClinicService;
+import br.com.branlycrm.tenant.domain.ClinicName;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

@@ -23,6 +23,15 @@ public class BranlyCrmApplication {
           .run(args);
       return;
     }
+    // WhatsApp worker (ADR-036): no HTTP server, central channel credential, the only process with
+    // the private key that opens channel tokens.
+    if ("whatsapp-worker".equals(System.getenv("APP_MODE"))) {
+      new SpringApplicationBuilder(BranlyCrmApplication.class)
+          .web(WebApplicationType.NONE)
+          .properties("app.whatsapp.worker.enabled=true", "spring.main.keep-alive=true")
+          .run(args);
+      return;
+    }
     // Schema rollout for existing clinics (ADR-031): provisioner credentials, but neither the
     // provisioning queue, the secret writer nor the scheduler. Runs once and exits with a code.
     if ("tenant-migrate".equals(System.getenv("APP_MODE"))) {
