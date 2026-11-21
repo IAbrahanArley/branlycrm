@@ -68,13 +68,17 @@ services:
       APP_WHATSAPP_KEYS_PUBLIC_DIRECTORY: /run/branly/whatsapp-keys/public
       # ADR-036: webhook app secret and verification token come from mounted files, never env.
       # Without them the webhook answers 503 and the rest of the API works.
-      APP_WHATSAPP_WEBHOOK_APP_SECRET_FILE: /run/branly/whatsapp-webhook/app-secret
+      APP_WHATSAPP_WEBHOOK_APP_SECRET_FILE: /run/branly/whatsapp-meta/app-secret
       APP_WHATSAPP_WEBHOOK_VERIFY_TOKEN_FILE: /run/branly/whatsapp-webhook/verify-token
+      # CRM-081b: the Meta app id is not a secret; the API exchanges the Embedded Signup code.
+      APP_WHATSAPP_META_APP_ID: ${WHATSAPP_APP_ID:-}
     volumes:
       # Read-only: only the future provisioner writes clinic credentials (ADR-016).
       - tenant_secrets:/run/branly/tenant-secrets:ro
       - ${WHATSAPP_KEYS_DIR:-./.whatsapp-keys}/public:/run/branly/whatsapp-keys/public:ro
+      # ADR-036: the verification token only here; the app secret here and in the worker.
       - ${WHATSAPP_WEBHOOK_DIR:-./.whatsapp-webhook}:/run/branly/whatsapp-webhook:ro
+      - ${WHATSAPP_META_DIR:-./.whatsapp-meta}:/run/branly/whatsapp-meta:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,10 +107,16 @@ services:
       APP_TENANCY_SECRETS_DIRECTORY: /run/branly/tenant-secrets
       APP_WHATSAPP_KEYS_PUBLIC_DIRECTORY: /run/branly/whatsapp-keys/public
       APP_WHATSAPP_KEYS_PRIVATE_DIRECTORY: /run/branly/whatsapp-keys/private
+      # CRM-081b: the worker calls the Graph API with appsecret_proof (app secret file).
+      APP_WHATSAPP_META_APP_ID: ${WHATSAPP_APP_ID:-}
+      APP_WHATSAPP_WEBHOOK_APP_SECRET_FILE: /run/branly/whatsapp-meta/app-secret
     volumes:
       - tenant_secrets:/run/branly/tenant-secrets:ro
       - ${WHATSAPP_KEYS_DIR:-./.whatsapp-keys}/public:/run/branly/whatsapp-keys/public:ro
       - ${WHATSAPP_KEYS_DIR:-./.whatsapp-keys}/private:/run/branly/whatsapp-keys/private:ro
+      # A folder, not a file: a missing file would make Docker create a directory in its place.
+      # Only the app secret; the verification token stays in the API (ADR-036).
+      - ${WHATSAPP_META_DIR:-./.whatsapp-meta}:/run/branly/whatsapp-meta:ro
     depends_on:
       migrate:
         condition: service_completed_successfully

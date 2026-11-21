@@ -148,6 +148,12 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `WHATSAPP_WEBHOOK_VERIFICATION_FAILED` | 403 | Modo, token de verificação ou desafio inválido no `GET` | Webhook do WhatsApp |
 | `WHATSAPP_WEBHOOK_MALFORMED` | 400 | Corpo assinado que não é um objeto JSON | Webhook do WhatsApp |
 | `WHATSAPP_WEBHOOK_TOO_LARGE` | 413 | Corpo acima de 3 MiB | Webhook do WhatsApp |
+| `CHANNEL_ALREADY_CONNECTED` | 409 | A clínica já tem um número conectado, inclusive com falha: desconecte antes | Canal WhatsApp |
+| `CHANNEL_NOT_CONNECTED` | 409 | Não há número para desconectar | Canal WhatsApp |
+| `CHANNEL_BUSY` | 409 | Uma conexão ou desconexão do canal ainda está em andamento | Canal WhatsApp |
+| `CHANNEL_CODE_INVALID` | 400 | A Meta recusou o código do Embedded Signup (vencido, já usado ou de outro app) | Canal WhatsApp |
+| `CHANNEL_META_UNAVAILABLE` / `CHANNEL_NOT_CONFIGURED` | 503 | A Meta não respondeu, ou faltam no servidor o app id, o segredo do app ou a chave de selagem | Canal WhatsApp |
+| `CLINIC_NOT_FOUND` | 404 | Clínica fora da carteira da agência, ou inexistente (mesma resposta) | Canal WhatsApp (agência) |
 | `WHATSAPP_WEBHOOK_NOT_CONFIGURED` / `_BUSY` / `_STORAGE_FAILED` | 503 | Sem os arquivos de segredo, muitas entregas simultâneas ou falha ao gravar numa clínica; a Meta reenvia | Webhook do WhatsApp |
 | `STATE_CONFLICT` | 409 | O banco recusou uma mudança de estado ou de campo imutável (BRL02), ou uma escrita concorrente no banco da clínica | Todos os handlers |
 | `NOT_FOUND` | 404 | Rota inexistente (usuário autenticado; anônimo recebe 401) | `GlobalErrorHandler` |
