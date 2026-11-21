@@ -1,4 +1,4 @@
-# Canal WhatsApp: base (CRM-081a) e webhook (CRM-082a)
+# Canal WhatsApp: base (CRM-081a), webhook (CRM-082a) e worker de entrada (CRM-082b)
 
 Implementado em 17/11/2026. Desenho completo na ADR-036; este documento cobre o que já existe em código.
 
@@ -121,9 +121,47 @@ O segredo do app e o token de verificação vêm de **arquivos montados**, nunca
 - Cada arquivo é lido de novo quando a data de modificação muda. Trocar o segredo na Meta e no arquivo não exige reiniciar a API.
 - Os valores nunca aparecem em log, resposta ou `toString`.
 
+## Worker de entrada (CRM-082b)
+
+O processo `whatsapp-worker` transforma os eventos gravados pelo webhook em contato, lead e mensagem.
+
+- **Gatilho:** o `LISTEN whatsapp_inbound` e a varredura de 30 segundos só pedem uma drenagem. A drenagem roda numa thread só, canal por canal, em lotes de 200; pedidos que chegam durante uma drenagem viram mais uma passada.
+- **Acesso:** a clínica sai do registro central (`openForChannel`), com canal e clínica ativos; nunca do payload.
+- **Um evento, uma transação:**
+  1. reserva o próximo evento devido, com `FOR UPDATE SKIP LOCKED`, na ordem do horário da Meta. Um evento de mensagem espera enquanto houver outro anterior do mesmo contato pendente e ainda tentável;
+  2. trava o telefone canônico (advisory lock);
+  3. se a mensagem já estiver gravada, não faz nada (reprocessamento manual seguro);
+  4. cria o contato sem autor (`created_via = WHATSAPP`) ou reaproveita o existente;
+  5. abre o lead em Novo com a origem detectada, se o contato não tiver lead aberto (RN-01). Com lead aberto e origem detectada, grava um toque de origem (RN-02);
+  6. grava a conversa e a mensagem e marca o evento como processado.
+- **Regras:**
+  - **nome:** o do perfil do WhatsApp; sem ele, o próprio número. Um contato criado sem nome ganha o do perfil na primeira mensagem dele. Nome dado por uma pessoa nunca é trocado;
+  - **telefone:** `PhoneNumber.parse`, com a regra do 9º dígito. Número recusado marca o evento como `INVALID_PHONE`, com aviso no log;
+  - **eco do app WhatsApp Business:** contato e mensagem enviada (`sent_by_app`), nunca lead;
+  - **contato arquivado:** a mensagem é gravada, sem lead (decisão do responsável, 21/11/2026). Para voltar a ser oportunidade, a equipe desarquiva o contato e abre o lead;
+  - **status e eventos da conta:** marcados como processados com `DEFERRED_STATUS` e `DEFERRED_ACCOUNT`, sem efeito, até a CRM-084 e a CRM-081b.
+- **Origem (CRM-091):**
+  - `referral` de anúncio ou post impulsionado: Tráfego pago, com o id e o título do anúncio e o `ctwa_clid`. Valores inválidos são descartados um a um;
+  - `[CODIGO]` no início do texto (letras, números, `_` e `-`, até 32): tipo Outro, fonte código. `[ig01]` e `[IG01]` são códigos diferentes;
+  - nenhum dos dois: Não identificada.
+- **Mensagem guardada:** tipo, texto (ou legenda, ou título do botão), sem NUL e com até 4096 caracteres, e o id e o tipo da mídia. O arquivo da mídia é baixado na CRM-084.
+- **Falhas:**
+  - **da clínica** (banco fora, migração pendente, identidade, segredo, permissão): o evento é adiado 30 segundos, sem gastar tentativa, e a passada daquela clínica para;
+  - **do evento:** gasta uma tentativa, com espera de 30 s que dobra até 1 h, no máximo 8. Os outros contatos seguem;
+  - o sinal `inbound_pending_since` só é limpo quando não resta evento tentável.
+- **Evento esgotado:** fica guardado com o código do erro em `last_error` e um `ERROR` no log (`failed permanently`). Para reprocessar, como dono do banco da clínica, depois de corrigir a causa:
+  ```sql
+  UPDATE whatsapp_inbound_events SET attempts = 0, next_attempt_at = NULL
+  WHERE processed_at IS NULL AND attempts >= 8;
+  ```
+  e marque o canal como pendente no banco central (`UPDATE whatsapp_channels SET inbound_pending_since = now() WHERE id = ...`). A mensagem já gravada não é duplicada.
+- **Retenção:** uma vez por dia, o JSON bruto dos eventos processados há mais de 30 dias é apagado, em lotes de 1000. A linha fica, para a deduplicação. Só alcança clínicas e canais ativos.
+- **Desempenho:** no teste local, do webhook ao lead leva bem menos de 5 segundos.
+
 ## Limites atuais
 
-- O worker só descobre os canais com eventos pendentes: pelo `LISTEN whatsapp_inbound` numa conexão própria e por uma varredura a cada 30 segundos. O processamento vem na CRM-082b. Ao terminar um canal, o worker precisa limpar `inbound_pending_since` e conferir de novo se chegou evento, porque o webhook só marca o sinal quando ele está vazio.
+- O laço do worker (`LISTEN`, varredura e retenção) não tem teste automatizado; os testes chamam a drenagem diretamente.
+- Clínica suspensa ou canal desconectado não passam pela retenção (CRM-073).
 - A conexão pelo Embedded Signup (CRM-081b) ainda não existe.
 - O webhook ainda não foi testado com a Meta real: falta a URL pública (CRM-072 ou túnel) e o app publicado.
 - A subida do processo do worker não tem teste automatizado. O modo `whatsapp-worker` liga `spring.main.keep-alive`, porque sem HTTP só sobram threads daemon e a JVM sairia logo depois de subir. **A estabilidade do container ainda precisa ser conferida** com `docker compose up -d whatsapp-worker` e `docker compose ps` depois de alguns minutos.

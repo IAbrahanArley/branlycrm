@@ -75,83 +75,117 @@ public class LeadRepository {
     UUID actor = access.subjectId();
     return persistence.inTransaction(
         ClinicTenant.of(access),
-        session -> {
-          requireActiveContact(session, contactId);
-          Object[] entry =
-              session
-                  .createNativeQuery(
-                      "SELECT id, pipeline_id FROM pipeline_stages WHERE system_key = 'NEW'",
-                      Object[].class)
-                  .getResultList()
-                  .stream()
-                  .findFirst()
-                  .orElseThrow(
-                      () -> new ClinicDataException(ClinicDataException.Reason.INVALID_DATA, null));
-          boolean inserted =
-              !session
-                  .createNativeQuery(
-                      """
-                      INSERT INTO leads (id, contact_id, pipeline_id, stage_id, status,
-                                         temperature, responsible_id, opened_at, created_by,
-                                         updated_at, updated_by, origin_type, origin_source,
-                                         origin_ad_id, origin_code, origin_title,
-                                         origin_ctwa_clid)
-                      VALUES (:id, :contact, :pipeline, :stage, 'OPEN', :temperature,
-                              :responsible, :at, :actor, :at, :actor, :originType,
-                              :originSource, :adId, :code, :title, :clid)
-                      ON CONFLICT (contact_id) WHERE status = 'OPEN' DO NOTHING
-                      RETURNING id
-                      """,
-                      UUID.class)
-                  .setParameter("id", id)
-                  .setParameter("contact", contactId)
-                  .setParameter("pipeline", entry[1])
-                  .setParameter("stage", entry[0])
-                  .setParameter(
-                      "temperature", temperature == null ? null : temperature.name(), String.class)
-                  .setParameter("responsible", responsibleId, UUID.class)
-                  .setParameter("originType", origin.type().name())
-                  .setParameter("originSource", origin.source().name())
-                  .setParameter("adId", origin.adId(), String.class)
-                  .setParameter("code", origin.code(), String.class)
-                  .setParameter("title", origin.title(), String.class)
-                  .setParameter("clid", origin.ctwaClid(), String.class)
-                  .setParameter("at", at)
-                  .setParameter("actor", actor)
-                  .getResultList()
-                  .isEmpty();
-          if (!inserted) {
-            throw new LeadException(
-                LeadException.Reason.ALREADY_OPEN, openLeadOf(session, contactId).orElse(null));
-          }
-          session.persist(
-              new LeadEventEntity(
-                  id, LeadEventType.CREATED, null, String.valueOf(entry[0]), null, actor, at));
-          if (responsibleId != null) {
-            session.persist(
-                new LeadEventEntity(
-                    id,
-                    LeadEventType.RESPONSIBLE_CHANGED,
-                    null,
-                    responsibleId.toString(),
-                    null,
-                    actor,
-                    at));
-          }
-          if (temperature != null) {
-            session.persist(
-                new LeadEventEntity(
-                    id,
-                    LeadEventType.TEMPERATURE_CHANGED,
-                    null,
-                    temperature.name(),
-                    null,
-                    actor,
-                    at));
-          }
-          session.flush();
-          return session.find(LeadEntity.class, id).toDomain();
-        });
+        session ->
+            insertLead(session, id, contactId, temperature, responsibleId, origin, at, actor));
+  }
+
+  /**
+   * Opens a lead inside the caller's clinic transaction, without an author: the WhatsApp worker
+   * (CRM-082b) opens it together with the contact and the message. Same rules as {@link
+   * #open(ClinicAccess, UUID, Temperature, UUID, LeadOrigin)}; the exceptions leave the transaction
+   * usable (no statement failed).
+   *
+   * @throws LeadException CONTACT_UNAVAILABLE (archived) or ALREADY_OPEN
+   */
+  public Lead openWithin(Session session, UUID contactId, LeadOrigin origin, Instant at) {
+    Objects.requireNonNull(origin, "origin");
+    return insertLead(session, UUID.randomUUID(), contactId, null, null, origin, at, null);
+  }
+
+  /**
+   * As {@link #recordTouch}, inside the caller's clinic transaction (WhatsApp worker).
+   *
+   * @throws LeadException CONTACT_UNAVAILABLE
+   */
+  public OriginTouch recordTouchWithin(
+      Session session, UUID contactId, LeadOrigin origin, Instant at) {
+    Objects.requireNonNull(origin, "origin");
+    requireActiveContact(session, contactId);
+    UUID lead = openLeadOf(session, contactId).orElse(null);
+    OriginTouchEntity touch = new OriginTouchEntity(contactId, lead, origin, at);
+    session.persist(touch);
+    session.flush();
+    return touch.toDomain();
+  }
+
+  private static Lead insertLead(
+      Session session,
+      UUID id,
+      UUID contactId,
+      Temperature temperature,
+      UUID responsibleId,
+      LeadOrigin origin,
+      Instant at,
+      UUID actor) {
+    requireActiveContact(session, contactId);
+    Object[] entry =
+        session
+            .createNativeQuery(
+                "SELECT id, pipeline_id FROM pipeline_stages WHERE system_key = 'NEW'",
+                Object[].class)
+            .getResultList()
+            .stream()
+            .findFirst()
+            .orElseThrow(
+                () -> new ClinicDataException(ClinicDataException.Reason.INVALID_DATA, null));
+    boolean inserted =
+        !session
+            .createNativeQuery(
+                """
+                INSERT INTO leads (id, contact_id, pipeline_id, stage_id, status,
+                                   temperature, responsible_id, opened_at, created_by,
+                                   updated_at, updated_by, origin_type, origin_source,
+                                   origin_ad_id, origin_code, origin_title,
+                                   origin_ctwa_clid)
+                VALUES (:id, :contact, :pipeline, :stage, 'OPEN', :temperature,
+                        :responsible, :at, :actor, :at, :actor, :originType,
+                        :originSource, :adId, :code, :title, :clid)
+                ON CONFLICT (contact_id) WHERE status = 'OPEN' DO NOTHING
+                RETURNING id
+                """,
+                UUID.class)
+            .setParameter("id", id)
+            .setParameter("contact", contactId)
+            .setParameter("pipeline", entry[1])
+            .setParameter("stage", entry[0])
+            .setParameter(
+                "temperature", temperature == null ? null : temperature.name(), String.class)
+            .setParameter("responsible", responsibleId, UUID.class)
+            .setParameter("originType", origin.type().name())
+            .setParameter("originSource", origin.source().name())
+            .setParameter("adId", origin.adId(), String.class)
+            .setParameter("code", origin.code(), String.class)
+            .setParameter("title", origin.title(), String.class)
+            .setParameter("clid", origin.ctwaClid(), String.class)
+            .setParameter("at", at)
+            .setParameter("actor", actor, UUID.class)
+            .getResultList()
+            .isEmpty();
+    if (!inserted) {
+      throw new LeadException(
+          LeadException.Reason.ALREADY_OPEN, openLeadOf(session, contactId).orElse(null));
+    }
+    session.persist(
+        new LeadEventEntity(
+            id, LeadEventType.CREATED, null, String.valueOf(entry[0]), null, actor, at));
+    if (responsibleId != null) {
+      session.persist(
+          new LeadEventEntity(
+              id,
+              LeadEventType.RESPONSIBLE_CHANGED,
+              null,
+              responsibleId.toString(),
+              null,
+              actor,
+              at));
+    }
+    if (temperature != null) {
+      session.persist(
+          new LeadEventEntity(
+              id, LeadEventType.TEMPERATURE_CHANGED, null, temperature.name(), null, actor, at));
+    }
+    session.flush();
+    return session.find(LeadEntity.class, id).toDomain();
   }
 
   /** The lead, or empty for a missing id and for another clinic's id alike. */

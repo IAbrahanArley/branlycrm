@@ -74,6 +74,44 @@ public class ContactRepository {
         });
   }
 
+  /**
+   * Creates the contact of a WhatsApp number, without an author, or returns the one already holding
+   * it, inside the caller's clinic transaction (WhatsApp worker, CRM-082b). The name of an existing
+   * contact is never replaced.
+   */
+  public ContactCreation createFromWhatsapp(Session session, ContactFields fields, Instant at) {
+    UUID id = UUID.randomUUID();
+    for (int attempt = 0; attempt < 2; attempt++) {
+      if (insert(session, id, fields, ContactCreatedVia.WHATSAPP, at, null)) {
+        return new ContactCreation.Created(id);
+      }
+      Optional<UUID> existing = holderOf(session, fields, null);
+      if (existing.isPresent()) {
+        nameUnnamed(session, existing.get(), fields, at);
+        return new ContactCreation.Existing(existing.get());
+      }
+    }
+    throw new ContactException(ContactException.Reason.STALE);
+  }
+
+  /**
+   * A WhatsApp contact still named by its number (first seen in an echo, without a profile) takes
+   * the profile name of its first own message. A name a person gave is never replaced.
+   */
+  private static void nameUnnamed(Session session, UUID id, ContactFields fields, Instant at) {
+    if (fields.name().equals(fields.phone().e164())) return;
+    session
+        .createNativeMutationQuery(
+            "UPDATE contacts SET name = :name, name_search = :search, updated_at = :at"
+                + " WHERE id = :id AND created_via = 'WHATSAPP' AND updated_by IS NULL"
+                + " AND name = phone_e164")
+        .setParameter("name", fields.name())
+        .setParameter("search", fields.nameSearch())
+        .setParameter("at", at)
+        .setParameter("id", id)
+        .executeUpdate();
+  }
+
   /** The contact, or empty for a missing id and for another clinic's id alike. */
   public Optional<Contact> find(ClinicAccess access, UUID id) {
     if (id == null) return Optional.empty();
@@ -267,7 +305,7 @@ public class ContactRepository {
         .setParameter("notes", fields.notes(), String.class)
         .setParameter("via", via.name())
         .setParameter("at", at)
-        .setParameter("actor", actor)
+        .setParameter("actor", actor, UUID.class)
         .getResultList()
         .isEmpty();
   }

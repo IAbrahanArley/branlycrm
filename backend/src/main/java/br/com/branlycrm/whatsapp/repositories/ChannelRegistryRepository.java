@@ -83,13 +83,37 @@ public class ChannelRegistryRepository {
         channelId.toString());
   }
 
+  /**
+   * The worker drained the clinic: clears the durable signal. The caller checks the clinic again
+   * afterwards and raises it back if an event arrived in between (the webhook only raises an empty
+   * signal).
+   */
+  public void clearPending(UUID channelId) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET inbound_pending_since = NULL WHERE id = ?", channelId);
+  }
+
+  /** Raises the durable signal again without a notification (events left to retry later). */
+  public void keepPending(UUID channelId) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET inbound_pending_since = now()"
+            + " WHERE id = ? AND inbound_pending_since IS NULL",
+        channelId);
+  }
+
+  /** Every active channel, for daily maintenance such as retention. */
+  public List<UUID> activeChannels() {
+    return jdbc.queryForList(
+        "SELECT id FROM whatsapp_channels WHERE status = 'ACTIVE' ORDER BY id", UUID.class);
+  }
+
   /** Active channels whose webhook left events waiting, oldest first. */
   public List<UUID> channelsWithPendingEvents() {
     return jdbc.queryForList(
         """
-        SELECT id FROM whatsapp_channels
-        WHERE status = 'ACTIVE' AND inbound_pending_since IS NOT NULL
-        ORDER BY inbound_pending_since, id
+        SELECT c.id FROM whatsapp_channels c JOIN tenants t ON t.tenant_id = c.tenant_id
+        WHERE c.status = 'ACTIVE' AND t.status = 'ACTIVE' AND c.inbound_pending_since IS NOT NULL
+        ORDER BY c.inbound_pending_since, c.id
         LIMIT ?
         """,
         UUID.class,
