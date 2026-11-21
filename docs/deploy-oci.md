@@ -33,14 +33,19 @@ O ponto principal: **o orçamento (Budget) da OCI só avisa, não bloqueia**. El
 ```text
 zero compute-core quotas in tenancy
 set compute-core quota standard-a1-core-count to 2 in tenancy
+set compute-core quota standard-a1-core-regional-count to 2 in tenancy
+set compute-core quota standard-e2-micro-core-count to 2 in tenancy
+zero compute-memory quotas in tenancy
+set compute-memory quota standard-a1-memory-count to 12 in tenancy
+set compute-memory quota standard-a1-memory-regional-count to 12 in tenancy
+set block-storage quota total-storage-gb to 200 in tenancy
+set block-storage quota backup-count to 5 in tenancy
 ```
 
-- **Antes de salvar, confira na página [Compute Quotas](https://docs.oracle.com/iaas/Content/Quotas/Concepts/resourcequotas_topic-Compute_Quotas.htm):**
-  - o nome exato da cota de memória da A1, para limitar a 12 GB;
-  - o da micro AMD (`VM.Standard.E2.1.Micro`), caso a VM de restauração (seção 9) use esse formato;
-  - os nomes de disco (família de Block Volume), para limitar o total a 200 GB e as cópias de volume a 5;
-  - os demais serviços que não usamos (bancos gerenciados, balanceador pago e outros), para zerá-los também.
-- **Teste:** depois de salvar, tente criar uma VM de outro formato. A criação precisa ser recusada.
+- **Política aplicada em 21/11/2026:** é a `always-free-only`, no compartimento raiz, e o bloco acima é o texto dela.
+- **Variantes regionais:** a criação de uma A1 também consome `standard-a1-core-regional-count` e `standard-a1-memory-regional-count`. Sem as duas linhas `regional`, o `zero` recusa até a VM gratuita. Ao liberar outro formato, conferir se ele também tem variante regional.
+- **Micro AMD:** ainda não testada. Se a VM de restauração (seção 9) for recusada, procurar a variante regional da micro na página [Compute Quotas](https://docs.oracle.com/iaas/Content/Quotas/Concepts/resourcequotas_topic-Compute_Quotas.htm).
+- **Teste:** depois de salvar, tente criar uma VM de outro formato. A criação precisa ser recusada. Em 21/11/2026, a primeira versão, sem as linhas `regional`, recusou a A1, o que comprovou o bloqueio.
 
 ### 1.3 Orçamento como alarme
 
@@ -91,7 +96,10 @@ set compute-core quota standard-a1-core-count to 2 in tenancy
    - **Boot:** 50 GB, criptografado (padrão).
    - **Rede:** sub-rede pública com IP público.
    - **SSH:** chave pública do operador. A chave privada nunca vai para o repositório.
-2. Se aparecer "Out of host capacity", tentar outro *availability domain* ou repetir mais tarde.
+2. **"Out of host capacity":** São Paulo tem um único *availability domain*, então a saída é repetir mais tarde, de preferência fora do horário comercial.
+   - A configuração está salva como o stack `branlycrm-api` em *Developer Services → Resource Manager → Stacks*, no compartimento `branlycrm`.
+   - Cada nova tentativa é *Apply* nesse stack; o log do job mostra o motivo de uma falha.
+   - Em 21/11/2026, as três primeiras tentativas falharam por falta de capacidade.
 3. Registrar no DNS:
    - `A api.<domínio>` apontando para o IP público da VM;
    - o domínio do app (`app.<domínio>`) aponta para a Vercel.
