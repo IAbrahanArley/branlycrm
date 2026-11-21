@@ -44,7 +44,7 @@ O frontend acompanha cada API aprovada.
   - stack (ADR-001, ADR-012, ADR-017) e monorepo (ADR-011);
   - persistência (ADR-017, ADR-018), sessão (ADR-015), banco por clínica (ADR-014) e fuso;
   - escopo pelo documento do cliente (ADR-024), papéis (ADR-025) e agências (ADR-026);
-  - e-mail com Resend (ADR-021) e hospedagem Lightsail São Paulo + Vercel (ADR-022 revisada).
+  - e-mail com Resend (ADR-021) e hospedagem OCI Always Free em São Paulo + Vercel (ADR-037, mantendo ADR-022 no que não foi substituído).
 - **Falta:**
   - fornecedor do WhatsApp (depois de CRM-005) e desenho do canal (CRM-080);
   - segredos na VM e proxy confiável (CRM-072).
@@ -957,13 +957,24 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
 
 ### [ ] CRM-072 — Deploy, backup e operação (P0)
 **Depende de:** CRM-003, CRM-070, CRM-080.
-**Entregas:** deploy na VM Lightsail em São Paulo e na Vercel (ADR-022 revisada):
-- **Rede:** rewrite `/api`; rota pública do webhook em `api.<domínio>`; TLS e firewall.
-- **Segurança:** proxy confiável para o IP real; variáveis e segredos.
-- **Arquivos:** armazenamento de objetos.
-- **Backup:** diário, criptografado e fora da VM; procedimento de restauração (central e por clínica).
+**Entregas:** deploy numa VM OCI Always Free (Ampere A1, arm64) em São Paulo e na Vercel (ADR-037; itens mantidos de ADR-022):
+- **Conta:** região inicial `sa-saopaulo-1`; conversão para Pay As You Go; alerta de orçamento baixo; só recursos Always Free.
+- **VMs:** cota dividida em duas A1 de 2 OCPUs e 12 GB, uma para o piloto e outra para restauração isolada e testes de deploy.
+- **Imagens:** build arm64 na VM ou com `docker buildx --platform linux/arm64`; Compose do backend na VM.
+- **Rede:**
+  - rewrite `/api` na Vercel;
+  - rota pública do webhook em `api.<domínio>`;
+  - TLS com Let's Encrypt no Nginx, com renovação automática;
+  - firewall na VCN e na VM, só 80 e 443 abertas, SSH restrito;
+  - domínio próprio antes do webhook definitivo na Meta e do piloto.
+- **Segurança:** proxy confiável para o IP real por cabeçalho com segredo compartilhado (a Vercel não tem IPs fixos); variáveis e segredos fora do repositório.
+- **Arquivos:** OCI Object Storage pela API compatível com S3 (ADR-027).
+- **Backup:** diário, criptografado antes do envio, no Object Storage, com retenção dentro do limite gratuito; procedimento de restauração (central e por clínica).
 - **Migrações:** ordem parar o provisionador antigo → `migrate` → provisionador novo → `tenant-migrate` → API nova, com tratamento do código de saída 1 (ADR-031, [provisionamento-clinicas.md](docs/provisionamento-clinicas.md)).
-**Aceite:** restauração realizada em ambiente isolado; monitoramento e recuperação documentados.
+**Aceite:**
+- restauração realizada na VM isolada;
+- monitoramento e recuperação documentados;
+- primeira fatura da conta OCI conferida com custo zero.
 
 ### [ ] CRM-073 — Revisão de privacidade e LGPD (P0)
 **Depende de:** CRM-053, CRM-083.
@@ -1175,7 +1186,7 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 - [ ] Definições das métricas (CRM-050).
 - [ ] Retenção de mensagens e mídias; contratos de tratamento de dados (CRM-073).
 - [-] Nome e identidade do SaaS ("Branly CRM" em uso).
-- [x] Escopo pelo documento do cliente (ADR-024); papéis (ADR-025); agências (ADR-026); agenda fora do MVP; região São Paulo (ADR-022).
+- [x] Escopo pelo documento do cliente (ADR-024); papéis (ADR-025); agências (ADR-026); agenda fora do MVP; região São Paulo (ADR-022, ADR-037).
 
 ## Template de execução por tarefa
 
