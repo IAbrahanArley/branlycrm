@@ -33,6 +33,7 @@ SC significa cenário; AC significa critério de aceitação. Propostas e detalh
 Os documentos originais foram preservados e complementados. ADRs históricas mantêm suas datas; decisões novas estão datadas separadamente. Mudanças futuras devem registrar qual decisão substituem.
 
 - [Ambiente Docker e conexões](docker.md)
+- [Deploy na Oracle Cloud (OCI Always Free)](deploy-oci.md)
 
 - [Multitenancy: banco por clínica](multitenancy.md)
 

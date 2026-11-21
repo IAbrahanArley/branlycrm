@@ -1127,21 +1127,32 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 ### [ ] CRM-072 — Deploy, backup e operação (P0)
 **Depende de:** CRM-003, CRM-070, CRM-080.
 **Entregas:** deploy numa VM OCI Always Free (Ampere A1, arm64) em São Paulo e na Vercel (ADR-037; itens mantidos de ADR-022):
-- **Conta:** região inicial `sa-saopaulo-1`; conversão para Pay As You Go; alerta de orçamento baixo; só recursos Always Free.
-- **VMs:** cota dividida em duas A1 de 2 OCPUs e 12 GB, uma para o piloto e outra para restauração isolada e testes de deploy.
-- **Imagens:** build arm64 na VM ou com `docker buildx --platform linux/arm64`; Compose do backend na VM.
+- **Roteiro:** [docs/deploy-oci.md](docs/deploy-oci.md).
+- **Conta:**
+  - região inicial `sa-saopaulo-1`;
+  - Free Tier na homologação;
+  - cotas que zeram recursos fora do Always Free e orçamento de US$ 1 como alarme;
+  - Pay As You Go só no piloto, com as cotas ativas.
+- **VMs:**
+  - uma A1 com 2 OCPUs e 12 GB (a cota inteira);
+  - restauração isolada numa micro AMD ou fora da OCI.
+- **Imagens:** build arm64 na VM ou com `docker buildx --platform linux/arm64`; Compose do backend na VM com o override `compose.oci.yaml` (a criar: sem frontend, Nginx em 80/443 com TLS).
 - **Rede:**
   - rewrite `/api` na Vercel;
   - rota pública do webhook em `api.<domínio>`;
   - TLS com Let's Encrypt no Nginx, com renovação automática;
   - firewall na VCN e na VM, só 80 e 443 abertas, SSH restrito;
   - domínio próprio antes do webhook definitivo na Meta e do piloto.
-- **Segurança:** proxy confiável para o IP real por cabeçalho com segredo compartilhado (a Vercel não tem IPs fixos); variáveis e segredos fora do repositório.
+- **Segurança:**
+  - proxy confiável para o IP real por cabeçalho com segredo compartilhado (a Vercel não tem IPs fixos), injetado pelo frontend e conferido no Nginx;
+  - `forward-headers-strategy` restrito ao proxy local;
+  - variáveis e segredos fora do repositório;
+  - revisão de segurança antes de dados reais.
 - **Arquivos:** OCI Object Storage pela API compatível com S3 (ADR-027).
-- **Backup:** diário, criptografado antes do envio, no Object Storage, com retenção dentro do limite gratuito; procedimento de restauração (central e por clínica).
+- **Backup:** diário, criptografado antes do envio, no Object Storage, com retenção abaixo de 10 GB; procedimento de restauração (central e por clínica).
 - **Migrações:** ordem parar o provisionador antigo → `migrate` → provisionador novo → `tenant-migrate` → API nova, com tratamento do código de saída 1 (ADR-031, [provisionamento-clinicas.md](docs/provisionamento-clinicas.md)).
 **Aceite:**
-- restauração realizada na VM isolada;
+- restauração realizada no ambiente isolado;
 - monitoramento e recuperação documentados;
 - primeira fatura da conta OCI conferida com custo zero.
 
