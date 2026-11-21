@@ -31,6 +31,7 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Configuração comercial (funil, etapas, motivos de perda, procedimentos, profissionais, respostas rápidas) | ✓ | ✓ | — | — |
 | Procedimentos e profissionais: ver (`LEAD_READ`, para registrar vendas) | ✓ | ✓ | ✓ | ✓ |
 | Canal WhatsApp: ver estado | ✓ | ✓ | — | — |
+| Canal WhatsApp: conectar e desconectar o número (`CHANNEL_CONNECT`) | ✓ | ✓ | — | — |
 | Contatos: ver e buscar | ✓ | ✓ | ✓ | ✓ |
 | Contatos: criar, editar, criar e vincular tags, consentimento | ✓ | ✓ | ✓ | — |
 | Contatos: arquivar e desarquivar | ✓ | ✓ | — | — |

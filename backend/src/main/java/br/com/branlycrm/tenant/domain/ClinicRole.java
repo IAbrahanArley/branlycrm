@@ -34,6 +34,7 @@ public enum ClinicRole {
     row(ClinicPermission.TEAM_MANAGE, ALL, ALL, NONE, NONE);
     row(ClinicPermission.COMMERCIAL_SETTINGS_EDIT, ALL, ALL, NONE, NONE);
     row(ClinicPermission.CHANNEL_VIEW, ALL, ALL, NONE, NONE);
+    row(ClinicPermission.CHANNEL_CONNECT, ALL, ALL, NONE, NONE);
     row(ClinicPermission.CONTACT_READ, ALL, ALL, ALL, ALL);
     row(ClinicPermission.CONTACT_WRITE, ALL, ALL, ALL, NONE);
     row(ClinicPermission.CONTACT_ARCHIVE, ALL, ALL, NONE, NONE);

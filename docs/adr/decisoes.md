@@ -776,6 +776,13 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
      - **recusamos a importação do histórico** (minimização de dados).
      - Confirmado pelo responsável em 17/11/2026.
 - **Desconexão:** cancela a assinatura dos webhooks, apaga o token e o PIN selados e marca `DISCONNECTED`. Eventos que chegarem depois são descartados.
+- **Na implementação (CRM-081b, 21/11/2026):**
+  - permissão `CHANNEL_CONNECT` para Proprietário e Gestor; o administrador da agência conecta só na própria carteira;
+  - o `phoneNumberId` do navegador é aceito só como escolha entre os números das contas do próprio token;
+  - a assinatura dos webhooks é da conta inteira: a desconexão não a cancela enquanto outro canal vivo usar a mesma conta;
+  - o segredo do app fica numa pasta própria, montada na API e no worker; o token de verificação continua só na API;
+  - a coexistência vem do evento do Embedded Signup, sem conferência na Meta até o teste real;
+  - a reação a `account_update` e a recifragem na rotação das chaves ficam para uma tarefa seguinte.
 
 - **Chaves e segredos:**
   - **Cifra:** híbrida da JDK (RSA-OAEP 3072 + AES-256-GCM), sem dependência nova, com versão por chave.

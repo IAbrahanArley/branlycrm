@@ -839,10 +839,36 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - ArchUnit também pega referências de método e restringe o driver ao worker;
   - documentadas as permissões das chaves na VM Linux;
   - testes de privilégio, de valor truncado e de `ClinicTenant`.
-- **Falta:**
-  - a **081b**: Embedded Signup, troca do código, registro do número, assinatura dos webhooks e tela de situação do canal;
-  - na 081b, o caminho de reconexão de um canal `FAILED` (o worker desconecta, e só então a API cria outro);
+- **Falta (depois da 081b):**
+  - a tela (FE-009, Codex) e o teste com a Meta real (ID de configuração do Embedded Signup, app publicado e URL pública);
   - conferir no Compose que o container do worker fica estável.
+
+**Estado (21/11/2026):** parte **081b (conexão)** concluída na branch `feat/crm-081b-conexao`, detalhada em [docs/whatsapp-canal.md](docs/whatsapp-canal.md). Fica `[-]` só pela tela e pelo teste real.
+- **Decisões aprovadas pelo responsável em 21/11/2026:** permissão `CHANNEL_CONNECT` (Proprietário e Gestor) mais o administrador da agência na própria carteira; o `phoneNumberId` do navegador só como escolha, conferida pelo worker; migração central V17; reação a `account_update` e recifragem por rotação ficam para depois.
+- **Migração central V17:** etapa `DISCONNECT`, colunas `requested_phone_number_id` e `coexistence` nas tarefas, uma tarefa aberta por canal. A API ganha só o INSERT dessas duas colunas.
+- **API:** `GET`, `POST …/connect` e `POST …/disconnect` para a clínica e para a agência; troca do código na hora e token selado antes de gravar.
+- **Worker:** `ChannelOnboardingProcessor`, com as etapas de conferência, registro, assinatura e desconexão, chamado a cada 5 segundos.
+- **Cliente da Graph API:** JDK, com `appsecret_proof`, sem dependência nova.
+- **Segredos:** o segredo do app passou para a pasta própria `.whatsapp-meta` (API e worker); o token de verificação continua só na API, em `.whatsapp-webhook`.
+- **Testes:** `WhatsappConnectionIT`, com uma Graph API falsa e o papel real do worker:
+  - conexão até `ACTIVE`, com o PIN selado e `appsecret_proof` correto em toda chamada;
+  - código recusado sem criar nada; segunda conexão recusada;
+  - número de outra clínica (`NUMBER_IN_USE`), conta com dois números (`AMBIGUOUS_NUMBER`) e escolha do número com coexistência, sem registro;
+  - token revogado (`TOKEN_INVALID`); desconexão com webhooks cancelados e segredos apagados;
+  - agência: só na própria carteira, conexão e desconexão de um número numa conta compartilhada sem cancelar os webhooks da outra clínica;
+  - Atendente recebe 403; nenhum token, código ou segredo no log.
+  - ArchUnit: só o worker usa o repositório e o processador das tarefas.
+  - `ClinicRoleTest` com a linha nova de `docs/permissoes.md`;
+  - `clean verify`: 256 unitários e 156 de integração, sem falhas.
+- **Revisão (`reviewer`, também no papel de security):** nenhum vazamento de segredo e autorização correta. Corrigidos:
+  - **alto:** desconectar uma clínica cancelava os webhooks da conta inteira e derrubava outra clínica na mesma conta;
+  - o worker via o token de verificação (pastas separadas);
+  - tarefa presa depois de queda do worker voltava para sempre, e escritas sem conferir o lease;
+  - desconexão sem chaves ou sem segredo apagava o token sem cancelar a assinatura;
+  - `debug_token` exige os dois escopos na mesma conta;
+  - pedidos de conexão juntados no worker;
+  - código de falha final mais específico.
+- **Riscos aceitos:** em [docs/whatsapp-canal.md](docs/whatsapp-canal.md), "Conexão do número": coexistência não conferida, token na query do `debug_token`, canal `FAILED` com token e número reservados, eventos descartados na desconexão. O `WhatsappConnectionIT` monta o repositório do worker sem transação, então a atomicidade de `activate`, `fail` e `disconnect` não é provada por ele.
 
 ### [x] CRM-082 — Webhook de entrada e criação automática de contato e lead (P0)
 **Depende de:** CRM-081, CRM-021, CRM-031.
@@ -1414,6 +1440,21 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - Notas e motivos não vão para storage, URL nem console.
 - Funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam.
+
+### [ ] FE-009 — Conexão do WhatsApp da clínica (P0)
+**Depende de:** FE-002, FE-005 e o merge da CRM-081b (rotas `/api/v1/clinic/whatsapp/channel` e `/api/v1/agencies/{agencyId}/clinics/{tenantId}/whatsapp/channel` no contrato).
+**Entregas:**
+- Seção "WhatsApp" em `/app/configuracoes` (ou página própria), só para quem tem `CHANNEL_VIEW` (Proprietário e Gestor), e o mesmo bloco no detalhe da clínica da agência (`/agencia`).
+- **Situação** (`GET …/channel`): `NONE`, `CONNECTING`, `ACTIVE` (com o número exibido), `FAILED` (com uma frase por `failureCode`: `TOKEN_INVALID`, `NUMBER_IN_USE`, `AMBIGUOUS_NUMBER`, `NUMBER_NOT_GRANTED`, `NO_NUMBER`, `META_UNAVAILABLE`, outros como "falha na conexão") e `DISCONNECTING`. Enquanto estiver `CONNECTING` ou `DISCONNECTING`, consultar a cada 5 segundos.
+- **Conectar:** botão que carrega o SDK JavaScript da Meta e abre o Embedded Signup v4 com o `config_id` do app (configuração pública, `NEXT_PUBLIC_META_APP_ID` e `NEXT_PUBLIC_META_SIGNUP_CONFIG_ID`).
+  - Ao terminar, enviar na hora `POST …/channel/connect` com `{code, phoneNumberId?, coexistence?}`: o `code` vale cerca de 30 segundos e é de uso único.
+  - `phoneNumberId` e `coexistence` vêm do evento `WA_EMBEDDED_SIGNUP` da janela (`FINISH` ou `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING`). São só sugestões: o servidor confere.
+  - Nunca guardar o `code` em storage, URL ou console.
+- **Desconectar:** `POST …/channel/disconnect`, com confirmação ("as mensagens deixam de chegar"); é também o caminho para tentar de novo depois de `FAILED`.
+**Aceite:**
+- `CHANNEL_ALREADY_CONNECTED`, `CHANNEL_BUSY`, `CHANNEL_NOT_CONNECTED` (409), `CHANNEL_CODE_INVALID` (400, pedir para abrir de novo) e `CHANNEL_META_UNAVAILABLE` / `CHANNEL_NOT_CONFIGURED` (503) têm mensagens próprias; `CLINIC_ACCESS_DENIED` esconde a seção.
+- Estados de carregamento, erro e sucesso; funciona no celular e por teclado.
+- `lint`, `typecheck` e `build` passam. A prova com a Meta real depende do app publicado e da URL pública (CRM-072).
 
 ## Retirado do MVP
 

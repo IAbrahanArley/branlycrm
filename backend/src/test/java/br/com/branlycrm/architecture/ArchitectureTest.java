@@ -239,6 +239,24 @@ class ArchitectureTest {
         .check(CODE);
   }
 
+  /**
+   * The connection tasks read the sealed token and move a channel's status: worker only (ADR-036).
+   */
+  @Test
+  void onlyTheWhatsappWorkerRunsConnectionTasks() {
+    noClasses()
+        .that()
+        .resideOutsideOfPackage("br.com.branlycrm.whatsapp.worker..")
+        .and()
+        .haveNameNotMatching(".*\\.ChannelOnboardingRepository(\\$.*)?")
+        .should()
+        .dependOnClassesThat()
+        .belongToAnyOf(
+            br.com.branlycrm.whatsapp.repositories.ChannelOnboardingRepository.class,
+            br.com.branlycrm.whatsapp.worker.ChannelOnboardingProcessor.class)
+        .check(CODE);
+  }
+
   /** The JDBC driver is compile scope only for the worker's LISTEN connection (ADR-036). */
   @Test
   void onlyTheWhatsappWorkerUsesTheDriverDirectly() {

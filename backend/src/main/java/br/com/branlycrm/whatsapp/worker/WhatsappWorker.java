@@ -41,6 +41,7 @@ public class WhatsappWorker implements SmartLifecycle {
 
   private final ChannelRegistryRepository channels;
   private final InboundProcessingService inbound;
+  private final ChannelOnboardingProcessor onboarding;
   private final ChannelUnsealer unsealer;
   private final ChannelSealer sealer;
   private final String url;
@@ -49,6 +50,7 @@ public class WhatsappWorker implements SmartLifecycle {
   private final long sweepSeconds;
   private final AtomicLong wakeups = new AtomicLong();
   private final AtomicBoolean drainRequested = new AtomicBoolean();
+  private final AtomicBoolean connectionsRequested = new AtomicBoolean();
   private volatile ScheduledExecutorService executor;
   private volatile ExecutorService processor;
   private volatile boolean running;
@@ -56,6 +58,7 @@ public class WhatsappWorker implements SmartLifecycle {
   public WhatsappWorker(
       ChannelRegistryRepository channels,
       InboundProcessingService inbound,
+      ChannelOnboardingProcessor onboarding,
       ChannelUnsealer unsealer,
       ChannelSealer sealer,
       @Value("${spring.datasource.url}") String url,
@@ -64,6 +67,7 @@ public class WhatsappWorker implements SmartLifecycle {
       @Value("${app.whatsapp.worker.sweep-seconds:30}") long sweepSeconds) {
     this.channels = channels;
     this.inbound = inbound;
+    this.onboarding = onboarding;
     this.unsealer = unsealer;
     this.sealer = sealer;
     this.url = url;
@@ -99,6 +103,8 @@ public class WhatsappWorker implements SmartLifecycle {
     executor.execute(this::listen);
     executor.scheduleWithFixedDelay(this::requestDrain, 0, sweepSeconds, TimeUnit.SECONDS);
     executor.scheduleWithFixedDelay(this::retention, 1, 24 * 60, TimeUnit.MINUTES);
+    // Connections: the person waits on the status screen, so they are picked up within seconds.
+    executor.scheduleWithFixedDelay(this::connections, 2, 5, TimeUnit.SECONDS);
     LOG.info("WhatsApp worker started");
   }
 
@@ -158,6 +164,27 @@ public class WhatsappWorker implements SmartLifecycle {
       }
     } catch (RuntimeException failure) {
       LOG.warn("WhatsApp sweep failed code={}", failure.getClass().getSimpleName());
+    }
+  }
+
+  private void connections() {
+    ExecutorService draining = processor;
+    if (!running || draining == null) return;
+    // Coalesced like the drains: never more than one connection pass waiting in the queue.
+    if (!connectionsRequested.compareAndSet(false, true)) return;
+    try {
+      draining.execute(
+          () -> {
+            connectionsRequested.set(false);
+            try {
+              onboarding.runPending(20);
+            } catch (RuntimeException failure) {
+              LOG.warn(
+                  "WhatsApp connection tasks failed code={}", failure.getClass().getSimpleName());
+            }
+          });
+    } catch (RuntimeException rejected) {
+      connectionsRequested.set(false);
     }
   }
 
