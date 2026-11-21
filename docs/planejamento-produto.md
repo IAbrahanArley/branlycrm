@@ -246,7 +246,7 @@ A Fase 3 (escala) junta o que sobrar e as ideias da seção 12 do documento: NPS
 | WhatsApp | WhatsApp Business Platform oficial (Cloud API ou provedor parceiro, a decidir) | ADR-027 |
 | E-mail | Resend | ADR-021 |
 | Arquivos | Armazenamento de objetos compatível com S3, na mesma região | ADR-027 |
-| Hospedagem | AWS Lightsail em São Paulo (`sa-east-1`) para o backend; Vercel para o Next.js | ADR-022 (revisada) |
+| Hospedagem | VM OCI Always Free (Ampere A1) em São Paulo (`sa-saopaulo-1`) para o backend; Vercel para o Next.js | ADR-037, ADR-022 |
 
 - **Módulos existentes:** `identity`, `tenant`, `provisioning` e `config`.
 - **Módulos planejados:** `agency`, `contacts`, `sales` (funil, leads e vendas), `messaging` (WhatsApp e caixa de entrada), `origin`, `tasks`, `notifications`, `exports`, `analytics`, `audit` e `platform`.
@@ -255,7 +255,7 @@ A Fase 3 (escala) junta o que sobrar e as ideias da seção 12 do documento: NPS
 
 **Rotas de rede:**
 - **Navegador:** usa `app.<domínio>` com rewrite de `/api` para o backend, sem mudança de cookie.
-- **Meta:** chama `api.<domínio>/api/v1/webhooks/whatsapp` direto no Lightsail. É a única rota pública sem sessão, protegida por assinatura.
+- **Meta:** chama `api.<domínio>/api/v1/webhooks/whatsapp` direto na VM da OCI. É a única rota pública sem sessão, protegida por assinatura.
 - **Atualização da caixa de entrada:**
   - na F1, consulta periódica curta;
   - eventos do servidor (SSE) direto na API, se o rewrite da Vercel não sustentar conexões longas (decidir em CRM-080).
@@ -272,7 +272,7 @@ A Fase 3 (escala) junta o que sobrar e as ideias da seção 12 do documento: NPS
 | Usabilidade | Português, simples, responsivo, PWA | Telas para celular primeiro na caixa de entrada; manifesto PWA (push só na F2) |
 | Escala | Começar com 3 a 5 clínicas | Pools por clínica com limite (ADR-018); revisar ao passar de dezenas de clínicas |
 | Observabilidade | Alertas de falha de webhook, conexão e envio | Logs sanitizados e alertas em CRM-070 |
-| Hospedagem | Servidores no Brasil | Lightsail `sa-east-1` e armazenamento na mesma região; a Vercel serve só a interface |
+| Hospedagem | Servidores no Brasil | VM OCI em `sa-saopaulo-1` e Object Storage na mesma região; a Vercel serve só a interface |
 
 ## 10. Segurança e privacidade
 
@@ -337,7 +337,7 @@ A estimativa anterior (12 a 16 semanas) não vale mais: o WhatsApp e a caixa de 
 - [x] **Papéis:** Gestor, Atendente e Somente leitura (ADR-025).
 - [x] **Agências:** como camada opcional sobre clínicas (ADR-026).
 - [x] **Agenda própria:** fora do MVP (ADR-024).
-- [x] **Região:** Lightsail São Paulo (ADR-022 revisada).
+- [x] **Região:** OCI São Paulo (ADR-037).
 
 ## 14. Instruções para agentes
 

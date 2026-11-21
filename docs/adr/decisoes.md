@@ -288,6 +288,8 @@ Data de todos os registros: 04/11/2026.
 
 ## ADR-022 — Hospedagem: AWS Lightsail para a API e Vercel para o frontend
 
+> **Substituída parcialmente pela ADR-037 em 21/11/2026:** o backend sai do Lightsail e vai para uma VM OCI Always Free em São Paulo. A Vercel, o rewrite, o IP real, o HTTPS e a operação descritos abaixo continuam valendo.
+>
 > **Revisão de 06/11/2026 (ADR-024, ADR-027):**
 > - **Região:** a VM e o armazenamento de objetos ficam em São Paulo (`sa-east-1`), disponível no Lightsail desde junho de 2026, porque o cliente pede servidores no Brasil.
 > - **Webhook:** a rota do WhatsApp é chamada pela Meta direto em `api.<domínio>`, sem passar pela Vercel. O Nginx expõe só essa rota sem sessão; o restante da API continua acessível apenas pelo rewrite.
@@ -833,7 +835,7 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - **Mídias:**
   - **Download:** o worker baixa em streaming, com teto de bytes (sem confiar no `Content-Length`).
   - **Validação:** tipo detectado pelos primeiros bytes do arquivo, numa lista permitida. Limites da Meta: imagem até 5 MB, áudio e vídeo até 16 MB, documento até 100 MB.
-  - **Armazenamento:** objetos S3 do Lightsail em São Paulo. A **chave do objeto vem sempre do registro no banco da clínica**, nunca do cliente.
+  - **Armazenamento:** OCI Object Storage em São Paulo, pela API compatível com S3 (ADR-037). A **chave do objeto vem sempre do registro no banco da clínica**, nunca do cliente.
   - **Entrega:** link pré-assinado de até 5 minutos, com `Content-Disposition: attachment` e `Content-Type` fixado.
   - **Dependência:** o SDK S3 entra para aprovação na CRM-084.
 
@@ -869,3 +871,37 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
   - o tamanho máximo do payload;
   - o `biz_opaque_callback_data` nos status;
   - os campos da coexistência.
+
+## ADR-037 — Hospedagem do backend na Oracle Cloud (OCI Always Free)
+
+**Data:** 21/11/2026. **Status:** Aceita pelo usuário; preparação operacional em CRM-072. **Substitui:** ADR-022 quanto à VM do backend. **Mantém:** ADR-022 quanto à Vercel, ao rewrite, ao IP real, ao HTTPS e à operação.
+
+**Contexto:** A homologação e o piloto do MVP precisam ser validados em produção sem custo inicial de infraestrutura. O Lightsail (ADR-022) cobra mensalidade fixa desde o primeiro dia. O nível Always Free da Oracle Cloud oferece VMs ARM (Ampere A1) com até 4 OCPUs e 24 GB de RAM no total, 200 GB de disco em bloco e armazenamento de objetos, com região em São Paulo.
+
+**Decisão:**
+- **Backend:** uma VM Ampere A1 (arm64) do Always Free, na região `sa-saopaulo-1`, roda o mesmo Compose de ADR-022: PostgreSQL com controle total dos papéis, `db-bootstrap`, `migrate`, API, provisionador, worker de mensagens e o volume de segredos, com Nginx e TLS na entrada.
+- **Frontend:** continua na Vercel. O plano Hobby é usado só durante os testes; o Pro é assinado antes de atender clínica pagante (ADR-022).
+- **Conta:** São Paulo é a região inicial (home region), que não pode ser trocada. A conta é convertida para **Pay As You Go**, com alerta de orçamento baixo, e só recebe recursos marcados como Always Free. Assim o custo continua zero dentro dos limites, sem o risco de recuperação de instância ociosa das contas só gratuitas e com prioridade maior na falta de capacidade.
+- **Arquivos e backups:** OCI Object Storage em São Paulo, pela API de compatibilidade com S3, atende ADR-027 (mídias e exportações) e os backups.
+- **TLS:** certificado Let's Encrypt no Nginx da VM, com renovação automática.
+- **Domínio:** a homologação sem dados reais pode usar um subdomínio gratuito. O domínio próprio é obrigatório antes de registrar o webhook definitivo na Meta e antes do piloto.
+- **Tamanho:** a cota é dividida em duas VMs de 2 OCPUs e 12 GB. Uma é a de produção do piloto; a outra fica para a restauração isolada exigida em CRM-072 e para testes de deploy. Medir o consumo antes de redistribuir.
+
+**Por quê:** Mantém tudo o que levou à VM própria em ADR-022 (CREATEDB/CREATEROLE, vector em `template1` e volume compartilhado entre provisionador e API), sem mudar a arquitetura, com dados no Brasil e sem custo de infraestrutura enquanto o piloto valida o produto.
+
+**Alternativas:**
+- **Manter o Lightsail:** é mais previsível na contratação e não tem falta de capacidade, mas tem custo fixo desde o início.
+- **Conta OCI só gratuita, sem Pay As You Go:** não exige vincular cobrança, mas a VM do piloto, com pouco uso, pode ser recuperada pela Oracle.
+- **Next.js na mesma VM:** eliminaria o plano da Vercel e o tratamento do IP real, mas o usuário preferiu manter o frontend na Vercel.
+
+**Consequências e itens obrigatórios:**
+- **Arquitetura arm64:** as imagens base em uso (`eclipse-temurin:21`, `maven:3.9-eclipse-temurin-21`, `pgvector/pgvector:pg17`, `nginx:stable-alpine`) são multiplataforma. O build é feito na VM ou com `docker buildx --platform linux/arm64`. Se uma imagem passar a ser fixada por digest, usar o digest do índice multiplataforma. A CI e o Testcontainers continuam em amd64.
+- **Capacidade:** a criação da VM A1 em São Paulo pode falhar por falta de capacidade; repetir ou criar menor e redimensionar.
+- **Firewall em duas camadas:** a lista de segurança (ou NSG) da VCN e o firewall da própria imagem. Abertas só 80 e 443; SSH restrito ao operador ou pelo OCI Bastion; PostgreSQL e a porta da API nunca públicas.
+- **IP real atrás da Vercel:** a Vercel não tem faixa de IPs fixa nos planos usados. O proxy confiável de ADR-022 usa um cabeçalho com segredo compartilhado, injetado pelo rewrite e conferido no Nginx.
+- **Custo:** qualquer recurso fora do Always Free é cobrado. O alerta de orçamento e a conferência da primeira fatura fazem parte de CRM-072. O custo das mensagens do WhatsApp é da conta Meta da clínica ou da agência (conversas de serviço respondidas na janela de 24 horas são gratuitas; modelos iniciados pela empresa são pagos), independente da hospedagem.
+- **Sem SLA nem suporte** no nível gratuito. A VM única continua sendo ponto único de falha (risco aceito em ADR-022). Reavaliar a hospedagem antes de passar do piloto para clínicas pagantes.
+- **Backup:** dumps diários criptografados antes do envio ao Object Storage, com política de retenção que caiba no limite gratuito, e restauração testada na segunda VM.
+- **Links temporários de mídia:** confirmar em CRM-084 que as URLs pré-assinadas pela compatibilidade com S3 funcionam. Se não funcionarem, usar as Pre-Authenticated Requests nativas da OCI.
+- **E-mail:** a porta 25 é bloqueada na OCI; o Resend usa HTTPS (ADR-021), sem impacto.
+- **Limites:** os números do Always Free citados aqui devem ser conferidos na página oficial da Oracle ao criar a conta, porque mudam com o tempo.
