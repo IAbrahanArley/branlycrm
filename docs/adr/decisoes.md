@@ -823,6 +823,15 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
     - atualizações de entrega.
   - **Falhas:** tentativas com espera crescente (até 8). `FAILED` nunca perde o evento: tem métrica, alerta e um comando de reprocessamento.
   - **Meta de desempenho:** a mensagem vira lead em até 5 segundos, medido localmente.
+  - **Na implementação (CRM-082b, decisões aprovadas em 17/11/2026):**
+    - `[CODIGO]` vira origem do tipo Outro, com fonte código;
+    - o eco do app WhatsApp Business cria contato e mensagem enviada, nunca lead;
+    - conversas e mensagens entram com o worker (V15 de clínica), e a API da caixa de entrada com a CRM-083;
+    - uma transação por evento, com os repositórios de contato e lead rodando dentro dela;
+    - toque de origem só com origem detectada e lead aberto;
+    - a ordem é por contato: um evento espera enquanto houver outro anterior do mesmo contato pendente;
+    - falha da clínica adia sem gastar tentativa; só falhas do evento contam;
+    - o reprocessamento do evento esgotado é, por enquanto, uma consulta documentada (`docs/whatsapp-canal.md`), não um comando.
 
 - **Fila de saída** (`whatsapp_outbox`, no banco da clínica):
   - **Pedido:** a API grava o pedido com uma chave de idempotência gerada pelo cliente. Cada envio leva `biz_opaque_callback_data` igual ao id da linha na fila.

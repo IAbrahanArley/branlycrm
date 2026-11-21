@@ -844,7 +844,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - na 081b, o caminho de reconexão de um canal `FAILED` (o worker desconecta, e só então a API cria outro);
   - conferir no Compose que o container do worker fica estável.
 
-### [-] CRM-082 — Webhook de entrada e criação automática de contato e lead (P0)
+### [x] CRM-082 — Webhook de entrada e criação automática de contato e lead (P0)
 **Depende de:** CRM-081, CRM-021, CRM-031.
 **Atende:** WPP-02, PAC-02, CRM-03, RN-01.
 **Entregas:**
@@ -880,9 +880,50 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - a regra "o webhook só insere" é garantida pelo código, porque o papel da clínica é o mesmo da API e do worker (ADR-036);
   - a leitura e a assinatura do corpo acontecem antes do limite de concorrência; o Nginx e as threads do Tomcat limitam a memória;
   - um evento que o banco recuse por outro motivo de dado ainda trava a entrega até ser corrigido. Ele aparece no log como `storage failed`.
-- **Falta:**
-  - a **082b** (worker): contato, lead com origem, mensagem, tentativas, varredura e retenção de 30 dias;
-  - testar com a Meta real, o que depende da URL pública (CRM-072 ou túnel) e do app publicado.
+- **Falta:** testar com a Meta real, o que depende da URL pública (CRM-072 ou túnel) e do app publicado.
+
+**Estado (21/11/2026):** parte **082b (worker de entrada)** concluída na branch `feat/crm-082b-worker`, com a detecção de origem da CRM-091. Detalhes em [docs/whatsapp-canal.md](docs/whatsapp-canal.md). Com ela, o aceite da CRM-082 está cumprido localmente, por isso `[x]`; a prova com a Meta real continua pendente acima.
+- **Decisões aprovadas pelo responsável em 17/11/2026:**
+  1. `[CODIGO]` vira origem do tipo Outro, com fonte código;
+  2. o eco do app WhatsApp Business cria contato e mensagem enviada, nunca lead;
+  3. conversas e mensagens já nesta tarefa (migração de clínica V15); a API da caixa de entrada fica na CRM-083;
+  4. uma transação por evento, com `ContactRepository.createFromWhatsapp` e `LeadRepository.openWithin` e `recordTouchWithin` rodando dentro da transação aberta pelo worker;
+  5. toque de origem só com origem detectada e lead já aberto.
+- **Migração de clínica V15:** `whatsapp_conversations` (uma por contato) e `whatsapp_messages` (`wamid` único), sem DELETE e com UPDATE só nos horários da conversa.
+- **Fila:**
+  - reserva com `FOR UPDATE SKIP LOCKED`, em ordem por contato: um evento espera enquanto houver outro anterior do mesmo contato pendente;
+  - advisory lock pelo telefone canônico;
+  - falha da própria clínica (banco fora, migração pendente, identidade, segredo) só adia o evento, sem gastar tentativa;
+  - outras falhas gastam tentativa, com espera de 30 s dobrando até 1 h, no máximo 8;
+  - status e eventos da conta ficam marcados com `DEFERRED_STATUS` e `DEFERRED_ACCOUNT`, para a CRM-084 e a CRM-081b os acharem.
+- **Worker:** drenagem numa thread só, por canal, em lotes de 200; o sinal pendente só é limpo quando não resta evento a tentar. Retenção diária do JSON bruto com mais de 30 dias, em lotes.
+- **Testes:**
+  - `InboundEventInterpreterTest`: telefone com 9º dígito, nome do perfil, NUL, mídia, eco, status e conta adiados, número e JSON inválidos, origem por anúncio, post, código válido e inválido, e espera das tentativas;
+  - `WhatsappWorkerIT`, do webhook assinado até o banco da clínica, com o papel runtime real:
+    - mensagem de anúncio vira contato sem autor, lead em Novo com a origem e mensagem, em menos de 5 s;
+    - reenvio sem duplicar; o mesmo contato com e sem o 9º dígito; código vira toque sem mudar a origem;
+    - lead perdido leva a abrir outro; eco sem lead; status sem escrita; clínica B isolada;
+    - contato do eco ganha o nome do perfil; ordem por contato preserva a origem do anúncio;
+    - falha da clínica adia sem gastar tentativa e não deixa nada gravado; retenção;
+  - `TenantMigrationRolloutIT` passa a remover as tabelas da V15 no rebaixamento.
+  - `clean verify`: 255 unitários e 155 de integração, sem falhas.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico. Corrigidos:
+  - falhas da clínica não gastam mais tentativas, e o processamento de outros contatos segue quando um evento falha;
+  - ordem por contato, para uma mensagem nova não tomar a origem de um clique de anúncio que falhou;
+  - retenção em lotes;
+  - status e eventos da conta com código estável;
+  - mensagem já gravada não muda nada, nem o lead (protege o reprocessamento manual);
+  - contato criado pelo eco ganha o nome do perfil depois;
+  - a varredura ignora clínicas suspensas;
+  - número recusado vai para o log como aviso;
+  - a `version` da conversa não muda a cada mensagem, para a CRM-083 usá-la na atribuição.
+- **Riscos aceitos e pendências:**
+  - **reprocessamento:** o evento esgotado (8 tentativas) fica guardado, com o código do erro, e é reprocessado pela consulta documentada em `docs/whatsapp-canal.md`. O comando próprio que a ADR-036 pede fica para quando houver o primeiro caso real;
+  - **retenção:** só alcança clínicas e canais ativos. Clínica suspensa ou canal desconectado mantém o JSON até a CRM-073 definir a limpeza de clínicas inativas;
+  - **contato arquivado** que escreve: a mensagem é gravada, mas ele não ganha lead. **Precisa da sua confirmação.**
+  - **código** `[ig01]` e `[IG01]` são códigos diferentes nos relatórios (ADR-035 não normaliza);
+  - as regras de RN-01 e RN-02 do worker ficam no repositório (`InboundQueueRepository`), porque a `Session` não pode passar por um service (decisão 4);
+  - a CRM-073 precisa tratar conversas e mensagens, que impedem a exclusão definitiva do contato (`ON DELETE RESTRICT`).
 
 ### [ ] CRM-083 — Caixa de entrada compartilhada (P1)
 **Depende de:** CRM-082.
@@ -951,7 +992,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Tela (16/11/2026):** origem no detalhe do lead, com correção, e histórico de chegadas no perfil do contato, entregues pelo Codex (`feat(frontend): capture and display lead origins`, PR #48).
 - **Pendente:** selo e filtros por origem (CRM-092).
 
-### [ ] CRM-091 — Detecção automática da origem (P0)
+### [-] CRM-091 — Detecção automática da origem (P0)
 **Depende de:** CRM-082, CRM-090.
 **Atende:** ORI-02, ORI-03.
 **Entregas:** classificação no worker:
@@ -962,6 +1003,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Testes com payloads sintéticos:** anúncio, post impulsionado, código válido, código inválido e sem nada.
 - **Retorno do contato:** contato antigo voltando por anúncio gera evento sem trocar a origem do lead aberto.
 - **Prova real:** confirmada no piloto (CRM-074).
+**Estado (21/11/2026):** implementada no worker da CRM-082b (`OriginDetector`): `referral` de anúncio ou de post impulsionado vira Tráfego pago, com o id e o título do anúncio e o `ctwa_clid`; `[CODIGO]` no início do texto vira origem do tipo Outro; o resto, Não identificada. Os testes sintéticos e o retorno do contato por código estão no `InboundEventInterpreterTest` e no `WhatsappWorkerIT`. Falta só a prova real, no piloto, por isso `[-]`.
 
 ### [ ] CRM-092 — Selo, filtros e relatório por origem (P1)
 **Depende de:** CRM-091, CRM-033.
