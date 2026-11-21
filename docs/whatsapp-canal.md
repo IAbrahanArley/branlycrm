@@ -138,7 +138,7 @@ O processo `whatsapp-worker` transforma os eventos gravados pelo webhook em cont
   - **nome:** o do perfil do WhatsApp; sem ele, o próprio número. Um contato criado sem nome ganha o do perfil na primeira mensagem dele. Nome dado por uma pessoa nunca é trocado;
   - **telefone:** `PhoneNumber.parse`, com a regra do 9º dígito. Número recusado marca o evento como `INVALID_PHONE`, com aviso no log;
   - **eco do app WhatsApp Business:** contato e mensagem enviada (`sent_by_app`), nunca lead;
-  - **contato arquivado:** a mensagem é gravada, sem lead;
+  - **contato arquivado:** a mensagem é gravada, sem lead (decisão do responsável, 21/11/2026). Para voltar a ser oportunidade, a equipe desarquiva o contato e abre o lead;
   - **status e eventos da conta:** marcados como processados com `DEFERRED_STATUS` e `DEFERRED_ACCOUNT`, sem efeito, até a CRM-084 e a CRM-081b.
 - **Origem (CRM-091):**
   - `referral` de anúncio ou post impulsionado: Tráfego pago, com o id e o título do anúncio e o `ctwa_clid`. Valores inválidos são descartados um a um;

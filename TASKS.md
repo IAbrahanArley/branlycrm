@@ -920,7 +920,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Riscos aceitos e pendências:**
   - **reprocessamento:** o evento esgotado (8 tentativas) fica guardado, com o código do erro, e é reprocessado pela consulta documentada em `docs/whatsapp-canal.md`. O comando próprio que a ADR-036 pede fica para quando houver o primeiro caso real;
   - **retenção:** só alcança clínicas e canais ativos. Clínica suspensa ou canal desconectado mantém o JSON até a CRM-073 definir a limpeza de clínicas inativas;
-  - **contato arquivado** que escreve: a mensagem é gravada, mas ele não ganha lead. **Precisa da sua confirmação.**
+  - **contato arquivado** que escreve: a mensagem é gravada, mas ele não ganha lead. Confirmado pelo responsável em 21/11/2026.
   - **código** `[ig01]` e `[IG01]` são códigos diferentes nos relatórios (ADR-035 não normaliza);
   - as regras de RN-01 e RN-02 do worker ficam no repositório (`InboundQueueRepository`), porque a `Session` não pode passar por um service (decisão 4);
   - a CRM-073 precisa tratar conversas e mensagens, que impedem a exclusão definitiva do contato (`ON DELETE RESTRICT`).
