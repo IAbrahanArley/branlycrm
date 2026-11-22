@@ -1,4 +1,4 @@
-# Canal WhatsApp: base (CRM-081a), webhook (CRM-082a) e worker de entrada (CRM-082b)
+# Canal WhatsApp: base (CRM-081a), conexão (CRM-081b), webhook (CRM-082a) e worker de entrada (CRM-082b)
 
 Implementado em 17/11/2026. Desenho completo na ADR-036; este documento cobre o que já existe em código.
 
@@ -111,15 +111,46 @@ Rota pública `POST` e `GET /api/v1/webhooks/whatsapp`. É a URL de retorno conf
 
 O segredo do app e o token de verificação vêm de **arquivos montados**, nunca de variável de ambiente:
 
-| Arquivo | Conteúdo |
-|---|---|
-| `app-secret` | o segredo do app (Meta, Configurações > Básico) |
-| `verify-token` | um texto aleatório de 16 ou mais caracteres, o mesmo digitado na configuração do webhook na Meta |
+| Arquivo | Conteúdo | Quem recebe |
+|---|---|---|
+| `.whatsapp-meta/app-secret` | o segredo do app (Meta, Configurações > Básico) | API e worker |
+| `.whatsapp-webhook/verify-token` | um texto aleatório de 16 ou mais caracteres, o mesmo digitado na configuração do webhook na Meta | só a API |
 
-- No Compose, ficam na pasta `${WHATSAPP_WEBHOOK_DIR:-./.whatsapp-webhook}`, montada só na API, como leitura. A pasta é ignorada pelo Git.
+- No Compose, as pastas são `${WHATSAPP_META_DIR:-./.whatsapp-meta}` e `${WHATSAPP_WEBHOOK_DIR:-./.whatsapp-webhook}`, montadas como leitura. Monta-se a pasta, nunca o arquivo, porque um arquivo ausente faria o Docker criar uma pasta no lugar. As duas são ignoradas pelo Git.
 - Sem os arquivos, o webhook responde 503 e o resto da API funciona.
 - Cada arquivo é lido de novo quando a data de modificação muda. Trocar o segredo na Meta e no arquivo não exige reiniciar a API.
 - Os valores nunca aparecem em log, resposta ou `toString`.
+
+## Conexão do número (CRM-081b)
+
+Quem conecta: o Proprietário ou o Gestor da clínica (`CHANNEL_CONNECT`), ou o administrador da agência dona da carteira. Os outros papéis não veem o canal.
+
+- **Rotas:**
+  - clínica selecionada: `GET /v1/clinic/whatsapp/channel`, `POST …/connect` e `POST …/disconnect`;
+  - agência: as mesmas em `/v1/agencies/{agencyId}/clinics/{tenantId}/whatsapp/channel`. Clínica fora da carteira, ou não ativa, responde 404 como se não existisse.
+- **Situação devolvida:** `NONE`, `CONNECTING`, `ACTIVE` (com o número exibido), `FAILED` (com o código) ou `DISCONNECTING`. Nunca token, PIN, id da conta ou do número.
+- **Conectar (`POST …/connect` com `{code, phoneNumberId?, coexistence?}`):**
+  1. recusa logo se a clínica já tem canal vivo (`CHANNEL_ALREADY_CONNECTED`), antes de gastar o código;
+  2. troca o código do Embedded Signup pelo token na hora, com o segredo do app no corpo da requisição;
+  3. sela o token com a chave pública, grava o canal `PENDING` e a tarefa `VERIFY_ASSETS`, e responde 202. O código e o token nunca são gravados nem registrados em claro.
+- **No worker, em etapas, com o token aberto só ali:**
+  1. **`VERIFY_ASSETS`:** pelo próprio token (`debug_token`, que precisa ser deste app e ter os escopos de gestão e de mensagens na mesma conta) descobre as contas e lista os números. O `phoneNumberId` do navegador é só escolha entre eles. Sem escolha e com mais de um número, falha com `AMBIGUOUS_NUMBER`; número já usado por outra clínica, `NUMBER_IN_USE`;
+  2. **`REGISTER_NUMBER`:** gera um PIN de 6 dígitos, sela token e PIN juntos com a chave mais nova e registra o número. Com `coexistence` (número que continua no app WhatsApp Business), essa etapa é pulada;
+  3. **`SUBSCRIBE_WEBHOOKS`:** assina os webhooks da conta e ativa o canal.
+- **Desconectar:** cria a tarefa `DISCONNECT`. O worker cancela a assinatura dos webhooks, a não ser que outro canal vivo use a mesma conta (uma agência com várias clínicas), apaga token e PIN e marca `DISCONNECTED`. É também o caminho para sair de `FAILED` e conectar de novo. Eventos que estavam na fila e chegam depois são descartados.
+- **Falhas:**
+  - Meta fora, limite de taxa ou chaves e segredo ausentes: nova tentativa, de 30 s até 8 min, no máximo 6;
+  - recusa da Meta ou token revogado (erro 190): o canal fica `FAILED` com o código, por exemplo `TOKEN_INVALID`;
+  - tentativas esgotadas: `FAILED` com o último código;
+  - a desconexão acontece mesmo se a Meta não responder depois das tentativas;
+  - uma tarefa cujo worker caiu volta depois de 2 minutos e gasta uma tentativa. Toda escrita confere o lease, então um worker atrasado nunca sobrescreve outro.
+- **Chamadas à Meta:** cliente HTTP da própria JDK, com `appsecret_proof` em toda chamada com o token, sem redirecionamentos, e a versão da Graph API configurável (`app.whatsapp.meta.graph-version`, v25.0).
+- **Configuração:** `WHATSAPP_APP_ID` no `.env` (não é segredo) e o arquivo `.whatsapp-meta/app-secret`. Sem eles, conectar responde 503 `CHANNEL_NOT_CONFIGURED`.
+- **Riscos aceitos:**
+  - a `coexistence` vem do evento do Embedded Signup e não é conferida pela Meta até o teste real: um `true` errado pula o registro, e um `false` errado faz o registro falhar com código;
+  - o `debug_token` leva o token na query da URL, como a Graph API exige. A conexão é TLS direta, sem proxy com log de URL;
+  - um canal `FAILED` mantém o token selado e o número reservado até alguém desconectar;
+  - a ADR-036 pede a reação a `account_update` (bloqueio) e a recifragem na rotação das chaves: ficam para depois.
 
 ## Worker de entrada (CRM-082b)
 
@@ -162,6 +193,6 @@ O processo `whatsapp-worker` transforma os eventos gravados pelo webhook em cont
 
 - O laço do worker (`LISTEN`, varredura e retenção) não tem teste automatizado; os testes chamam a drenagem diretamente.
 - Clínica suspensa ou canal desconectado não passam pela retenção (CRM-073).
-- A conexão pelo Embedded Signup (CRM-081b) ainda não existe.
+- A tela da conexão é a FE-009 (Codex). A conexão nunca foi feita com a Meta real: falta o ID de configuração do Embedded Signup, o app publicado e a URL pública.
 - O webhook ainda não foi testado com a Meta real: falta a URL pública (CRM-072 ou túnel) e o app publicado.
 - A subida do processo do worker não tem teste automatizado. O modo `whatsapp-worker` liga `spring.main.keep-alive`, porque sem HTTP só sobram threads daemon e a JVM sairia logo depois de subir. **A estabilidade do container ainda precisa ser conferida** com `docker compose up -d whatsapp-worker` e `docker compose ps` depois de alguns minutos.

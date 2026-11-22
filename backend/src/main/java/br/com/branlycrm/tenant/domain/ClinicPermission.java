@@ -10,6 +10,8 @@ public enum ClinicPermission {
   /** Funnel, stages, loss reasons, procedures, professionals and quick replies. */
   COMMERCIAL_SETTINGS_EDIT,
   CHANNEL_VIEW,
+  /** Connect or disconnect the WhatsApp number (CRM-081b). */
+  CHANNEL_CONNECT,
   CONTACT_READ,
   /** Create, edit, tags and consent. */
   CONTACT_WRITE,

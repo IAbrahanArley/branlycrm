@@ -48,6 +48,8 @@ class ClinicRoleTest {
     documented(ClinicPermission.COMMERCIAL_SETTINGS_EDIT, ALL, ALL, NONE, NONE);
     // Canal WhatsApp: ver estado: ✓ | ✓ | — | —
     documented(ClinicPermission.CHANNEL_VIEW, ALL, ALL, NONE, NONE);
+    // Canal WhatsApp: conectar e desconectar o número: ✓ | ✓ | — | —
+    documented(ClinicPermission.CHANNEL_CONNECT, ALL, ALL, NONE, NONE);
     // Contatos: ver e buscar: ✓ | ✓ | ✓ | ✓
     documented(ClinicPermission.CONTACT_READ, ALL, ALL, ALL, ALL);
     // Contatos: criar, editar, tags, consentimento: ✓ | ✓ | ✓ | —
