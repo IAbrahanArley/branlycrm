@@ -69,7 +69,9 @@ public class ReportService {
         dashboard.salesMonthCount(),
         dashboard.salesMonthCents(),
         dashboard.tasksOverdue(),
-        dashboard.tasksToday());
+        dashboard.tasksToday(),
+        dashboard.conversationsAwaitingReply(),
+        dashboard.conversationsUnassigned());
   }
 
   private static YearMonth month(String value) {

@@ -31,29 +31,37 @@ public class TimelineRepository {
       SELECT 'LEAD_EVENT' AS kind, e.id, e.occurred_at, e.actor_id, e.lead_id,
              CAST(NULL AS UUID) AS sale_id, CAST(NULL AS UUID) AS task_id, e.type,
              e.from_value, e.to_value, e.loss_reason_id, CAST(NULL AS BIGINT) AS amount_cents,
-             CAST(NULL AS VARCHAR) AS text, 1 AS rank, e.seq
+             CAST(NULL AS VARCHAR) AS text, 1 AS rank, e.seq,
+             CAST(NULL AS UUID) AS conversation_id, CAST(NULL AS VARCHAR) AS message_type,
+             CAST(NULL AS BOOLEAN) AS sent_by_app
       FROM lead_events e JOIN leads l ON l.id = e.lead_id
       WHERE l.contact_id = :contact
       UNION ALL
       SELECT 'NOTE', n.id, n.created_at, n.author_id, n.lead_id, NULL, NULL, NULL, NULL, NULL,
-             NULL, NULL, n.body, 2, n.seq
+             NULL, NULL, n.body, 2, n.seq, NULL, NULL, NULL
       FROM lead_notes n JOIN leads l ON l.id = n.lead_id
       WHERE l.contact_id = :contact
       UNION ALL
       SELECT 'SALE_EVENT', se.id, se.occurred_at, se.actor_id, s.lead_id, s.id, NULL, se.type,
-             NULL, NULL, NULL, se.amount_cents, se.reason, 3, se.seq
+             NULL, NULL, NULL, se.amount_cents, se.reason, 3, se.seq, NULL, NULL, NULL
       FROM sale_events se JOIN sales s ON s.id = se.sale_id
       WHERE s.contact_id = :contact
       UNION ALL
       SELECT 'TASK_CREATED', t.id, t.created_at, t.created_by, t.lead_id, NULL, t.id, NULL,
-             NULL, NULL, NULL, NULL, t.title, 4, 0
+             NULL, NULL, NULL, NULL, t.title, 4, 0, NULL, NULL, NULL
       FROM tasks t
       WHERE t.contact_id = :contact
       UNION ALL
       SELECT 'TASK_COMPLETED', t.id, t.completed_at, t.completed_by, t.lead_id, NULL, t.id, NULL,
-             NULL, NULL, NULL, NULL, t.title, 5, 0
+             NULL, NULL, NULL, NULL, t.title, 5, 0, NULL, NULL, NULL
       FROM tasks t
       WHERE t.contact_id = :contact AND t.completed_at IS NOT NULL
+      UNION ALL
+      SELECT 'MESSAGE', m.id, m.sent_at, NULL, NULL, NULL, NULL, m.direction, NULL, NULL, NULL,
+             NULL, left(m.body, 200), 6, m.seq, m.conversation_id, m.message_type,
+             m.sent_by_app
+      FROM whatsapp_messages m JOIN whatsapp_conversations c ON c.id = m.conversation_id
+      WHERE c.contact_id = :contact AND :messages
       """;
 
   private final ClinicPersistence persistence;
@@ -67,7 +75,10 @@ public class TimelineRepository {
   /**
    * @throws TimelineException when the contact is missing in this clinic (archived ones included)
    */
-  public Page page(ClinicAccess access, UUID contactId, PageQuery query) {
+  /**
+   * @param messages include WhatsApp messages: only for who may read the inbox (INBOX_READ)
+   */
+  public Page page(ClinicAccess access, UUID contactId, PageQuery query, boolean messages) {
     return persistence.inTransaction(
         ClinicTenant.of(access),
         session -> {
@@ -84,28 +95,31 @@ public class TimelineRepository {
                   .createNativeQuery(
                       "SELECT kind, id, occurred_at, actor_id, lead_id, sale_id, task_id, type,"
                           + " from_value, to_value, loss_reason_id, amount_cents, text,"
+                          + " conversation_id, message_type, sent_by_app,"
                           + " count(*) OVER () FROM ("
                           + ENTRIES
                           + ") entries ORDER BY occurred_at DESC, rank DESC, seq DESC, id DESC"
                           + " LIMIT :limit OFFSET :offset",
                       Object[].class)
                   .setParameter("contact", contactId)
+                  .setParameter("messages", messages)
                   .setParameter("limit", query.pageSize())
                   .setParameter("offset", query.offset())
                   .getResultList();
           long total =
               rows.isEmpty()
-                  ? (query.offset() == 0 ? 0 : count(session, contactId))
-                  : ((Number) rows.getFirst()[13]).longValue();
+                  ? (query.offset() == 0 ? 0 : count(session, contactId, messages))
+                  : ((Number) rows.getFirst()[16]).longValue();
           return new Page(rows.stream().map(TimelineRepository::entry).toList(), total);
         });
   }
 
   /** Total for a page past the end, where the windowed count has no row to ride on. */
-  private static long count(Session session, UUID contactId) {
+  private static long count(Session session, UUID contactId, boolean messages) {
     return session
         .createNativeQuery("SELECT count(*) FROM (" + ENTRIES + ") entries", Long.class)
         .setParameter("contact", contactId)
+        .setParameter("messages", messages)
         .getSingleResult();
   }
 
@@ -123,7 +137,10 @@ public class TimelineRepository {
         (String) row[9],
         (UUID) row[10],
         row[11] == null ? null : ((Number) row[11]).longValue(),
-        (String) row[12]);
+        (String) row[12],
+        (UUID) row[13],
+        (String) row[14],
+        (Boolean) row[15]);
   }
 
   private static Instant instant(Object value) {

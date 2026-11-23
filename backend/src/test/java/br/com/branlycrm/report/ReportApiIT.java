@@ -58,6 +58,73 @@ class ReportApiIT {
   @Container @ServiceConnection
   static final PostgreSQLContainer POSTGRES = TestPostgres.container();
 
+  /** Conversation cards (CRM-083, docs/metricas.md): latest message from the contact. */
+  @Test
+  void conversationCardsCountWhatAwaitsAReply() throws Exception {
+    UUID owner = account("owner-c@example.test");
+    UUID clinic = provision(owner);
+    UUID clinicB = provision(account("owner-d@example.test"));
+    Browser browser = selected("owner-c@example.test", clinic);
+    Browser browserB = selected("owner-d@example.test", clinicB);
+    // Unassigned and waiting; taken and waiting; answered; without messages.
+    conversationWith(clinic, "+5511987000301", null, "IN");
+    conversationWith(clinic, "+5511987000302", owner, "OUT", "IN");
+    conversationWith(clinic, "+5511987000303", null, "IN", "OUT");
+    conversationWith(clinic, "+5511987000304", null);
+
+    JsonNode dashboard = ok(browser.get("/v1/clinic/dashboard"));
+    assertThat(dashboard.get("conversationsAwaitingReply").asLong()).isEqualTo(2);
+    assertThat(dashboard.get("conversationsUnassigned").asLong()).isEqualTo(1);
+    JsonNode other = ok(browserB.get("/v1/clinic/dashboard"));
+    assertThat(other.get("conversationsAwaitingReply").asLong()).isZero();
+    assertThat(other.get("conversationsUnassigned").asLong()).isZero();
+  }
+
+  /** A contact, its conversation and messages in arrival order, written as the worker does. */
+  private void conversationWith(UUID tenant, String phone, UUID assignee, String... directions)
+      throws Exception {
+    UUID contact = UUID.randomUUID();
+    UUID conversation = UUID.randomUUID();
+    StringBuilder sql =
+        new StringBuilder(
+            "INSERT INTO contacts (id, name, name_search, phone_e164, created_via, created_at,"
+                + " updated_at) VALUES ('"
+                + contact
+                + "', 'Sintético', 'sintetico', '"
+                + phone
+                + "', 'WHATSAPP', now(), now());"
+                + "INSERT INTO whatsapp_conversations (id, contact_id, channel_id, created_at,"
+                + " last_message_at, status, assignee_id, assigned_at) VALUES ('"
+                + conversation
+                + "', '"
+                + contact
+                + "', gen_random_uuid(), now(), now(), "
+                + (assignee == null
+                    ? "'WAITING', NULL, NULL"
+                    : "'IN_SERVICE', '" + assignee + "', now()")
+                + ");");
+    for (String direction : directions) {
+      sql.append(
+          "INSERT INTO whatsapp_messages (id, conversation_id, wamid, direction, message_type,"
+              + " sent_at, created_at) VALUES (gen_random_uuid(), '"
+              + conversation
+              + "', 'wamid.' || gen_random_uuid(), '"
+              + direction
+              + "', 'text', now(), now());");
+    }
+    String database =
+        jdbc.queryForObject(
+            "SELECT database_name FROM tenants WHERE tenant_id = ?", String.class, tenant);
+    try (var connection =
+            java.sql.DriverManager.getConnection(
+                TestPostgres.url(POSTGRES, database),
+                POSTGRES.getUsername(),
+                POSTGRES.getPassword());
+        var statement = connection.createStatement()) {
+      statement.execute(sql.toString());
+    }
+  }
+
   private static final Path SECRETS = temporaryDirectory();
   private static final String LOGIN_PASSWORD = "Synthetic report api secret 2026!";
   private static final String LEADS = "/v1/clinic/leads";

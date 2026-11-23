@@ -12,4 +12,6 @@ public record Dashboard(
     long salesMonthCount,
     long salesMonthCents,
     long tasksOverdue,
-    long tasksToday) {}
+    long tasksToday,
+    long conversationsAwaitingReply,
+    long conversationsUnassigned) {}

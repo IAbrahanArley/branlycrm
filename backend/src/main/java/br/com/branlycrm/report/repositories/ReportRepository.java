@@ -127,6 +127,7 @@ public class ReportRepository {
           Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
           long[] salesToday = salesBetween(session, today, today);
           long[] salesMonth = salesBetween(session, today.withDayOfMonth(1), today);
+          long[] conversations = awaitingReply(session);
           return new Dashboard(
               today,
               zone.getId(),
@@ -152,8 +153,31 @@ public class ReportRepository {
                   "SELECT count(*) FROM tasks WHERE status = 'OPEN'"
                       + " AND due_at >= :start AND due_at < :end",
                   now,
-                  dayEnd));
+                  dayEnd),
+              conversations[0],
+              conversations[1]);
         });
+  }
+
+  /**
+   * Conversations whose latest message (arrival order) came from the contact, and those of them
+   * nobody has taken (docs/metricas.md).
+   */
+  private static long[] awaitingReply(Session session) {
+    Object[] row =
+        session
+            .createNativeQuery(
+                """
+                SELECT count(*), count(*) FILTER (WHERE c.assignee_id IS NULL)
+                FROM whatsapp_conversations c
+                JOIN LATERAL (
+                    SELECT direction FROM whatsapp_messages
+                    WHERE conversation_id = c.id ORDER BY seq DESC LIMIT 1) m ON true
+                WHERE m.direction = 'IN'
+                """,
+                Object[].class)
+            .getSingleResult();
+    return new long[] {((Number) row[0]).longValue(), ((Number) row[1]).longValue()};
   }
 
   private static long count(Session session, String sql, Instant start, Instant end) {
