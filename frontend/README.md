@@ -103,6 +103,38 @@ O contrato atual não expõe a origem do lead.
 3. Tente cadastrar um nome já utilizado, inclusive por um item inativo. Em duas abas, abra a edição do mesmo item e confira que a versão antiga pede recarga após a primeira edição salvar.
 4. Com uma conta de atendente, consulte o catálogo. As ações de cadastro, edição e mudança de situação ficam disponíveis para quem tem permissão de gestão. Repita usando Tab e Enter em uma janela estreita.
 
+## WhatsApp da clínica (FE-009)
+
+O gestor e o proprietário acessam **Preferências → WhatsApp** em `/app/whatsapp`.
+Na carteira da agência, o botão **WhatsApp** de uma clínica ativa ou aguardando gestor abre o mesmo painel.
+O servidor autoriza todas as operações; a carteira não altera a clínica ativa da sessão.
+
+Antes de compilar, configure `NEXT_PUBLIC_META_APP_ID` e
+`NEXT_PUBLIC_META_SIGNUP_CONFIG_ID` em `.env.local`, conforme `.env.example`.
+São identificadores públicos, incorporados ao bundle no build. Nunca coloque o
+segredo do app ou tokens nesse arquivo. A API e o worker precisam estar configurados
+conforme `docs/whatsapp-canal.md`, inclusive migrações da CRM-081b.
+Sem os identificadores públicos, o painel consulta a situação e explica por que a conexão está desabilitada.
+
+Para validar com a Meta real, publique em HTTPS numa origem autorizada no app:
+
+1. Com uma conta sintética de gestor, consulte o canal sem conexão e selecione **Conectar WhatsApp**.
+2. Conclua o Embedded Signup v4. Confira **Conectando** e depois **Conectado**, com o número. A consulta se repete a cada 5 segundos nos estados de processamento.
+3. Teste cancelamento, popup bloqueado, falha da Meta e seleção em coexistência com WhatsApp Business App. O código é usado uma única vez, somente em memória; falhas exigem reabrir o cadastro.
+4. Use **Desconectar**, cancele o diálogo e depois confirme. Confira **Desconectando** até voltar ao estado inicial. Uma conexão com falha também permite desconectar para tentar novamente.
+5. Repita pela agência, com teclado e em celular. Atendente e consulta não devem ver a seção. Troque de clínica durante uma tentativa e confira que o contexto anterior desaparece.
+
+O SDK não fornece uma referência pública à janela de cadastro. Para correlacionar
+com segurança o evento de conclusão, o adaptador captura uma única janela aberta
+sincronamente durante `FB.login`, restaura `window.open` imediatamente e exige
+origem Meta permitida e a mesma janela de origem. Se o SDK não abrir uma janela
+capturável, o fluxo encerra sem enviar o código. Esse comportamento depende do SDK:
+é necessário validar desktop, celular e coexistência com o app real antes de produção.
+Não há fallback que aceite mensagens de qualquer janela apenas pela origem.
+
+Referências: [Embedded Signup](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/implementation)
+e [versões](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/versions).
+
 ## Verificação
 
 ```sh

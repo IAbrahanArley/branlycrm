@@ -6,7 +6,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
   Activity, BriefcaseBusiness, Building2, ChartNoAxesColumn, ChevronDown, ClipboardCheck, ClipboardList, Columns3, LayoutDashboard, LogOut,
-  Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, ReceiptText, ShieldCheck, UserRound, Users, UsersRound, X,
+  Menu as MenuIcon, MessageCircle, PanelLeftClose, PanelLeftOpen, ReceiptText, ShieldCheck, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ type NavigationProps = {
   canViewTeam: boolean;
   canViewReport: boolean;
   canViewTasks: boolean;
+  canViewChannel: boolean;
   currentPath: string;
   choosingClinic: boolean;
   signingOut: boolean;
@@ -46,7 +47,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function NavigationLinks({
-  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, canViewTasks, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
+  compact = false, ready, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, canViewTasks, canViewChannel, currentPath, canSwitchClinic, choosingClinic, onChooseClinic, onOverview, onNavigate,
 }: {
   compact?: boolean;
   ready: boolean;
@@ -57,6 +58,7 @@ function NavigationLinks({
   canViewTeam: boolean;
   canViewReport: boolean;
   canViewTasks: boolean;
+  canViewChannel: boolean;
   currentPath: string;
   canSwitchClinic: boolean;
   choosingClinic: boolean;
@@ -156,6 +158,10 @@ function NavigationLinks({
       </div>
       <div className="space-y-1">
         <p className={cn("mb-2 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase", compact && "sr-only")}>Preferências</p>
+        {canViewChannel && <Link href="/app/whatsapp" aria-current={currentPath === "/app/whatsapp" ? "page" : undefined}
+          title={compact ? "WhatsApp" : undefined} onNavigate={onNavigate} className={cn(item, currentPath === "/app/whatsapp" && active)}>
+          <MessageCircle className="size-[18px] shrink-0" aria-hidden="true" /><span className={label}>WhatsApp</span>
+        </Link>}
         <Link href="/seguranca" title={compact ? "Segurança da conta" : undefined} onNavigate={onNavigate} className={item}>
           <ShieldCheck className="size-[18px] shrink-0" aria-hidden="true" />
           <span className={label}>Segurança da conta</span>
@@ -203,7 +209,7 @@ function AccountMenu({ email, onSignOut }: { email: string; onSignOut: () => voi
 }
 
 export function PanelNavigation({
-  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, canViewTasks, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
+  email, clinic, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, canViewTasks, canViewChannel, currentPath, choosingClinic, signingOut, onChooseClinic, onOverview, onSignOut, children,
 }: NavigationProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -218,7 +224,7 @@ export function PanelNavigation({
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
-  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, canViewTasks, currentPath, choosingClinic, onChooseClinic, onOverview };
+  const nav = { ready, canSwitchClinic, hasAgencies, hasClinicArea, canViewContacts, canReadCommercial, canViewTeam, canViewReport, canViewTasks, canViewChannel, currentPath, choosingClinic, onChooseClinic, onOverview };
 
   return (
     <div className="flex min-h-dvh bg-[#f3f6fa] text-[#10233b]">

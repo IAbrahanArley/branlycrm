@@ -11,6 +11,7 @@ import { readClinicRequest, writeClinicRequest } from "@/lib/api/agency-request"
 import { ApiError } from "@/lib/api/client";
 import { AgencyActionDialog, agencyInput, confirmAgencyAccount, mustRefreshAgency, type AgencyAction } from "./agency-action";
 import { useAgencies } from "./agency-context";
+import { AgencyWhatsapp } from "@/components/whatsapp/channel-card";
 
 const clinicStatus: Record<PortfolioClinic["status"], string> = {
   PROVISIONING: "Em preparação", AWAITING_OWNER: "Aguardando gestor", ACTIVE: "Ativa", SUSPENDED: "Suspensa", FAILED: "Falha na preparação",
@@ -30,6 +31,7 @@ function Portfolio({ agency, retryDraft, setRetryDraft }: {
   const [notice, setNotice] = useState("");
   const [formProblem, setFormProblem] = useState("");
   const [blockedUntil, setBlockedUntil] = useState(0);
+  const [whatsappClinic, setWhatsappClinic] = useState<PortfolioClinic>();
   const [savedRequestId, setSavedRequestId] = useState(() => {
     try {
       return readClinicRequest(subjectId, agency.agencyId, window.sessionStorage);
@@ -140,6 +142,9 @@ function Portfolio({ agency, retryDraft, setRetryDraft }: {
                       </div>
                     </div>
                     {eligible && <Button type="button" variant="outline" className="min-h-11" aria-label={`Reemitir convite do gestor de ${clinic.clinicName}`} onClick={() => setAction({ kind: "reissue", clinic })}>Reemitir convite</Button>}
+                    {["ACTIVE", "AWAITING_OWNER"].includes(clinic.status) && <Button type="button" variant="outline" className="min-h-11"
+                      aria-label={`WhatsApp de ${clinic.clinicName}`} aria-expanded={whatsappClinic?.tenantId === clinic.tenantId}
+                      onClick={() => setWhatsappClinic((current) => current?.tenantId === clinic.tenantId ? undefined : clinic)}>WhatsApp</Button>}
                   </li>
                 );
               })}
@@ -156,6 +161,7 @@ function Portfolio({ agency, retryDraft, setRetryDraft }: {
           )}
         </CardContent>
       </Card>
+      {whatsappClinic && <AgencyWhatsapp agencyId={agency.agencyId} tenantId={whatsappClinic.tenantId} clinicName={whatsappClinic.clinicName} />}
       {action && <AgencyActionDialog agencyId={agency.agencyId} action={action}
         retryDraft={action.kind === "create" ? retryDraft : undefined} setRetryDraft={setRetryDraft}
         recovered={action.kind === "create" && savedRequestId === action.requestId} rememberRequest={rememberRequest}
