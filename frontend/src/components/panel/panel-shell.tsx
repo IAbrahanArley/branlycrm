@@ -142,13 +142,15 @@ export function PanelShell({ children }: { children: ReactNode }) {
   const team = pathname === "/app/equipe";
   const reports = pathname === "/app/relatorios";
   const tasks = pathname === "/app/tarefas";
+  const whatsapp = pathname === "/app/whatsapp";
   const canViewContacts = clinic?.permissions.CONTACT_READ === "ALL";
   const canViewTeam = clinic?.permissions.TEAM_VIEW === "ALL";
   const canReadCommercial = clinic?.permissions.LEAD_READ === "ALL";
   const canViewReport = clinic?.permissions.MONTHLY_REPORT_VIEW === "ALL";
   const canViewTasks = clinic?.permissions.TASK_READ === "ALL";
+  const canViewChannel = clinic?.permissions.CHANNEL_VIEW === "ALL";
   const commercial = funnel || catalog || sales;
-  const sectionName = team ? "a equipe" : funnel ? "o funil" : catalog ? "o catálogo" : sales ? "vendas" : reports ? "relatórios" : tasks ? "tarefas" : "contatos";
+  const sectionName = team ? "a equipe" : funnel ? "o funil" : catalog ? "o catálogo" : sales ? "vendas" : reports ? "relatórios" : tasks ? "tarefas" : whatsapp ? "o WhatsApp" : "contatos";
 
   useEffect(() => {
     if (redirectToAgency) router.replace("/agencia");
@@ -166,6 +168,7 @@ export function PanelShell({ children }: { children: ReactNode }) {
       canReadCommercial={canReadCommercial && !selecting}
       canViewReport={canViewReport && !selecting}
       canViewTasks={canViewTasks && !selecting}
+      canViewChannel={canViewChannel && !selecting}
       currentPath={pathname}
       choosingClinic={selecting}
       signingOut={signingOut}
@@ -247,14 +250,14 @@ export function PanelShell({ children }: { children: ReactNode }) {
                     )}
                   </div>
                 ) : check.clinic && (
-                  ((!contacts || canViewContacts) && (!team || canViewTeam) && (!commercial || canReadCommercial) && (!reports || canViewReport) && (!tasks || canViewTasks)) ? (
+                  ((!contacts || canViewContacts) && (!team || canViewTeam) && (!commercial || canReadCommercial) && (!reports || canViewReport) && (!tasks || canViewTasks) && (!whatsapp || canViewChannel)) ? (
                     <ClinicContext.Provider key={`${check.clinic.tenantId}:${check.subjectId}`} value={{ clinic: check.clinic, subjectId: check.subjectId, refresh: retry }}>
                       {children}
                     </ClinicContext.Provider>
                   ) : <PanelState kind="forbidden" title={`Sem permissão para acessar ${sectionName}`} message="Confira as permissões do seu vínculo com esta clínica." />
                 )
               )}
-              {(contacts || team || commercial || reports || tasks) && check.access.kind === "agency" && (
+              {(contacts || team || commercial || reports || tasks || whatsapp) && check.access.kind === "agency" && (
                 <PanelState kind="forbidden" title={`Selecione uma clínica para acessar ${sectionName}`} message="Sua conta não tem vínculo ativo com uma clínica." />
               )}
             </>
