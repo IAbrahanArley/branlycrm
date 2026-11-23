@@ -515,9 +515,16 @@ Todas as tabelas desta fase em diante vivem no banco da clínica (`db/tenant-mig
   - ordem dentro do mesmo instante documentada;
   - testes de tarefa sem lead e reaberta.
   - **Não feito:** paginação por keyset (por enquanto o cliente deduplica) e renomear `TimelineException`.
-- **Pendente:**
-  - tela no perfil do contato (FE-008, Codex);
-  - mensagens (CRM-083).
+- **Pendente:** tela no perfil do contato (FE-008, Codex).
+- **Mensagens do WhatsApp (23/11/2026):** concluídas na branch `feat/crm-023-051-conversas`.
+  - Novo tipo `MESSAGE`: `type` é a direção (`IN` ou `OUT`), `text` os primeiros 200 caracteres, mais `messageType`, `sentByApp` e `conversationId`. `actorId` é nulo.
+  - Cada mensagem é um item; no mesmo segundo, a ordem é a de chegada.
+  - Permissão: a da linha do tempo (`LEAD_READ`) e, para as mensagens, também a da caixa de entrada (`INBOX_READ`); hoje as duas valem para todos os papéis.
+  - Ordem: pelo horário da Meta e, no mesmo segundo, pela chegada; uma mensagem gravada atrasada fica na posição do horário da Meta, enquanto a caixa de entrada a mostra no fim.
+  - **Implantação:** a linha do tempo e o dashboard passam a ler as migrações de clínica V15 e V16. O `tenant-migrate` precisa rodar antes da API nova, como já manda o runbook ([docs/deploy-oci.md](docs/deploy-oci.md)); sem isso, as duas telas respondem 503 naquela clínica.
+  - **Revisão (`reviewer`):** sem críticos nem altos; o contrato OpenAPI foi regenerado e as mensagens passaram a exigir também `INBOX_READ`.
+  - `clean verify` (com os cards do dashboard): 256 unitários e 159 de integração, sem falhas.
+  - Teste: `ContactTimelineIT` (`whatsappMessagesJoinTheContactTimeline`), com a ordem no mesmo segundo, o corte do texto e a clínica B sem as mensagens de A.
 
 ### [ ] CRM-024 — Importação de contatos por planilha (P1)
 **Depende de:** CRM-021.
@@ -1136,12 +1143,12 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - **Procedimentos mais vendidos:** os 10 primeiros por quantidade.
 - **Dashboard:** leads de hoje, vendas de hoje e do mês, tarefas atrasadas e de hoje. As conversas entram com a CRM-083.
 
-### [-] CRM-051 — API do dashboard da recepção e do relatório mensal (P1)
+### [x] CRM-051 — API do dashboard da recepção e do relatório mensal (P1)
 **Depende de:** CRM-050, CRM-083.
 **Atende:** REL-01, REL-02.
 **Entregas:** consultas agregadas por período no fuso da clínica, conforme [docs/metricas.md](docs/metricas.md).
 **Plano (11/11/2026, aprovado):** implementar já o relatório mensal e os cards do dashboard que não dependem do WhatsApp; os cards de conversas entram com a CRM-083.
-**Estado (11/11/2026):** concluída na branch `feat/crm-051-relatorios`, exceto os cards de conversas (CRM-083), por isso `[-]`.
+**Estado (11/11/2026):** concluída na branch `feat/crm-051-relatorios`, exceto os cards de conversas (CRM-083), por isso `[-]`. Os cards entraram em 23/11/2026 (abaixo); a API está completa.
 - **Módulo `report`**, só leitura, com SQL nativo numa transação por leitura; migração de clínica V13 só com índices.
 - **Rotas:**
   - `GET /v1/clinic/reports/monthly?month=yyyy-MM` (`MONTHLY_REPORT_VIEW`: Proprietário, Gestor e Somente leitura); por padrão o mês corrente no fuso da clínica; mês futuro ou anterior a 2000 dá 400;
@@ -1160,16 +1167,15 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - consultas escalares tipadas;
   - a permissão é checada antes de validar o mês;
   - nota de lock e rollback na V13.
-- **Pendente:**
-  - cards de conversas (CRM-083);
-  - telas (CRM-052, Codex).
+- **Pendente:** telas (CRM-052, Codex).
+- **Cards de conversas (23/11/2026):** concluídos na branch `feat/crm-023-051-conversas`. O dashboard ganha `conversationsAwaitingReply` (última mensagem do paciente) e `conversationsUnassigned` (dessas, sem responsável), definidos em [docs/metricas.md](docs/metricas.md). Teste: `ReportApiIT` (`conversationCardsCountWhatAwaitsAReply`), com quatro situações e a clínica B isolada.
 **Aceite:** valores conferem com fixtures conhecidas; nenhuma agregação inclui outra clínica; permissões testadas.
 
 ### [-] CRM-052 — Telas de dashboard e relatório (P1)
 **Depende de:** CRM-051.
 **Entregas:** cards do dashboard com atualização periódica, relatório mensal com gráficos e tabelas, e estados vazios.
 **Aceite:** números iguais aos da API; responsivo.
-**Estado (16/11/2026):** dashboard da recepção em `/app` e relatório mensal em `/app/relatorios`, entregues pelo Codex (`feat(frontend): add clinic dashboard and monthly report`, PR #43). Faltam só os cards de conversas, que dependem da CRM-083, como na CRM-051.
+**Estado (16/11/2026):** dashboard da recepção em `/app` e relatório mensal em `/app/relatorios`, entregues pelo Codex (`feat(frontend): add clinic dashboard and monthly report`, PR #43). Faltam só os cards de conversas: a API já devolve `conversationsAwaitingReply` ("Aguardando resposta") e `conversationsUnassigned` ("Aguardando atendimento"), por isso `[-]` até o Codex mostrá-los.
 
 ### [ ] CRM-053 — Lista de leads e exportação (P1)
 **Depende de:** CRM-032, CRM-092.
@@ -1455,6 +1461,7 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
   - `NOTE`: o texto da nota, preservando quebras de linha e sem interpretar HTML.
   - `SALE_EVENT`: venda registrada, corrigida ou cancelada, com o valor (`amountCents`, em reais) e o motivo do cancelamento.
   - `TASK_CREATED` e `TASK_COMPLETED`: o título da tarefa.
+  - `MESSAGE`: mensagem do WhatsApp, recebida (`type` = `IN`) ou enviada (`OUT`, com "pelo celular" quando `sentByApp`); o texto (até 200 caracteres) ou o tipo da mídia (`messageType`), e link para a conversa (`/app/conversas/{conversationId}`). Autor: o contato, ou "Equipe" quando enviada.
   - Link para o lead (`/app/funil/{leadId}`), a venda (`/app/vendas/{saleId}`) ou a lista de tarefas, quando houver.
 **Aceite:**
 - A ordem é a da API; nada é reordenado no navegador.

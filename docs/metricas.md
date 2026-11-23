@@ -74,8 +74,10 @@ Atualizado por consulta periódica na Fase 1; o tempo real é REL-03, da F2.
 | **Vendas do mês** | Quantidade e soma das vendas ativas com `sold_on` no mês corrente até hoje |
 | **Tarefas atrasadas** | Tarefas abertas com prazo antes de agora (mesma regra da CRM-040) |
 | **Tarefas de hoje** | Tarefas abertas com prazo entre agora e a meia-noite da clínica |
-| **Conversas em aberto** | Entra com a caixa de entrada (CRM-083) |
-| **Aguardando atendimento** | Entra com a caixa de entrada (CRM-083) |
+| **Aguardando resposta** | Conversas do WhatsApp cuja última mensagem, pela ordem de chegada, é do paciente, com ou sem responsável |
+| **Aguardando atendimento** | Dessas, as que ninguém assumiu (sem responsável) |
+
+No MVP não existe "encerrar conversa" (CRM-083), por isso "conversas em aberto" virou "aguardando resposta". Conversas de contatos arquivados também contam: as mensagens deles continuam chegando e a caixa de entrada as mostra marcadas. Os dois números são do momento da consulta, sem relação com o fuso.
 
 ## Permissões
 
