@@ -385,6 +385,78 @@
         },
         "type" : "object"
       },
+      "ConversationChangeRequest" : {
+        "properties" : {
+          "assigneeId" : {
+            "type" : "string"
+          },
+          "needsHuman" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ConversationView" : {
+        "properties" : {
+          "assignedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "assigneeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "awaitingReply" : {
+            "type" : "boolean"
+          },
+          "contactArchived" : {
+            "type" : "boolean"
+          },
+          "contactId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "contactName" : {
+            "type" : "string"
+          },
+          "contactPhone" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "lastInboundAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastMessageAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastMessageType" : {
+            "type" : "string"
+          },
+          "needsHuman" : {
+            "type" : "boolean"
+          },
+          "preview" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "CountView" : {
         "properties" : {
           "count" : {
@@ -772,6 +844,51 @@
         },
         "type" : "object"
       },
+      "Message" : {
+        "properties" : {
+          "body" : {
+            "type" : "string"
+          },
+          "direction" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "mediaMime" : {
+            "type" : "string"
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "sentByApp" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MessagePageView" : {
+        "properties" : {
+          "after" : {
+            "type" : "string"
+          },
+          "before" : {
+            "type" : "string"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Message"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "MfaCodeRequest" : {
         "properties" : {
           "code" : {
@@ -959,6 +1076,29 @@
           "items" : {
             "items" : {
               "$ref" : "#/components/schemas/ContactSummaryView"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageSize" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageViewConversationView" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConversationView"
             },
             "type" : "array"
           },
@@ -4858,6 +4998,665 @@
         } ],
         "summary" : "Reception dashboard for today (all roles)",
         "tags" : [ "Reports" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations" : {
+      "get" : {
+        "operationId" : "listConversations",
+        "parameters" : [ {
+          "description" : "WAITING or IN_SERVICE",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "mine or none",
+          "in" : "query",
+          "name" : "assignee",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "true or false",
+          "in" : "query",
+          "name" : "needsHuman",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageViewConversationView"
+                }
+              }
+            },
+            "description" : "Page of conversations"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: status, assignee, needsHuman, page or pageSize"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Conversations, most recent first (every role); poll every 5 s while visible",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}" : {
+      "get" : {
+        "operationId" : "getConversation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConversationView"
+                }
+              }
+            },
+            "description" : "Conversation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "One conversation (every role)",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/assignee" : {
+      "put" : {
+        "operationId" : "assignConversation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConversationChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConversationView"
+                }
+              }
+            },
+            "description" : "Conversation, IN_SERVICE with the assignee"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_STALE or CONVERSATION_ASSIGNEE_INVALID"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Transfer to an active member who replies (OWNER, MANAGER)",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/messages" : {
+      "get" : {
+        "operationId" : "listConversationMessages",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "before",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "1 to 100, default 50",
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessagePageView"
+                }
+              }
+            },
+            "description" : "Messages and cursors"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: before, after or limit"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "History, oldest first: the latest messages, the ones before a cursor, or the new ones after a cursor (poll)",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/needs-human" : {
+      "put" : {
+        "operationId" : "markConversationNeedsHuman",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConversationChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConversationView"
+                }
+              }
+            },
+            "description" : "Conversation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_STALE"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Mark or clear \"needs a person\" (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/release" : {
+      "post" : {
+        "operationId" : "releaseConversation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConversationChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConversationView"
+                }
+              }
+            },
+            "description" : "Conversation, WAITING"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_STALE, CONVERSATION_NOT_ASSIGNED or CONVERSATION_NOT_YOURS"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Release back to WAITING: one's own (ATTENDANT up), anyone's (OWNER, MANAGER)",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/take" : {
+      "post" : {
+        "operationId" : "takeConversation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConversationView"
+                }
+              }
+            },
+            "description" : "Conversation, IN_SERVICE with the actor"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_TAKEN"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Take a conversation nobody serves (OWNER, MANAGER, ATTENDANT); atomic",
+        "tags" : [ "Inbox" ]
       }
     },
     "/v1/clinic/leads" : {
@@ -10499,6 +11298,9 @@
   }, {
     "description" : "Professionals who perform the clinic's procedures",
     "name" : "Professionals"
+  }, {
+    "description" : "WhatsApp conversations shared by the clinic's team",
+    "name" : "Inbox"
   }, {
     "description" : "Name and time zone of the selected clinic",
     "name" : "Clinic settings"

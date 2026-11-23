@@ -148,6 +148,12 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `WHATSAPP_WEBHOOK_VERIFICATION_FAILED` | 403 | Modo, token de verificação ou desafio inválido no `GET` | Webhook do WhatsApp |
 | `WHATSAPP_WEBHOOK_MALFORMED` | 400 | Corpo assinado que não é um objeto JSON | Webhook do WhatsApp |
 | `WHATSAPP_WEBHOOK_TOO_LARGE` | 413 | Corpo acima de 3 MiB | Webhook do WhatsApp |
+| `CONVERSATION_NOT_FOUND` | 404 | Conversa inexistente nesta clínica (mesma resposta para a de outra clínica) | Caixa de entrada |
+| `CONVERSATION_TAKEN` | 409 | Outra pessoa já assumiu a conversa | Caixa de entrada |
+| `CONVERSATION_STALE` | 409 | A conversa mudou desde a leitura (`version`) | Caixa de entrada |
+| `CONVERSATION_NOT_ASSIGNED` | 409 | Soltar uma conversa que ninguém atende | Caixa de entrada |
+| `CONVERSATION_NOT_YOURS` | 409 | O Atendente soltando a conversa de outra pessoa | Caixa de entrada |
+| `CONVERSATION_ASSIGNEE_INVALID` | 409 | O novo responsável não é membro ativo que atende conversas | Caixa de entrada |
 | `CHANNEL_ALREADY_CONNECTED` | 409 | A clínica já tem um número conectado, inclusive com falha: desconecte antes | Canal WhatsApp |
 | `CHANNEL_NOT_CONNECTED` | 409 | Não há número para desconectar | Canal WhatsApp |
 | `CHANNEL_BUSY` | 409 | Uma conexão ou desconexão do canal ainda está em andamento | Canal WhatsApp |

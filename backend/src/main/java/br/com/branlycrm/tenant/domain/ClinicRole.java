@@ -50,6 +50,7 @@ public enum ClinicRole {
     row(ClinicPermission.SALE_CORRECT, ALL, ALL, NONE, NONE);
     row(ClinicPermission.INBOX_READ, ALL, ALL, ALL, ALL);
     row(ClinicPermission.INBOX_REPLY, ALL, ALL, ALL, NONE);
+    row(ClinicPermission.INBOX_ASSIGN, ALL, ALL, NONE, NONE);
     row(ClinicPermission.TASK_WRITE, ALL, ALL, ALL, NONE);
     row(ClinicPermission.TASK_READ, ALL, ALL, ALL, ALL);
     row(ClinicPermission.NOTIFICATIONS_VIEW, ALL, ALL, ALL, ALL);
