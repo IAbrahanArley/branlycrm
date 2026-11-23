@@ -47,5 +47,6 @@ Os documentos originais foram preservados e complementados. ADRs históricas man
 
 - [Segredos das clínicas](segredos-clinicas.md)
 - [Canal WhatsApp: base, permissões e chaves](whatsapp-canal.md)
+- [Caixa de entrada: conversas, assumir e histórico](caixa-de-entrada.md)
 
 - [Provisionamento de clínicas e pools](provisionamento-clinicas.md)

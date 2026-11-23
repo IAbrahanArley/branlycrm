@@ -78,6 +78,8 @@ class ClinicRoleTest {
     documented(ClinicPermission.INBOX_READ, ALL, ALL, ALL, ALL);
     // Caixa de entrada: responder, assumir, enviar mídia e template: ✓ | ✓ | ✓ | —
     documented(ClinicPermission.INBOX_REPLY, ALL, ALL, ALL, NONE);
+    // Caixa de entrada: transferir ou soltar a conversa de outra pessoa: ✓ | ✓ | — | —
+    documented(ClinicPermission.INBOX_ASSIGN, ALL, ALL, NONE, NONE);
     // Tarefas: criar e atribuir: ✓ | ✓ | ✓ | —
     documented(ClinicPermission.TASK_WRITE, ALL, ALL, ALL, NONE);
     // Tarefas: ver: ✓ | ✓ | ✓ | ✓

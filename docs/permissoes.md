@@ -47,6 +47,7 @@ O escopo "próprios" da matriz anterior não existe aqui: a caixa de entrada é 
 | Vendas: ver lista, detalhe e histórico (`LEAD_READ`) | ✓ | ✓ | ✓ | ✓ |
 | Caixa de entrada: ler conversas | ✓ | ✓ | ✓ | ✓ |
 | Caixa de entrada: responder, assumir, enviar mídia e template | ✓ | ✓ | ✓ | — |
+| Caixa de entrada: transferir ou soltar a conversa de outra pessoa (`INBOX_ASSIGN`) | ✓ | ✓ | — | — |
 | Tarefas: criar e atribuir | ✓ | ✓ | ✓ | — |
 | Tarefas: ver | ✓ | ✓ | ✓ | ✓ |
 | Notificações próprias | ✓ | ✓ | ✓ | ✓ |

@@ -33,6 +33,8 @@ public enum ClinicPermission {
   INBOX_READ,
   /** Reply, take the conversation, send media and templates. */
   INBOX_REPLY,
+  /** Transfer a conversation to another member, or release a colleague's (CRM-083). */
+  INBOX_ASSIGN,
   /** Create and assign tasks. */
   TASK_WRITE,
   TASK_READ,

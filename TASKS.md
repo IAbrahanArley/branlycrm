@@ -951,7 +951,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - as regras de RN-01 e RN-02 do worker ficam no repositório (`InboundQueueRepository`), porque a `Session` não pode passar por um service (decisão 4);
   - a CRM-073 precisa tratar conversas e mensagens, que impedem a exclusão definitiva do contato (`ON DELETE RESTRICT`).
 
-### [ ] CRM-083 — Caixa de entrada compartilhada (P1)
+### [-] CRM-083 — Caixa de entrada compartilhada (P1)
 **Depende de:** CRM-082.
 **Atende:** WPP-03, PAC-05.
 **Entregas:**
@@ -964,6 +964,28 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - `VIEWER` lê sem responder.
 - A/B testado.
 - Funciona no celular.
+**Estado (22/11/2026):** API concluída na branch `feat/crm-083-caixa-entrada`, detalhada em [docs/caixa-de-entrada.md](docs/caixa-de-entrada.md); falta a tela (FE-010, Codex), por isso `[-]`.
+- **Decisões aprovadas pelo responsável em 22/11/2026:**
+  1. ler para todos; assumir, soltar a própria e marcar com `INBOX_REPLY`; transferir e soltar a de outra pessoa com a nova `INBOX_ASSIGN` (Proprietário e Gestor);
+  2. mensagem nova não muda a situação, e não há encerrar;
+  3. sem "não lida" por pessoa, só `awaitingReply`;
+  4. mensagens na linha do tempo e cards do dashboard ficam para uma tarefa seguinte.
+- **Migração de clínica V16:** situação, responsável, horário e "precisa de humano" na conversa; `whatsapp_conversation_events`; ordem de chegada (`seq`) nas mensagens.
+- **Rotas:** lista com filtros, conversa, histórico por cursor (`before` e `after`), assumir, soltar, transferir e marcar.
+- **Testes:** `InboxApiIT` por HTTP real:
+  - lista com prévia e "aguardando resposta"; histórico por cursor; a consulta de novas não pula mensagem do mesmo segundo nem atrasada;
+  - dois atendentes assumindo ao mesmo tempo: um 200, outro 409;
+  - Atendente não solta a de outra pessoa nem transfere; Gestor transfere só para membro ativo que atende; versão antiga recebe 409;
+  - filtros; Somente leitura lê e recebe 403 nas ações;
+  - clínica B recebe 404 na lista, na conversa, no histórico e em todas as ações;
+  - contato arquivado aparece marcado; os eventos ficam gravados com o autor.
+  - `TenantMigrationRolloutIT` passa a remover a tabela de eventos no rebaixamento.
+  - `clean verify`: 256 unitários e 157 de integração, sem falhas.
+- **Revisão (`reviewer`, também no papel de security):** nada de tenant, permissão ou injeção. Corrigidos:
+  - **alto:** a consulta de novas mensagens pelo horário da Meta pulava mensagens do mesmo segundo e as que chegam atrasadas; agora é pela ordem de chegada;
+  - a lista lia a última mensagem de todas as conversas a cada consulta; agora só as da página;
+  - contato arquivado marcado; cursor inválido sempre 400; transferir para quem já atende não gera evento; a consulta de novas só confere se a conversa existe.
+- **Riscos aceitos:** a conversa de quem saiu da equipe continua com ele até o gestor soltar ou transferir; o responsável é conferido no banco central antes da transação da clínica. A CRM-073 precisa tratar conversas, mensagens e eventos na exclusão do contato.
 
 ### [ ] CRM-084 — Envio de mensagens e mídias (P1)
 **Depende de:** CRM-083, CRM-080.
@@ -1455,6 +1477,31 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - `CHANNEL_ALREADY_CONNECTED`, `CHANNEL_BUSY`, `CHANNEL_NOT_CONNECTED` (409), `CHANNEL_CODE_INVALID` (400, pedir para abrir de novo) e `CHANNEL_META_UNAVAILABLE` / `CHANNEL_NOT_CONFIGURED` (503) têm mensagens próprias; `CLINIC_ACCESS_DENIED` esconde a seção.
 - Estados de carregamento, erro e sucesso; funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam. A prova com a Meta real depende do app publicado e da URL pública (CRM-072).
+
+### [ ] FE-010 — Caixa de entrada (P1)
+**Depende de:** FE-002, FE-008 (perfil do contato) e o merge da CRM-083 (rotas `/api/v1/clinic/inbox/conversations` no contrato).
+**Entregas:**
+- Página `/app/conversas`, no menu para todos os papéis (`INBOX_READ`), em duas colunas no computador e em duas telas no celular.
+- **Lista** (`GET …/conversations`): nome e telefone do contato, prévia da última mensagem, horário no fuso da clínica, selo "aguardando resposta" (`awaitingReply`), "precisa de humano" e o responsável (nome pela equipe; sem nome disponível, "Membro da equipe").
+  - Filtros: todas, minhas (`assignee=mine`), sem responsável (`assignee=none`), precisa de humano (`needsHuman=true`).
+  - Consultar de novo a cada 5 segundos enquanto a aba estiver visível (`document.visibilityState`), sem mexer na rolagem.
+- **Conversa** (`GET …/{id}/messages`): as últimas 50 mensagens, as do paciente de um lado e as da clínica do outro; as enviadas pelo app WhatsApp Business com o selo "pelo celular". Mídia sem arquivo por enquanto: mostrar o tipo ("Imagem", "Áudio"...) e a legenda.
+  - "Carregar anteriores" com o cursor `before`.
+  - A cada 5 segundos, `after` com o último cursor recebido, somando ao fim as novas e descartando repetidas pelo `id`.
+  - Texto preservando quebras de linha e sem interpretar HTML.
+- **Ações** (com `INBOX_REPLY`; os botões são só dica, o servidor decide):
+  - **Assumir** (`POST …/take`), que leva a conversa para "em atendimento" com o usuário;
+  - **Soltar** (`POST …/release` com `version`);
+  - **Precisa de humano** (`PUT …/needs-human` com `{version, needsHuman}`);
+  - **Transferir** (`PUT …/assignee` com `{version, assigneeId}`), só com `INBOX_ASSIGN` (Proprietário e Gestor), escolhendo entre a equipe ativa que atende.
+- Link para o perfil do contato (`/app/contatos/{contactId}`).
+- Responder fica para a FE da CRM-084: deixar o espaço da caixa de texto desabilitado, com "em breve".
+**Aceite:**
+- `CONVERSATION_TAKEN` mostra que outra pessoa assumiu e recarrega a conversa; `CONVERSATION_STALE` pede para recarregar; `CONVERSATION_NOT_YOURS` e `CONVERSATION_ASSIGNEE_INVALID` têm mensagens próprias; `CONVERSATION_NOT_FOUND` volta para a lista.
+- Somente leitura vê tudo sem nenhum botão de ação.
+- Mensagens não vão para storage, URL nem console.
+- Estados de carregamento, vazio ("nenhuma conversa ainda") e erro; funciona no celular e por teclado.
+- `lint`, `typecheck` e `build` passam.
 
 ## Retirado do MVP
 

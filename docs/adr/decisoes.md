@@ -856,6 +856,7 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
   - **Dependência:** o SDK S3 entra para aprovação na CRM-084.
 
 - **Caixa de entrada:** consulta periódica a cada 5 segundos, com cursor, enquanto a aba está visível. Server-sent events (SSE) ficam para depois.
+  - **Na implementação (CRM-083, 22/11/2026):** o histórico e o cursor seguem a ordem de chegada das mensagens (`seq`), não o horário da Meta, que empata no mesmo segundo e pode chegar atrasado. Assumir uma conversa é um `UPDATE` condicional atômico.
 
 - **LGPD:**
   - As conversas vão trazer **dados de saúde** (pacientes descrevem sintomas).
