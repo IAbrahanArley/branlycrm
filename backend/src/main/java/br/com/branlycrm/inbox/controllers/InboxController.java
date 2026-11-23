@@ -5,8 +5,10 @@ import br.com.branlycrm.common.dto.response.PageView;
 import br.com.branlycrm.identity.security.CrmPrincipal;
 import br.com.branlycrm.identity.security.SelectedClinic;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
+import br.com.branlycrm.inbox.dto.request.ReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
 import br.com.branlycrm.inbox.dto.response.MessagePageView;
+import br.com.branlycrm.inbox.dto.response.OutboxView;
 import br.com.branlycrm.inbox.services.InboxService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,7 +16,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -97,6 +101,46 @@ public final class InboxController {
         before,
         after,
         limit);
+  }
+
+  @Operation(
+      operationId = "replyToConversation",
+      summary =
+          "Queue a text reply (OWNER, MANAGER, ATTENDANT); takes a conversation nobody serves."
+              + " The worker sends it; the same idempotencyKey never queues twice")
+  @ApiResponse(responseCode = "202", description = "The reply in the outbox")
+  @ApiResponse(responseCode = "400", description = "INVALID_INPUT: idempotencyKey or text")
+  @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED (VIEWER)")
+  @ApiResponse(responseCode = "404", description = "CONVERSATION_NOT_FOUND")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "CONVERSATION_TAKEN, CONVERSATION_WINDOW_CLOSED or CONVERSATION_IDEMPOTENCY_CONFLICT")
+  @SecurityRequirement(name = "csrf")
+  @PostMapping("/{conversationId}/messages")
+  public ResponseEntity<OutboxView> reply(
+      @PathVariable UUID conversationId,
+      @RequestBody ReplyRequest request,
+      @AuthenticationPrincipal CrmPrincipal principal,
+      HttpSession session) {
+    return ResponseEntity.accepted()
+        .body(
+            inbox.reply(
+                SelectedClinic.require(session), principal.subjectId(), conversationId, request));
+  }
+
+  @Operation(
+      operationId = "listPendingReplies",
+      summary = "Replies still queued, sending or uncertain, and failures of the last 7 days")
+  @ApiResponse(responseCode = "200", description = "Outbox items, newest first")
+  @ApiResponse(responseCode = "404", description = "CONVERSATION_NOT_FOUND")
+  @GetMapping("/{conversationId}/outbox")
+  public List<OutboxView> pendingReplies(
+      @PathVariable UUID conversationId,
+      @AuthenticationPrincipal CrmPrincipal principal,
+      HttpSession session) {
+    return inbox.pendingReplies(
+        SelectedClinic.require(session), principal.subjectId(), conversationId);
   }
 
   @Operation(

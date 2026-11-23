@@ -11,6 +11,8 @@ import java.util.UUID;
  * @param direction IN (from the contact) or OUT (sent by the clinic)
  * @param sentByApp an OUT message sent from the WhatsApp Business app, not from the CRM
  * @param sentAt Meta's time of the message (seconds), for display
+ * @param status delivery of a message sent from the CRM: SENT, DELIVERED, READ or FAILED; null
+ *     otherwise
  */
 public record InboxMessage(
     UUID id,
@@ -20,4 +22,5 @@ public record InboxMessage(
     String type,
     String body,
     String mediaMime,
-    Instant sentAt) {}
+    Instant sentAt,
+    String status) {}

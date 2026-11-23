@@ -19,6 +19,7 @@ public record MessagePageView(List<Message> items, String before, String after) 
   /**
    * @param direction IN (from the contact) or OUT (sent by the clinic)
    * @param sentByApp sent from the WhatsApp Business app
+   * @param status delivery of a reply sent from the CRM (SENT, DELIVERED, READ, FAILED), or null
    */
   public record Message(
       UUID id,
@@ -27,5 +28,6 @@ public record MessagePageView(List<Message> items, String before, String after) 
       String type,
       String body,
       String mediaMime,
-      Instant sentAt) {}
+      Instant sentAt,
+      String status) {}
 }

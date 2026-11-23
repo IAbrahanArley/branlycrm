@@ -153,6 +153,8 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `CONVERSATION_STALE` | 409 | A conversa mudou desde a leitura (`version`) | Caixa de entrada |
 | `CONVERSATION_NOT_ASSIGNED` | 409 | Soltar uma conversa que ninguém atende | Caixa de entrada |
 | `CONVERSATION_NOT_YOURS` | 409 | O Atendente soltando a conversa de outra pessoa | Caixa de entrada |
+| `CONVERSATION_WINDOW_CLOSED` | 409 | Passaram 24 horas desde a última mensagem do paciente: só modelos (CRM-085) | Caixa de entrada |
+| `CONVERSATION_IDEMPOTENCY_CONFLICT` | 409 | A chave de envio já foi usada em outra conversa | Caixa de entrada |
 | `CONVERSATION_ASSIGNEE_INVALID` | 409 | O novo responsável não é membro ativo que atende conversas | Caixa de entrada |
 | `CHANNEL_ALREADY_CONNECTED` | 409 | A clínica já tem um número conectado, inclusive com falha: desconecte antes | Canal WhatsApp |
 | `CHANNEL_NOT_CONNECTED` | 409 | Não há número para desconectar | Canal WhatsApp |

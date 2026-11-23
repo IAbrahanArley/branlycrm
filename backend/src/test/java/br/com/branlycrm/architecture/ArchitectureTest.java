@@ -248,12 +248,14 @@ class ArchitectureTest {
         .that()
         .resideOutsideOfPackage("br.com.branlycrm.whatsapp.worker..")
         .and()
-        .haveNameNotMatching(".*\\.ChannelOnboardingRepository(\\$.*)?")
+        .haveNameNotMatching(".*\\.(ChannelOnboardingRepository|OutboundChannelRepository)(\\$.*)?")
         .should()
         .dependOnClassesThat()
         .belongToAnyOf(
             br.com.branlycrm.whatsapp.repositories.ChannelOnboardingRepository.class,
-            br.com.branlycrm.whatsapp.worker.ChannelOnboardingProcessor.class)
+            br.com.branlycrm.whatsapp.worker.ChannelOnboardingProcessor.class,
+            br.com.branlycrm.whatsapp.repositories.OutboundChannelRepository.class,
+            br.com.branlycrm.whatsapp.worker.OutboundSender.class)
         .check(CODE);
   }
 

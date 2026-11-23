@@ -42,7 +42,7 @@ final class InboundEventInterpreter implements InboundHandler {
   @Override
   public InboundAction decide(StoredEvent event) {
     // Kept with a stable code so CRM-084 (statuses) and CRM-081b (account) can find them.
-    if (event.kind() == InboundKind.STATUS) return new InboundAction.Skip(DEFERRED_STATUS);
+    if (event.kind() == InboundKind.STATUS) return status(event);
     if (event.kind() != InboundKind.MESSAGE) return new InboundAction.Skip(DEFERRED_ACCOUNT);
     JsonNode root;
     try {
@@ -137,6 +137,42 @@ final class InboundEventInterpreter implements InboundHandler {
         text(node.get("source_id")),
         text(node.get("headline")),
         text(node.get("ctwa_clid")));
+  }
+
+  /** A delivery status of a reply sent from the CRM; unknown values are skipped with a code. */
+  private InboundAction status(StoredEvent event) {
+    JsonNode root;
+    try {
+      root = event.payload() == null ? null : json.readTree(event.payload());
+    } catch (JacksonException malformed) {
+      return new InboundAction.Skip(INVALID_PAYLOAD);
+    }
+    JsonNode status = root == null ? null : root.get("status");
+    if (!isObject(status)) return new InboundAction.Skip(INVALID_PAYLOAD);
+    String wamid = text(status.get("id"));
+    String value = text(status.get("status"));
+    if (wamid == null || value == null) return new InboundAction.Skip(INVALID_PAYLOAD);
+    if (!value.equals("sent")
+        && !value.equals("delivered")
+        && !value.equals("read")
+        && !value.equals("failed")) {
+      return new InboundAction.Skip(DEFERRED_STATUS);
+    }
+    java.util.UUID outbox = null;
+    String callback = text(status.get("biz_opaque_callback_data"));
+    if (callback != null) {
+      try {
+        outbox = java.util.UUID.fromString(callback);
+      } catch (IllegalArgumentException notOurs) {
+        outbox = null;
+      }
+    }
+    String error = null;
+    if (value.equals("failed")) {
+      JsonNode code = status.path("errors").path(0).path("code");
+      error = code.getNodeType() == JsonNodeType.NUMBER ? "META_" + code.asInt() : "STATUS_FAILED";
+    }
+    return new InboundAction.Status(wamid, value, outbox, sentAt(status, event), error);
   }
 
   private static Instant sentAt(JsonNode message, StoredEvent event) {
