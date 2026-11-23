@@ -517,6 +517,14 @@
       },
       "DashboardView" : {
         "properties" : {
+          "conversationsAwaitingReply" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "conversationsUnassigned" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "leadsToday" : {
             "format" : "int64",
             "type" : "integer"
@@ -1894,6 +1902,10 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "conversationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "fromValue" : {
             "type" : "string"
           },
@@ -1912,6 +1924,9 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "messageType" : {
+            "type" : "string"
+          },
           "occurredAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -1919,6 +1934,9 @@
           "saleId" : {
             "format" : "uuid",
             "type" : "string"
+          },
+          "sentByApp" : {
+            "type" : "boolean"
           },
           "taskId" : {
             "format" : "uuid",

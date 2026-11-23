@@ -219,6 +219,75 @@ class ContactTimelineIT {
     assertThat(json(badSize).get("fields").get(0).asText()).isEqualTo("pageSize");
   }
 
+  /** WhatsApp messages (CRM-083) join the timeline, in arrival order within the same second. */
+  @Test
+  void whatsappMessagesJoinTheContactTimeline() throws Exception {
+    UUID clinicA = provision(account("owner-m@example.test"));
+    UUID clinicB = provision(account("owner-n@example.test"));
+    Browser owner = selected("owner-m@example.test", clinicA);
+    Browser ownerB = selected("owner-n@example.test", clinicB);
+    String someone = contact(owner, "(11) 98700-0201");
+    String conversation = UUID.randomUUID().toString();
+    clinic(
+        clinicA,
+        "INSERT INTO whatsapp_conversations (id, contact_id, channel_id, created_at,"
+            + " last_message_at) VALUES ('"
+            + conversation
+            + "', '"
+            + someone
+            + "', gen_random_uuid(), now(), now())");
+    // Three messages in the same second: the order is the arrival order.
+    String longText = "a".repeat(250);
+    for (String[] message :
+        new String[][] {
+          {"IN", "false", "primeira"}, {"OUT", "true", "segunda"}, {"IN", "false", longText}
+        }) {
+      clinic(
+          clinicA,
+          "INSERT INTO whatsapp_messages (id, conversation_id, wamid, direction, sent_by_app,"
+              + " message_type, body, sent_at, created_at) VALUES (gen_random_uuid(), '"
+              + conversation
+              + "', 'wamid.' || gen_random_uuid(), '"
+              + message[0]
+              + "', "
+              + message[1]
+              + ", 'text', '"
+              + message[2]
+              + "', date_trunc('second', now()), now())");
+    }
+
+    JsonNode items = ok(owner.get(TIMELINE.formatted(someone))).get("items");
+    assertThat(items.size()).isEqualTo(3);
+    JsonNode newest = items.get(0);
+    assertThat(newest.get("kind").asText()).isEqualTo("MESSAGE");
+    assertThat(newest.get("type").asText()).isEqualTo("IN");
+    assertThat(newest.get("text").asText()).hasSize(200);
+    assertThat(newest.get("messageType").asText()).isEqualTo("text");
+    assertThat(newest.get("conversationId").asText()).isEqualTo(conversation);
+    assertThat(newest.get("actorId").isNull()).isTrue();
+    assertThat(items.get(1).get("text").asText()).isEqualTo("segunda");
+    assertThat(items.get(1).get("sentByApp").asBoolean()).isTrue();
+    assertThat(items.get(2).get("text").asText()).isEqualTo("primeira");
+
+    // Clinic B's contact with the same number shows none of A's messages.
+    String sameNumberInB = contact(ownerB, "(11) 98700-0201");
+    assertThat(ok(ownerB.get(TIMELINE.formatted(sameNumberInB))).get("total").asLong()).isZero();
+  }
+
+  private void clinic(UUID tenant, String sql) throws Exception {
+    String database =
+        jdbc.queryForObject(
+            "SELECT database_name FROM tenants WHERE tenant_id = ?", String.class, tenant);
+    try (var connection =
+            java.sql.DriverManager.getConnection(
+                TestPostgres.url(POSTGRES, database),
+                POSTGRES.getUsername(),
+                POSTGRES.getPassword());
+        var statement = connection.createStatement()) {
+      statement.execute(sql);
+    }
+  }
+
   private static JsonNode find(JsonNode items, String kind, String type) {
     for (JsonNode item : items) {
       if (item.get("kind").asText().equals(kind)

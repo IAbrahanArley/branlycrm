@@ -11,7 +11,12 @@ import java.util.UUID;
  *   <li>LEAD_EVENT: {@code type} is the lead event (CREATED, STAGE_CHANGED, ...);
  *   <li>NOTE: {@code text} is the note;
  *   <li>SALE_EVENT: {@code type} is CREATED, CORRECTED or CANCELLED, {@code text} the reason;
- *   <li>TASK_CREATED and TASK_COMPLETED: {@code text} is the task title.
+ *   <li>TASK_CREATED and TASK_COMPLETED: {@code text} is the task title;
+ *   <li>MESSAGE (CRM-083): a WhatsApp message; {@code type} is IN or OUT, {@code text} the first
+ *       200 characters, {@code messageType} text, image, audio..., {@code sentByApp} for one sent
+ *       from the WhatsApp Business app, and {@code conversationId} links to the inbox. Placed by
+ *       Meta's time ({@code sent_at}), then arrival order; the inbox orders by arrival only, so a
+ *       message stored late may sit higher here. Only with INBOX_READ.
  * </ul>
  *
  * <p>{@code actorId} is a global subject_id, null only for WhatsApp automation. {@code text} may
@@ -30,7 +35,10 @@ public record TimelineEntry(
     String toValue,
     UUID lossReasonId,
     Long amountCents,
-    String text) {
+    String text,
+    UUID conversationId,
+    String messageType,
+    Boolean sentByApp) {
   public TimelineEntry {
     Objects.requireNonNull(kind);
     Objects.requireNonNull(id);

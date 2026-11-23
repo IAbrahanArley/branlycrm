@@ -28,7 +28,9 @@ public class TimelineService {
   public PageView<TimelineEntryView> contact(
       UUID tenantId, UUID actor, UUID contactId, PageQuery query) {
     ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.LEAD_READ);
-    TimelineRepository.Page page = timeline.page(clinic, contactId, query);
+    // Messages may carry health data: they follow the inbox permission, not only the lead one.
+    TimelineRepository.Page page =
+        timeline.page(clinic, contactId, query, clinic.allows(ClinicPermission.INBOX_READ));
     return new PageView<>(
         page.entries().stream().map(TimelineService::view).toList(),
         query.page(),
@@ -50,6 +52,9 @@ public class TimelineService {
         entry.toValue(),
         entry.lossReasonId(),
         entry.amountCents(),
-        entry.text());
+        entry.text(),
+        entry.conversationId(),
+        entry.messageType(),
+        entry.sentByApp());
   }
 }

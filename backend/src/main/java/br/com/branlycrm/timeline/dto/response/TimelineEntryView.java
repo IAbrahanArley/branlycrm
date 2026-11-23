@@ -22,7 +22,10 @@ public record TimelineEntryView(
     String toValue,
     UUID lossReasonId,
     Long amountCents,
-    String text) {
+    String text,
+    UUID conversationId,
+    String messageType,
+    Boolean sentByApp) {
   @Override
   public String toString() {
     return "TimelineEntryView[kind=" + kind + ", id=" + id + "]";
