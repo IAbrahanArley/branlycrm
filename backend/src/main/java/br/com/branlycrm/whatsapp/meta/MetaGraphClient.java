@@ -222,13 +222,56 @@ public class MetaGraphClient {
     if (text == null || text.isEmpty() || text.length() > 4096) {
       throw new IllegalArgumentException("text");
     }
+    var payload = message(to, "text", callbackData);
+    payload.putObject("text").put("body", text).put("preview_url", false);
+    return sendMessage(token, phoneNumberId, payload);
+  }
+
+  /**
+   * Sends a file already uploaded to Meta (CRM-084b2), with the guarantees of {@link #sendText}.
+   *
+   * @param type image, video, audio or document
+   * @param caption optional; never for audio
+   * @param fileName optional, documents only
+   */
+  public MetaSendResult sendMedia(
+      String token,
+      String phoneNumberId,
+      String to,
+      String type,
+      String mediaId,
+      String caption,
+      String fileName,
+      String callbackData) {
+    requireId(phoneNumberId);
+    if (to == null || !to.matches("[0-9]{6,20}")) throw new IllegalArgumentException("to");
+    if (!List.of("image", "video", "audio", "document").contains(type)) {
+      throw new IllegalArgumentException("type");
+    }
+    if (mediaId == null || !mediaId.matches("[0-9A-Za-z_.-]{1,128}")) {
+      throw new IllegalArgumentException("mediaId");
+    }
+    var payload = message(to, type, callbackData);
+    var media = payload.putObject(type).put("id", mediaId);
+    if (caption != null && !type.equals("audio")) media.put("caption", caption);
+    if (fileName != null && type.equals("document")) media.put("filename", fileName);
+    return sendMessage(token, phoneNumberId, payload);
+  }
+
+  private tools.jackson.databind.node.ObjectNode message(
+      String to, String type, String callbackData) {
     var payload = json.createObjectNode();
     payload.put("messaging_product", "whatsapp");
     payload.put("recipient_type", "individual");
     payload.put("to", to);
-    payload.put("type", "text");
-    payload.putObject("text").put("body", text).put("preview_url", false);
+    payload.put("type", type);
     payload.put("biz_opaque_callback_data", callbackData);
+    return payload;
+  }
+
+  /** Posts a message; the result says whether Meta may have received it (ADR-005). */
+  private MetaSendResult sendMessage(
+      String token, String phoneNumberId, tools.jackson.databind.node.ObjectNode payload) {
     HttpRequest request;
     try {
       request =
@@ -275,6 +318,93 @@ public class MetaGraphClient {
     if (status >= 500) return new MetaSendResult.Uncertain("GRAPH_HTTP_" + status);
     return new MetaSendResult.Refused(code == 0 ? "GRAPH_HTTP_" + status : "META_" + code);
   }
+
+  /**
+   * Uploads a file to Meta for sending (CRM-084b2) and returns Meta's media id as {@link
+   * MetaSendResult.Sent}. An upload is not a message: when its answer is lost it is simply done
+   * again, so failures are NotSent (retry), Refused or TokenInvalid, never Uncertain.
+   */
+  public MetaSendResult uploadMedia(
+      String token,
+      String phoneNumberId,
+      java.nio.file.Path file,
+      String contentType,
+      String fileName) {
+    requireId(phoneNumberId);
+    if (contentType == null || !contentType.matches("[a-z]+/[0-9A-Za-z.+-]{1,90}")) {
+      throw new IllegalArgumentException("contentType");
+    }
+    String name = fileName == null ? "file" : fileName.replaceAll("[\\p{Cntrl}\"\\\\/]", "_");
+    String boundary = "branly-" + java.util.UUID.randomUUID();
+    String head =
+        part(boundary, "messaging_product", null, null)
+            + "whatsapp\r\n"
+            + part(boundary, "type", null, null)
+            + contentType
+            + "\r\n"
+            + part(boundary, "file", name, contentType);
+    String tail = "\r\n--" + boundary + "--\r\n";
+    HttpRequest request;
+    try {
+      request =
+          authorized(token, uri(phoneNumberId + "/media?appsecret_proof=" + proof(token)))
+              .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+              .POST(
+                  HttpRequest.BodyPublishers.concat(
+                      HttpRequest.BodyPublishers.ofString(head, StandardCharsets.UTF_8),
+                      HttpRequest.BodyPublishers.ofFile(file),
+                      HttpRequest.BodyPublishers.ofString(tail)))
+              .timeout(UPLOAD_TIMEOUT)
+              .build();
+    } catch (MetaGraphException invalid) {
+      return invalid.kind() == Kind.TOKEN_INVALID
+          ? new MetaSendResult.TokenInvalid()
+          : new MetaSendResult.NotSent(invalid.code());
+    } catch (java.io.FileNotFoundException missing) {
+      return new MetaSendResult.NotSent("MEDIA_FILE_MISSING");
+    }
+    HttpResponse<byte[]> response;
+    try {
+      response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+    } catch (IOException lost) {
+      return new MetaSendResult.NotSent("UPLOAD_NETWORK");
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return new MetaSendResult.NotSent("UPLOAD_INTERRUPTED");
+    }
+    JsonNode body = parse(response.body());
+    int status = response.statusCode();
+    if (status >= 200 && status < 300) {
+      String id = text(body.get("id"));
+      return id != null && id.matches("[0-9A-Za-z_.-]{1,128}")
+          ? new MetaSendResult.Sent(id)
+          : new MetaSendResult.NotSent("UPLOAD_NO_ID");
+    }
+    JsonNode error = body.path("error");
+    int code =
+        error.path("code").getNodeType() == JsonNodeType.NUMBER ? error.path("code").asInt() : 0;
+    if (code == 190) return new MetaSendResult.TokenInvalid();
+    if (status == 429 || status >= 500 || RATE_LIMITS.contains(code)) {
+      return new MetaSendResult.NotSent(code == 0 ? "UPLOAD_HTTP_" + status : "META_" + code);
+    }
+    return new MetaSendResult.Refused(code == 0 ? "UPLOAD_HTTP_" + status : "META_" + code);
+  }
+
+  /** The header of one multipart field, ending with the blank line before its value. */
+  private static String part(String boundary, String field, String fileName, String type) {
+    StringBuilder header =
+        new StringBuilder("--")
+            .append(boundary)
+            .append("\r\nContent-Disposition: form-data; name=\"")
+            .append(field)
+            .append('"');
+    if (fileName != null) header.append("; filename=\"").append(fileName).append('"');
+    if (type != null) header.append("\r\nContent-Type: ").append(type);
+    return header.append("\r\n\r\n").toString();
+  }
+
+  /** A 16 MB upload on a slow link. */
+  public static final Duration UPLOAD_TIMEOUT = Duration.ofMinutes(2);
 
   /**
    * Downloads a received media (CRM-084b1) into {@code target}: the Graph API gives a short-lived

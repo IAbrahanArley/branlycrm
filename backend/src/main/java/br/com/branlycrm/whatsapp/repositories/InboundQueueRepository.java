@@ -350,7 +350,7 @@ public class InboundQueueRepository {
     List<Object[]> rows =
         session
             .createNativeQuery(
-                "SELECT id, status, conversation_id, body FROM whatsapp_outbox"
+                "SELECT id, status, conversation_id FROM whatsapp_outbox"
                     + " WHERE id = :outbox OR wamid = :wamid ORDER BY (id = :outbox) DESC LIMIT 1"
                     + " FOR UPDATE",
                 Object[].class)
@@ -361,7 +361,6 @@ public class InboundQueueRepository {
     UUID id = (UUID) rows.getFirst()[0];
     String current = (String) rows.getFirst()[1];
     UUID conversation = (UUID) rows.getFirst()[2];
-    String body = (String) rows.getFirst()[3];
     String next = status.status().toUpperCase(java.util.Locale.ROOT);
     boolean failed = next.equals("FAILED");
     // A status for a QUEUED reply means Meta got it although the send looked refused: it is
@@ -380,8 +379,7 @@ public class InboundQueueRepository {
         .setParameter("id", id)
         .executeUpdate();
     if (!failed) {
-      OutboxRepository.insertMessage(
-          session, id, conversation, status.wamid(), body, next, status.at());
+      OutboxRepository.insertMessage(session, id, conversation, status.wamid(), next, status.at());
     }
     session
         .createNativeMutationQuery(

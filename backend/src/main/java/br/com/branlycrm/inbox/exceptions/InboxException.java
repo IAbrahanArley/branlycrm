@@ -26,7 +26,11 @@ public class InboxException extends RuntimeException {
     /** The file was not accepted (type or size) or could not be downloaded. */
     MEDIA_REJECTED,
     /** The object storage is not configured or did not answer. */
-    MEDIA_UNAVAILABLE
+    MEDIA_UNAVAILABLE,
+    /** A file to send of a type WhatsApp does not send, found by its first bytes (CRM-084b2). */
+    MEDIA_TYPE_NOT_ALLOWED,
+    /** A file to send above the limit of its type (CRM-084b2). */
+    MEDIA_TOO_LARGE
   }
 
   private final Reason reason;

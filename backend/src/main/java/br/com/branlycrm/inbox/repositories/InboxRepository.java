@@ -62,8 +62,9 @@ public class InboxRepository {
   static final Duration WINDOW = Duration.ofHours(24);
 
   private static final String OUTBOX =
-      "SELECT id, conversation_id, status, body, error_code, requested_by, created_at, sent_at"
-          + " FROM whatsapp_outbox";
+      "SELECT o.id, o.conversation_id, o.status, o.body, o.error_code, o.requested_by,"
+          + " o.created_at, o.sent_at, o.kind, md.content_type, md.file_name"
+          + " FROM whatsapp_outbox o LEFT JOIN whatsapp_media md ON md.id = o.media_id";
 
   private final ClinicPersistence persistence;
   private final Clock clock;
@@ -314,6 +315,124 @@ public class InboxRepository {
       UUID idempotencyKey,
       String text,
       boolean mayOverride) {
+    return queue(
+        access,
+        conversationId,
+        idempotencyKey,
+        mayOverride,
+        (session, id, at) ->
+            session
+                .createNativeMutationQuery(
+                    "INSERT INTO whatsapp_outbox (id, conversation_id, idempotency_key, kind,"
+                        + " body, next_attempt_at, requested_by, created_at, updated_at)"
+                        + " VALUES (:id, :conversation, :key, 'TEXT', :body, :at, :actor, :at,"
+                        + " :at)")
+                .setParameter("id", id)
+                .setParameter("conversation", conversationId)
+                .setParameter("key", idempotencyKey)
+                .setParameter("body", text)
+                .setParameter("at", utc(at))
+                .setParameter("actor", access.subjectId())
+                .executeUpdate());
+  }
+
+  /**
+   * The checks of {@link #enqueue} without writing anything (CRM-084b2): run before a file is
+   * stored, so a refused send leaves no object behind. The checks run again when queueing.
+   *
+   * @return the item the same idempotency key already queued, if any
+   * @throws InboxException NOT_FOUND, TAKEN, WINDOW_CLOSED or IDEMPOTENCY_CONFLICT
+   */
+  public Optional<QueuedReply> checkReply(
+      ClinicAccess access, UUID conversationId, UUID idempotencyKey, boolean mayOverride) {
+    QueuedReply checked = queue(access, conversationId, idempotencyKey, mayOverride, null);
+    return checked.created() ? Optional.empty() : Optional.of(checked);
+  }
+
+  /**
+   * Queues a file already stored in the bucket (CRM-084b2), with the rules of {@link #enqueue}: the
+   * media row (OUT, STORED) and the outbox item in one transaction.
+   *
+   * @throws InboxException NOT_FOUND, TAKEN, WINDOW_CLOSED or IDEMPOTENCY_CONFLICT
+   */
+  public QueuedReply enqueueMedia(
+      ClinicAccess access,
+      UUID conversationId,
+      UUID idempotencyKey,
+      String caption,
+      OutboundFile file,
+      boolean mayOverride) {
+    return queue(
+        access,
+        conversationId,
+        idempotencyKey,
+        mayOverride,
+        (session, id, at) -> {
+          session
+              .createNativeMutationQuery(
+                  """
+                  INSERT INTO whatsapp_media (id, direction, status, content_type, size_bytes,
+                                              sha256, storage_key, file_name, next_attempt_at,
+                                              created_at, updated_at)
+                  VALUES (:id, 'OUT', 'STORED', :type, :size, :sha, :key, :name, :at, :at, :at)
+                  """)
+              .setParameter("id", file.mediaId())
+              .setParameter("type", file.contentType())
+              .setParameter("size", file.size())
+              .setParameter("sha", file.sha256())
+              .setParameter("key", file.storageKey())
+              .setParameter("name", file.fileName(), String.class)
+              .setParameter("at", utc(at))
+              .executeUpdate();
+          return session
+              .createNativeMutationQuery(
+                  "INSERT INTO whatsapp_outbox (id, conversation_id, idempotency_key, kind, body,"
+                      + " media_id, next_attempt_at, requested_by, created_at, updated_at)"
+                      + " VALUES (:id, :conversation, :key, 'MEDIA', :body, :media, :at, :actor,"
+                      + " :at, :at)")
+              .setParameter("id", id)
+              .setParameter("conversation", conversationId)
+              .setParameter("key", idempotencyKey)
+              .setParameter("body", caption, String.class)
+              .setParameter("media", file.mediaId())
+              .setParameter("at", utc(at))
+              .setParameter("actor", access.subjectId())
+              .executeUpdate();
+        });
+  }
+
+  /**
+   * A file stored in the bucket by the API, to send (CRM-084b2); the key never leaves the server.
+   */
+  public record OutboundFile(
+      UUID mediaId,
+      String storageKey,
+      String contentType,
+      long size,
+      String sha256,
+      String fileName) {
+    @Override
+    public String toString() {
+      return "OutboundFile[id=" + mediaId + "]";
+    }
+  }
+
+  /** Writes the outbox row (and what it needs) once the rules passed. */
+  @FunctionalInterface
+  private interface OutboxWriter {
+    int write(Session session, UUID id, Instant at);
+  }
+
+  /**
+   * The rules of a reply, in one transaction with the conversation locked; with a null {@code
+   * writer} nothing is written and {@code created} is true when the key is new.
+   */
+  private QueuedReply queue(
+      ClinicAccess access,
+      UUID conversationId,
+      UUID idempotencyKey,
+      boolean mayOverride,
+      OutboxWriter writer) {
     UUID actor = access.subjectId();
     Instant at = now();
     return persistence.inTransaction(
@@ -344,6 +463,7 @@ public class InboxRepository {
           if (lastInbound == null || lastInbound.isBefore(at.minus(WINDOW))) {
             throw new InboxException(Reason.WINDOW_CLOSED);
           }
+          if (writer == null) return new QueuedReply(null, channel, true);
           if (assignee == null) {
             session
                 .createNativeMutationQuery(
@@ -355,19 +475,7 @@ public class InboxRepository {
                 .executeUpdate();
             event(session, conversationId, "TAKEN", actor, actor, at);
           }
-          UUID id = UUID.randomUUID();
-          session
-              .createNativeMutationQuery(
-                  "INSERT INTO whatsapp_outbox (id, conversation_id, idempotency_key, kind, body,"
-                      + " next_attempt_at, requested_by, created_at, updated_at)"
-                      + " VALUES (:id, :conversation, :key, 'TEXT', :body, :at, :actor, :at, :at)")
-              .setParameter("id", id)
-              .setParameter("conversation", conversationId)
-              .setParameter("key", idempotencyKey)
-              .setParameter("body", text)
-              .setParameter("at", utc(at))
-              .setParameter("actor", actor)
-              .executeUpdate();
+          writer.write(session, UUID.randomUUID(), at);
           return new QueuedReply(outboxByKey(session, idempotencyKey).orElseThrow(), channel, true);
         });
   }
@@ -387,10 +495,10 @@ public class InboxRepository {
           return session
               .createNativeQuery(
                   OUTBOX
-                      + " WHERE conversation_id = :conversation"
-                      + " AND (status IN ('QUEUED', 'SENDING', 'UNCERTAIN')"
-                      + " OR (status = 'FAILED' AND created_at >= :since))"
-                      + " ORDER BY created_at DESC, id LIMIT 50",
+                      + " WHERE o.conversation_id = :conversation"
+                      + " AND (o.status IN ('QUEUED', 'SENDING', 'UNCERTAIN')"
+                      + " OR (o.status = 'FAILED' AND o.created_at >= :since))"
+                      + " ORDER BY o.created_at DESC, o.id LIMIT 50",
                   Object[].class)
               .setParameter("conversation", conversationId)
               .setParameter("since", utc(since))
@@ -403,7 +511,7 @@ public class InboxRepository {
 
   private static Optional<OutboxItem> outboxByKey(Session session, UUID key) {
     return session
-        .createNativeQuery(OUTBOX + " WHERE idempotency_key = :key", Object[].class)
+        .createNativeQuery(OUTBOX + " WHERE o.idempotency_key = :key", Object[].class)
         .setParameter("key", key)
         .getResultList()
         .stream()
@@ -420,7 +528,10 @@ public class InboxRepository {
         (String) row[4],
         (UUID) row[5],
         instant(row[6]),
-        instant(row[7]));
+        instant(row[7]),
+        (String) row[8],
+        (String) row[9],
+        (String) row[10]);
   }
 
   private static void event(

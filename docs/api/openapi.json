@@ -1094,6 +1094,9 @@
       },
       "OutboxView" : {
         "properties" : {
+          "contentType" : {
+            "type" : "string"
+          },
           "conversationId" : {
             "format" : "uuid",
             "type" : "string"
@@ -1105,8 +1108,14 @@
           "errorCode" : {
             "type" : "string"
           },
+          "fileName" : {
+            "type" : "string"
+          },
           "id" : {
             "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
             "type" : "string"
           },
           "requestedBy" : {
@@ -5586,6 +5595,157 @@
           "session" : [ ]
         } ],
         "summary" : "Queue a text reply (OWNER, MANAGER, ATTENDANT); takes a conversation nobody serves. The worker sends it; the same idempotencyKey never queues twice",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/messages/media" : {
+      "post" : {
+        "operationId" : "sendConversationMedia",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "idempotencyKey",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "caption",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OutboxView"
+                }
+              }
+            },
+            "description" : "The file in the outbox (kind MEDIA)"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: idempotencyKey, caption (also any caption on audio) or file"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED (VIEWER); MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_TAKEN, CONVERSATION_WINDOW_CLOSED or CONVERSATION_IDEMPOTENCY_CONFLICT"
+          },
+          "413" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_MEDIA_TOO_LARGE (FILE_TOO_LARGE above 17 MB)"
+          },
+          "415" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_MEDIA_TYPE_NOT_ALLOWED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_MEDIA_UNAVAILABLE; SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Queue a file (multipart: file, idempotencyKey, optional caption) like a text reply. Type from the first bytes: JPG, PNG, MP4, 3GP, audio, PDF and Office; images up to 5 MB, the rest up to 16 MB",
         "tags" : [ "Inbox" ]
       }
     },
