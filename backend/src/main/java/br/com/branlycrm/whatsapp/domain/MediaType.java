@@ -78,6 +78,26 @@ public enum MediaType {
     return kind;
   }
 
+  /** The largest file the clinic sends from the CRM (CRM-084b2), whatever the type allows. */
+  public static final long OUTBOUND_MAX_BYTES = 16L * 1024 * 1024;
+
+  /**
+   * The WhatsApp message type that sends this file (CRM-084b2): {@code image}, {@code video},
+   * {@code audio} or {@code document}; empty for a type WhatsApp does not send as itself (WebP is
+   * only a sticker).
+   */
+  public Optional<String> outboundMessageType() {
+    return switch (this) {
+      case WEBP -> Optional.empty();
+      default -> Optional.of(kind.name().toLowerCase(java.util.Locale.ROOT));
+    };
+  }
+
+  /** The size limit of a sent file of this type. */
+  public long outboundMaxBytes() {
+    return Math.min(kind.maxBytes(), OUTBOUND_MAX_BYTES);
+  }
+
   /** The type of a file from its first bytes, or empty for anything not accepted. */
   public static Optional<MediaType> detect(byte[] head) {
     if (head == null || head.length < 4) return Optional.empty();

@@ -70,6 +70,21 @@ public final class GlobalErrorHandler {
     return ApiErrors.invalidInput(List.of("body"));
   }
 
+  /** A file above the multipart limit, refused while the request is parsed (CRM-084b2). */
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity<ApiError> tooLarge() {
+    return ApiErrors.response(413, "FILE_TOO_LARGE", "Arquivo grande demais.");
+  }
+
+  /** A multipart request without the expected part, or that could not be read. */
+  @ExceptionHandler({
+    org.springframework.web.multipart.MultipartException.class,
+    org.springframework.web.multipart.support.MissingServletRequestPartException.class
+  })
+  ResponseEntity<ApiError> invalidMultipart() {
+    return ApiErrors.invalidInput(List.of("file"));
+  }
+
   @ExceptionHandler(DataAccessException.class)
   ResponseEntity<ApiError> unavailable(DataAccessException exception) {
     return ApiErrors.dataAccess(exception);

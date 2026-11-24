@@ -30,18 +30,52 @@ public class OutboxRepository {
     this.persistence = persistence;
   }
 
-  /** A reply ready to send; the text never appears in {@link #toString()}. */
+  /**
+   * A reply ready to send; the text never appears in {@link #toString()}. A file (CRM-084b2) also
+   * carries its media row: {@code body} is then the optional caption.
+   */
   public record Outbound(
       UUID id,
       UUID conversationId,
       String body,
       String toDigits,
       Instant lastInboundAt,
-      int attempts) {
+      int attempts,
+      OutboundMedia media) {
+    public boolean isMedia() {
+      return media != null;
+    }
+
     @Override
     public String toString() {
       return "Outbound[id=" + id + "]";
     }
+  }
+
+  /**
+   * The file of a MEDIA reply: where it is stored and, once uploaded, Meta's media id (a retry does
+   * not upload it again).
+   */
+  public record OutboundMedia(
+      UUID id, String storageKey, String contentType, String fileName, String metaMediaId) {
+    /** image, video, audio or document. */
+    public String messageType() {
+      return OutboxRepository.messageType(contentType);
+    }
+
+    @Override
+    public String toString() {
+      return "OutboundMedia[id=" + id + "]";
+    }
+  }
+
+  /** The WhatsApp message type of a sent file's detected type ({@code document} by default). */
+  static String messageType(String contentType) {
+    return java.util.Arrays.stream(br.com.branlycrm.whatsapp.domain.MediaType.values())
+        .filter(type -> type.contentType().equals(contentType))
+        .findFirst()
+        .flatMap(br.com.branlycrm.whatsapp.domain.MediaType::outboundMessageType)
+        .orElse("document");
   }
 
   /** SENDING replies whose lease expired: UNCERTAIN, never resent. Returns how many. */
@@ -67,10 +101,12 @@ public class OutboxRepository {
                   .createNativeQuery(
                       """
                       SELECT o.id, o.conversation_id, o.body, ct.phone_e164, c.last_inbound_at,
-                             o.attempts
+                             o.attempts, md.id, md.storage_key, md.content_type, md.file_name,
+                             md.meta_media_id
                       FROM whatsapp_outbox o
                       JOIN whatsapp_conversations c ON c.id = o.conversation_id
                       JOIN contacts ct ON ct.id = c.contact_id
+                      LEFT JOIN whatsapp_media md ON md.id = o.media_id
                       WHERE o.status = 'QUEUED' AND o.next_attempt_at <= :now
                       ORDER BY o.created_at, o.id
                       LIMIT 1
@@ -99,8 +135,31 @@ public class OutboxRepository {
                   (String) row[2],
                   phone.startsWith("+") ? phone.substring(1) : phone,
                   instant(row[4]),
-                  attempts));
+                  attempts,
+                  row[6] == null
+                      ? null
+                      : new OutboundMedia(
+                          (UUID) row[6],
+                          (String) row[7],
+                          (String) row[8],
+                          (String) row[9],
+                          (String) row[10])));
         });
+  }
+
+  /** Meta's id of an uploaded file, kept for the retries of the same reply (CRM-084b2). */
+  public void uploaded(ChannelAccess access, UUID mediaId, String metaMediaId, Instant at) {
+    persistence.inTransaction(
+        ClinicTenant.ofChannel(access),
+        session ->
+            session
+                .createNativeMutationQuery(
+                    "UPDATE whatsapp_media SET meta_media_id = :meta, updated_at = :at"
+                        + " WHERE id = :id AND direction = 'OUT'")
+                .setParameter("meta", metaMediaId)
+                .setParameter("at", utc(at))
+                .setParameter("id", mediaId)
+                .executeUpdate());
   }
 
   /**
@@ -128,8 +187,7 @@ public class OutboxRepository {
               .setParameter("at", utc(at))
               .setParameter("id", reply.id())
               .executeUpdate();
-          insertMessage(
-              session, reply.id(), reply.conversationId(), wamid, reply.body(), "SENT", at);
+          insertMessage(session, reply.id(), reply.conversationId(), wamid, "SENT", at);
           return null;
         });
   }
@@ -189,15 +247,29 @@ public class OutboxRepository {
         });
   }
 
-  /** The message of a reply in its conversation, at most once (unique outbox id and wamid). */
+  /**
+   * The message of a reply in its conversation, at most once (unique outbox id and wamid). Text and
+   * file come from the outbox row; a file's media row then points to the message, so the history
+   * and the link show it like a received one (CRM-084b2).
+   */
   static void insertMessage(
       org.hibernate.Session session,
       UUID outboxId,
       UUID conversationId,
       String wamid,
-      String body,
       String status,
       Instant at) {
+    Object[] reply =
+        session
+            .createNativeQuery(
+                "SELECT o.body, o.media_id, md.content_type FROM whatsapp_outbox o"
+                    + " LEFT JOIN whatsapp_media md ON md.id = o.media_id WHERE o.id = :id",
+                Object[].class)
+            .setParameter("id", outboxId)
+            .getSingleResult();
+    String body = (String) reply[0];
+    UUID mediaId = (UUID) reply[1];
+    String contentType = (String) reply[2];
     // The same lock as the inbound worker: messages of one contact commit in their seq order, so
     // the inbox poll (seq > cursor) never skips one, even with more than one worker.
     session
@@ -212,20 +284,33 @@ public class OutboxRepository {
         .createNativeMutationQuery(
             """
             INSERT INTO whatsapp_messages (id, conversation_id, wamid, direction, sent_by_app,
-                                           message_type, body, sent_at, created_at, status,
-                                           outbox_id)
-            VALUES (:id, :conversation, :wamid, 'OUT', false, 'text', :body, :at, :at, :status,
-                    :outbox)
+                                           message_type, body, media_mime, sent_at, created_at,
+                                           status, outbox_id)
+            VALUES (:id, :conversation, :wamid, 'OUT', false, :type, :body, :mime, :at, :at,
+                    :status, :outbox)
             ON CONFLICT DO NOTHING
             """)
         .setParameter("id", UUID.randomUUID())
         .setParameter("conversation", conversationId)
         .setParameter("wamid", wamid)
-        .setParameter("body", body)
+        .setParameter("type", mediaId == null ? "text" : messageType(contentType))
+        .setParameter("body", body, String.class)
+        .setParameter("mime", contentType, String.class)
         .setParameter("at", utc(at))
         .setParameter("status", status)
         .setParameter("outbox", outboxId)
         .executeUpdate();
+    if (mediaId != null) {
+      session
+          .createNativeMutationQuery(
+              "UPDATE whatsapp_media SET message_id ="
+                  + " (SELECT id FROM whatsapp_messages WHERE outbox_id = :outbox), updated_at = :at"
+                  + " WHERE id = :media AND message_id IS NULL")
+          .setParameter("outbox", outboxId)
+          .setParameter("at", utc(at))
+          .setParameter("media", mediaId)
+          .executeUpdate();
+    }
     session
         .createNativeMutationQuery(
             "UPDATE whatsapp_conversations SET last_message_at = GREATEST(last_message_at, :at)"

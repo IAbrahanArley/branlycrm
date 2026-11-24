@@ -4,6 +4,7 @@ import br.com.branlycrm.common.domain.PageQuery;
 import br.com.branlycrm.common.dto.response.PageView;
 import br.com.branlycrm.identity.security.CrmPrincipal;
 import br.com.branlycrm.identity.security.SelectedClinic;
+import br.com.branlycrm.inbox.domain.MediaUpload;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
 import br.com.branlycrm.inbox.dto.request.ReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
@@ -28,7 +29,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Shared WhatsApp inbox of the clinic selected in the session (CRM-083). */
 @Tag(name = "Inbox", description = "WhatsApp conversations shared by the clinic's team")
@@ -128,6 +131,49 @@ public final class InboxController {
         .body(
             inbox.reply(
                 SelectedClinic.require(session), principal.subjectId(), conversationId, request));
+  }
+
+  @Operation(
+      operationId = "sendConversationMedia",
+      summary =
+          "Queue a file (multipart: file, idempotencyKey, optional caption) like a text reply."
+              + " Type from the first bytes: JPG, PNG, MP4, 3GP, audio, PDF and Office; images up"
+              + " to 5 MB, the rest up to 16 MB")
+  @ApiResponse(responseCode = "202", description = "The file in the outbox (kind MEDIA)")
+  @ApiResponse(
+      responseCode = "400",
+      description = "INVALID_INPUT: idempotencyKey, caption (also any caption on audio) or file")
+  @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED (VIEWER)")
+  @ApiResponse(responseCode = "404", description = "CONVERSATION_NOT_FOUND")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "CONVERSATION_TAKEN, CONVERSATION_WINDOW_CLOSED or CONVERSATION_IDEMPOTENCY_CONFLICT")
+  @ApiResponse(
+      responseCode = "413",
+      description = "CONVERSATION_MEDIA_TOO_LARGE (FILE_TOO_LARGE above 17 MB)")
+  @ApiResponse(responseCode = "415", description = "CONVERSATION_MEDIA_TYPE_NOT_ALLOWED")
+  @ApiResponse(responseCode = "503", description = "CONVERSATION_MEDIA_UNAVAILABLE")
+  @SecurityRequirement(name = "csrf")
+  @PostMapping(
+      path = "/{conversationId}/messages/media",
+      consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<OutboxView> sendMedia(
+      @PathVariable UUID conversationId,
+      @RequestPart("file") MultipartFile file,
+      @RequestParam(name = "idempotencyKey", required = false) String idempotencyKey,
+      @RequestParam(name = "caption", required = false) String caption,
+      @AuthenticationPrincipal CrmPrincipal principal,
+      HttpSession session) {
+    return ResponseEntity.accepted()
+        .body(
+            inbox.sendMedia(
+                SelectedClinic.require(session),
+                principal.subjectId(),
+                conversationId,
+                idempotencyKey,
+                caption,
+                new MediaUpload(file.getOriginalFilename(), file.getSize(), file::getInputStream)));
   }
 
   @Operation(

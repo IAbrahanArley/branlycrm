@@ -994,7 +994,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - contato arquivado marcado; cursor inválido sempre 400; transferir para quem já atende não gera evento; a consulta de novas só confere se a conversa existe.
 - **Riscos aceitos:** a conversa de quem saiu da equipe continua com ele até o gestor soltar ou transferir; o responsável é conferido no banco central antes da transação da clínica. A CRM-073 precisa tratar conversas, mensagens e eventos na exclusão do contato.
 
-### [-] CRM-084 — Envio de mensagens e mídias (P1)
+### [x] CRM-084 — Envio de mensagens e mídias (P1)
 **Depende de:** CRM-083, CRM-080.
 **Atende:** WPP-04.
 **Entregas:**
@@ -1071,6 +1071,45 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - falta confirmar, num bucket da OCI real, que o link pré-assinado sai como anexo (o S3Mock confirma; a ADR-037 prevê as Pre-Authenticated Requests da OCI se não funcionar);
   - a CRM-073 precisa apagar mídias e objetos antes das mensagens.
 - **Para o teste real:** criar na OCI um bucket privado e uma Customer Secret Key, e preencher `WHATSAPP_MEDIA_BUCKET`, `WHATSAPP_MEDIA_ENDPOINT` e a pasta `.whatsapp-storage`.
+
+**Estado (24/11/2026):** parte **084b2 (enviar mídia)** concluída na branch `feat/crm-084b2-envio-midia`, criada sobre a 084b1. Com ela a CRM-084 fica `[x]`. Detalhes em [docs/caixa-de-entrada.md](docs/caixa-de-entrada.md#enviar-arquivos-crm-084b2).
+- **Decisões aprovadas pelo responsável em 24/11/2026:**
+  - limite de 16 MB por envio, também para documentos;
+  - a API grava no bucket (cai a ideia de uma chave só de leitura para a API);
+  - figurinha e mensagem de voz gravada fora do MVP; áudio vai como arquivo;
+  - sem dependência nova.
+- **Migração de clínica V19:**
+  - `whatsapp_media` ganha a direção (`IN`/`OUT`) e o nome do documento;
+  - para mídias enviadas, `message_id` e `meta_media_id` ficam opcionais até o envio;
+  - `whatsapp_outbox` aceita `kind` `MEDIA`, com `media_id` e legenda opcional de até 1024 caracteres.
+- **API:** `POST …/conversations/{id}/messages/media` em multipart, com `file`, `idempotencyKey` e `caption`:
+  - as regras do texto rodam antes de gravar e de novo ao enfileirar; um envio recusado no meio apaga o objeto do bucket;
+  - o tipo vem dos primeiros bytes: JPEG e PNG até 5 MB; MP4, 3GP, áudios e documentos Office/PDF até 16 MB; WebP é recusado;
+  - os itens da fila (`OutboxView`) ganham `kind`, `contentType` e `fileName`;
+  - o Spring corta acima de 17 MB (`FILE_TOO_LARGE`); o Nginx aceita 18 MB só nessa rota.
+- **Worker:**
+  - baixa o arquivo do bucket, sobe para a Meta uma vez (o id fica guardado para as novas tentativas) e envia `image`, `video`, `audio` ou `document`;
+  - falha na subida é tentada de novo como envio que não chegou; incerto continua nunca reenviado;
+  - enviada (ou conciliada por status), a mídia aponta para a mensagem e aparece no histórico com o link, como as recebidas.
+- **Testes:**
+  - `WhatsappOutboundMediaIT`: PDF aceito, guardado no prefixo da clínica, com o nome limpo e a legenda; mesma chave sem segunda gravação; executável e WebP (415), legenda em áudio (400), imagem acima de 5 MB (413), sem arquivo (400), somente leitura (403) e clínica B (404) sem gravar nada; limite de taxa na primeira mensagem e nova tentativa sem subir de novo; o corpo enviado à Meta; o histórico e o link baixando o mesmo arquivo; a clínica B não alcança o link;
+  - o mesmo teste cobre um envio incerto (erro 5xx da Meta), que não é reenviado, e a conciliação pelo status, que liga a imagem à mensagem;
+  - `WhatsappOutboundIT` e `WhatsappMediaIT` ajustados ao novo construtor do worker;
+  - `TenantMigrationRolloutIT` ajustado à V19;
+  - `clean verify`: 258 unitários (2 ignorados) e 162 de integração, sem falhas; `docs/api/openapi.json` regerado.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico. Corrigidos:
+  - **alto:** a subida de arquivos ocupava a thread única do worker de todas as clínicas; agora vai um arquivo por canal a cada passada, com as mensagens recebidas no meio;
+  - a reserva de 2 minutos podia vencer durante a subida e marcar como incerta uma resposta que não saiu; agora é de 6 minutos;
+  - nomes de documento com separadores de linha, caracteres de formatação (inversão de direção) ou cortados no meio de um caractere;
+  - o SDK não conseguia repetir a gravação de 16 MB no bucket (agora reabre o arquivo);
+  - erro de validação de mídia no worker aparecia como `INVALID_RECIPIENT` (agora `INVALID_MEDIA`).
+- **Riscos aceitos:**
+  - a API e o worker usam a mesma chave do bucket, com escrita; restringir por prefixo quando houver usuários distintos na OCI;
+  - um objeto pode ficar órfão no bucket se a API cair entre gravar e enfileirar, ou se a remoção falhar;
+  - **para a CRM-073:** um arquivo enviado que falhou fica com a mídia `OUT` sem mensagem. A retenção precisa achar essas mídias pela fila (`whatsapp_outbox.media_id` → conversa → contato), não só pelas mensagens, e apagar também objetos sem linha;
+  - a subida ainda roda na thread do worker (um arquivo por vez, até 2 minutos); se pesar no piloto, passar para uma thread própria, como o download;
+  - a detecção de tipo é larga para envio (qualquer `ftyp` não recusado vira MP4, OGG sem Opus): a Meta recusa, e o envio fica `FAILED` com o código dela;
+  - um POST sem login e sem CSRF ainda pode mandar até 18 MB, que o Spring lê para o disco antes de recusar; um limite de taxa no Nginx nessa rota ajudaria.
 
 ### [ ] CRM-085 — Janela de 24 horas e templates (P1)
 **Depende de:** CRM-084.
@@ -1367,6 +1406,8 @@ Executadas pelo Codex na pasta `crm/api-front`, conforme [docs/agents/PARALELO.m
 
 Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `frontend/tests/` e o `build`. O fluxo completo do dono novo (convite, segundo fator e painel) não foi refeito agora no navegador.
 
+**Ordem do Codex a partir de 24/11/2026** (FE-009 entregue no PR #62): **FE-010** (caixa de entrada, respostas e mídias, com o contrato da CRM-084 completo), depois **FE-008** (perfil do contato com a linha do tempo, que já traz as mensagens), **FE-007** (configurações da clínica) e os cards de conversas do painel (CRM-052: `conversationsAwaitingReply` e `conversationsUnassigned`).
+
 **Próximas para o Codex (17/11/2026):** **FE-007** (configurações da clínica) e **FE-008** (linha do tempo do contato). As APIs estão na `main` e no `docs/api/openapi.json` (PRs #49 e #50), e as duas tarefas são independentes. As telas do WhatsApp (situação do canal, conexão e caixa de entrada) só entram depois da CRM-081b e da CRM-083.
 
 ### [x] FE-001 — Base do painel (P0)
@@ -1536,7 +1577,7 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - Funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam.
 
-### [ ] FE-009 — Conexão do WhatsApp da clínica (P0)
+### [x] FE-009 — Conexão do WhatsApp da clínica (P0)
 **Depende de:** FE-002, FE-005 e o merge da CRM-081b (rotas `/api/v1/clinic/whatsapp/channel` e `/api/v1/agencies/{agencyId}/clinics/{tenantId}/whatsapp/channel` no contrato).
 **Entregas:**
 - Seção "WhatsApp" em `/app/configuracoes` (ou página própria), só para quem tem `CHANNEL_VIEW` (Proprietário e Gestor), e o mesmo bloco no detalhe da clínica da agência (`/agencia`).
@@ -1551,6 +1592,8 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - Estados de carregamento, erro e sucesso; funciona no celular e por teclado.
 - `lint`, `typecheck` e `build` passam. A prova com a Meta real depende do app publicado e da URL pública (CRM-072).
 
+**Estado (24/11/2026):** entregue pelo Codex no PR #62, mergeado na `main`. A prova com a Meta real continua pendente (CRM-072).
+
 ### [ ] FE-010 — Caixa de entrada (P1)
 **Depende de:** FE-002, FE-008 (perfil do contato) e o merge da CRM-083 (rotas `/api/v1/clinic/inbox/conversations` no contrato).
 **Entregas:**
@@ -1558,7 +1601,7 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - **Lista** (`GET …/conversations`): nome e telefone do contato, prévia da última mensagem, horário no fuso da clínica, selo "aguardando resposta" (`awaitingReply`), "precisa de humano" e o responsável (nome pela equipe; sem nome disponível, "Membro da equipe").
   - Filtros: todas, minhas (`assignee=mine`), sem responsável (`assignee=none`), precisa de humano (`needsHuman=true`).
   - Consultar de novo a cada 5 segundos enquanto a aba estiver visível (`document.visibilityState`), sem mexer na rolagem.
-- **Conversa** (`GET …/{id}/messages`): as últimas 50 mensagens, as do paciente de um lado e as da clínica do outro; as enviadas pelo app WhatsApp Business com o selo "pelo celular". Mídia sem arquivo por enquanto: mostrar o tipo ("Imagem", "Áudio"...) e a legenda.
+- **Conversa** (`GET …/{id}/messages`): as últimas 50 mensagens, as do paciente de um lado e as da clínica do outro; as enviadas pelo app WhatsApp Business com o selo "pelo celular". Mídias: o tipo ("Imagem", "Áudio"...), a legenda e o botão de download (abaixo).
   - "Carregar anteriores" com o cursor `before`.
   - A cada 5 segundos, `after` com o último cursor recebido, somando ao fim as novas e descartando repetidas pelo `id`.
   - Texto preservando quebras de linha e sem interpretar HTML.
@@ -1577,6 +1620,12 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
   - mensagem com `mediaStatus`: `PENDING` ("baixando…", conferir de novo na próxima consulta), `STORED` (botão "abrir/baixar"), `REJECTED` ("arquivo não aceito"), `FAILED` ("não foi possível baixar");
   - o botão pede `GET …/{id}/messages/{messageId}/media` na hora do clique e abre a `url` devolvida, que vale 5 minutos e baixa como anexo. Nunca guardar a URL nem mostrar o arquivo embutido na página;
   - erros `CONVERSATION_MEDIA_*` com mensagens próprias.
+- **Enviar arquivo (CRM-084b2):** botão de anexo ao lado da caixa de texto, que manda `POST …/{id}/messages/media` em `multipart/form-data` com `file`, `idempotencyKey` e `caption` (opcional).
+  - Conferir antes, só como dica, o tipo e o tamanho (imagens até 5 MB, o resto até 16 MB); o servidor decide pelos primeiros bytes.
+  - Sem legenda para áudio.
+  - Na fila, o item vem com `kind` `MEDIA`, `contentType` e `fileName`: mostrar "enviando arquivo…" com o nome ou o tipo.
+  - Erros: `CONVERSATION_MEDIA_TYPE_NOT_ALLOWED` (415), `CONVERSATION_MEDIA_TOO_LARGE` e `FILE_TOO_LARGE` (413), `CONVERSATION_MEDIA_UNAVAILABLE` (503), além dos do texto.
+  - Enviado, o arquivo aparece no histórico como os recebidos, com o mesmo botão "abrir/baixar".
 **Aceite:**
 - `CONVERSATION_TAKEN` mostra que outra pessoa assumiu e recarrega a conversa; `CONVERSATION_STALE` pede para recarregar; `CONVERSATION_NOT_YOURS` e `CONVERSATION_ASSIGNEE_INVALID` têm mensagens próprias; `CONVERSATION_NOT_FOUND` volta para a lista.
 - Somente leitura vê tudo sem nenhum botão de ação.

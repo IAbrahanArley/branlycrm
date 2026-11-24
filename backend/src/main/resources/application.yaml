@@ -13,6 +13,13 @@ spring:
     deserialization:
       # 1.5 in an integer field (cents, version) is refused instead of silently truncated.
       accept-float-as-int: false
+  servlet:
+    multipart:
+      # Files sent from the inbox (CRM-084b2): the service refuses above 16 MB with its own code;
+      # this stops a larger request while it is parsed. Kept on disk while read, never in memory.
+      max-file-size: 17MB
+      max-request-size: 18MB
+      file-size-threshold: 0
   jpa:
     open-in-view: false
     show-sql: false

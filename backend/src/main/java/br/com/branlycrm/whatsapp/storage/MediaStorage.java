@@ -84,6 +84,61 @@ public class MediaStorage implements DisposableBean {
   }
 
   /**
+   * Stores {@code size} bytes under {@code key}, private (CRM-084b2). {@code content} opens the
+   * file from the start each time, so the SDK can retry the upload.
+   */
+  public void put(
+      String key,
+      software.amazon.awssdk.http.ContentStreamProvider content,
+      String contentType,
+      long size) {
+    Clients current = clients().orElseThrow(() -> new StorageException("STORAGE_NOT_CONFIGURED"));
+    try {
+      current
+          .s3()
+          .putObject(
+              PutObjectRequest.builder()
+                  .bucket(bucket)
+                  .key(key)
+                  .contentType(contentType)
+                  .contentLength(size)
+                  .build(),
+              RequestBody.fromContentProvider(content, size, contentType));
+    } catch (SdkException | java.io.UncheckedIOException failure) {
+      throw new StorageException("STORAGE_UNAVAILABLE");
+    }
+  }
+
+  /** Copies the object under {@code key} into {@code target} (replaced), for the worker. */
+  public void get(String key, Path target) {
+    Clients current = clients().orElseThrow(() -> new StorageException("STORAGE_NOT_CONFIGURED"));
+    try (var in =
+        current.s3().getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+      Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    } catch (SdkException | IOException failure) {
+      throw new StorageException("STORAGE_UNAVAILABLE");
+    }
+  }
+
+  /** Removes the object; best effort (a file whose send was refused after it was stored). */
+  public void delete(String key) {
+    Optional<Clients> current = clients();
+    if (current.isEmpty()) return;
+    try {
+      current
+          .get()
+          .s3()
+          .deleteObject(
+              software.amazon.awssdk.services.s3.model.DeleteObjectRequest.builder()
+                  .bucket(bucket)
+                  .key(key)
+                  .build());
+    } catch (SdkException ignored) {
+      // Left in the bucket with no row pointing to it (a known gap, see CRM-073).
+    }
+  }
+
+  /**
    * A temporary link ({@link #LINK_TTL}) that downloads the object as an attachment with the given
    * type, so a browser never renders a stored file inline.
    */

@@ -262,6 +262,7 @@ class WhatsappOutboundIT {
         outbox,
         new ChannelUnsealer(FILES.resolve("keys/private").toString()),
         meta,
+        context.getBean(br.com.branlycrm.whatsapp.storage.MediaStorage.class),
         context.getBeanProvider(Clock.class));
   }
 

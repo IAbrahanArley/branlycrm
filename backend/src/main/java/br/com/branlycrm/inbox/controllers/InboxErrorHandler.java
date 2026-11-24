@@ -52,6 +52,15 @@ public final class InboxErrorHandler {
           ResponseEntity.status(503)
               .header("Retry-After", "30")
               .body(new ApiError(code, "Arquivos indisponíveis no momento."));
+      case MEDIA_TYPE_NOT_ALLOWED ->
+          ApiErrors.response(
+              415,
+              code,
+              "Tipo de arquivo não aceito. Envie JPG, PNG, MP4, 3GP, áudio (MP3, M4A, OGG, AAC,"
+                  + " AMR), PDF, DOCX, XLSX ou PPTX.");
+      case MEDIA_TOO_LARGE ->
+          ApiErrors.response(
+              413, code, "Arquivo grande demais: imagens até 5 MB, outros arquivos até 16 MB.");
       case IDEMPOTENCY_CONFLICT ->
           ApiErrors.response(409, code, "Esta chave de envio já foi usada em outra conversa.");
       case ASSIGNEE_INVALID ->

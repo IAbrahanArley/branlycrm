@@ -83,6 +83,45 @@ public final class Browser {
             .POST(HttpRequest.BodyPublishers.ofString(json)));
   }
 
+  /**
+   * A multipart form with text fields and, when {@code file} is not null, one file part named
+   * {@code file}.
+   */
+  public HttpResponse<String> postMultipart(
+      String path, java.util.Map<String, String> fields, String fileName, byte[] file)
+      throws Exception {
+    String boundary = "test-" + java.util.UUID.randomUUID();
+    java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+    for (var field : fields.entrySet()) {
+      body.writeBytes(
+          ("--"
+                  + boundary
+                  + "\r\nContent-Disposition: form-data; name=\""
+                  + field.getKey()
+                  + "\"\r\n\r\n"
+                  + field.getValue()
+                  + "\r\n")
+              .getBytes(StandardCharsets.UTF_8));
+    }
+    if (file != null) {
+      body.writeBytes(
+          ("--"
+                  + boundary
+                  + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\""
+                  + fileName
+                  + "\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+              .getBytes(StandardCharsets.UTF_8));
+      body.writeBytes(file);
+      body.writeBytes("\r\n".getBytes(StandardCharsets.UTF_8));
+    }
+    body.writeBytes(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+    return send(
+        csrf(request(path), true)
+            .timeout(Duration.ofSeconds(60))
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray())));
+  }
+
   public HttpResponse<String> delete(String path, boolean withCsrf) throws Exception {
     return send(csrf(request(path), withCsrf).DELETE());
   }

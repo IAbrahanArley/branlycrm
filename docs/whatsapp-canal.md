@@ -199,7 +199,9 @@ O processo `whatsapp-worker` transforma os eventos gravados pelo webhook em cont
   - a chave de acesso (uma Customer Secret Key da OCI) em dois arquivos na pasta `${WHATSAPP_STORAGE_DIR:-./.whatsapp-storage}`: `access-key-id` e `secret-access-key`. A pasta é montada como leitura e ignorada pelo Git; os valores nunca vão a variável de ambiente nem a log.
 - **Sem configuração:** as mídias ficam pendentes, o link responde 503 e o resto funciona. Os arquivos de chave são procurados de novo a cada minuto.
 - **Download pelo worker:** numa thread própria, com prazo total de 3 minutos por arquivo. O token vai só aos domínios de mídia da Meta (`*.fbsbx.com`, `*.whatsapp.net`, `*.facebook.com`, `*.fbcdn.net`), em https.
-- **Riscos aceitos:** a mesma chave serve à API (que só gera links) e ao worker (que grava). Separar numa chave só de leitura para a API quando houver usuários distintos na OCI.
+- **Envio (CRM-084b2):** a API grava no bucket os arquivos que a clínica envia, e o worker os lê para subir à Meta. Por isso a API também precisa de escrita.
+- **Riscos aceitos:** a mesma chave serve à API e ao worker, os dois com leitura e escrita. Restringir a API ao prefixo `clinics/` quando houver usuários distintos na OCI.
+- **Limite de upload:** o Nginx aceita até 18 MB só na rota de envio de arquivo (10 MB no resto da API), e o Spring corta acima de 17 MB. A regra da API é 16 MB.
 
 ## Limites atuais
 

@@ -7,6 +7,7 @@ import br.com.branlycrm.common.exceptions.InvalidInputException;
 import br.com.branlycrm.inbox.domain.ConversationSummary;
 import br.com.branlycrm.inbox.domain.InboxFilter;
 import br.com.branlycrm.inbox.domain.InboxMessage;
+import br.com.branlycrm.inbox.domain.MediaUpload;
 import br.com.branlycrm.inbox.domain.MessageCursor;
 import br.com.branlycrm.inbox.domain.OutboxItem;
 import br.com.branlycrm.inbox.domain.QueuedReply;
@@ -25,7 +26,15 @@ import br.com.branlycrm.tenant.services.TenantAccessService;
 import br.com.branlycrm.whatsapp.domain.MediaType;
 import br.com.branlycrm.whatsapp.repositories.ChannelRegistryRepository;
 import br.com.branlycrm.whatsapp.storage.MediaStorage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -46,6 +55,7 @@ public class InboxService {
   static final int MESSAGES_DEFAULT = 50;
   static final int MESSAGES_MAX = 100;
   static final int REPLY_MAX = 4096;
+  static final int CAPTION_MAX = 1024;
 
   private final TenantAccessService access;
   private final InboxRepository inbox;
@@ -159,6 +169,176 @@ public class InboxService {
     return outbox(queued.item());
   }
 
+  /**
+   * Queues a file to send (CRM-084b2), with the rules of {@link #reply}. The type comes from the
+   * first bytes, never from the name or the declared type; the file is stored in the private bucket
+   * before the outbox item is written, and removed again when the send is refused meanwhile.
+   *
+   * @param caption optional, up to 1024 characters; not for audio
+   */
+  public OutboxView sendMedia(
+      UUID tenantId,
+      UUID actor,
+      UUID conversationId,
+      String idempotencyKey,
+      String caption,
+      MediaUpload upload) {
+    UUID key = uuid(idempotencyKey, "idempotencyKey");
+    String text = caption == null || caption.isEmpty() ? null : caption(caption);
+    if (upload == null || upload.size() <= 0) throw new InvalidInputException("file");
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_REPLY);
+    boolean override = clinic.allows(ClinicPermission.INBOX_ASSIGN);
+    Optional<QueuedReply> repeated = inbox.checkReply(clinic, conversationId, key, override);
+    if (repeated.isPresent()) return signalled(repeated.get());
+    if (upload.size() > MediaType.OUTBOUND_MAX_BYTES) {
+      throw new InboxException(InboxException.Reason.MEDIA_TOO_LARGE);
+    }
+    Inspected file = inspect(upload);
+    MediaType type =
+        MediaType.detect(file.head())
+            .filter(detected -> detected.outboundMessageType().isPresent())
+            .orElseThrow(() -> new InboxException(InboxException.Reason.MEDIA_TYPE_NOT_ALLOWED));
+    if (file.size() > type.outboundMaxBytes()) {
+      throw new InboxException(InboxException.Reason.MEDIA_TOO_LARGE);
+    }
+    if (text != null && type.kind() == MediaType.Kind.AUDIO) {
+      throw new InvalidInputException("caption");
+    }
+    String fileName =
+        type.kind() == MediaType.Kind.DOCUMENT ? fileName(upload.fileName(), type) : null;
+    UUID mediaId = UUID.randomUUID();
+    String storageKey = "clinics/" + clinic.tenantId() + "/media/" + mediaId;
+    try {
+      storage.put(
+          storageKey,
+          () -> {
+            try {
+              return upload.opener().open();
+            } catch (IOException unreadable) {
+              throw new java.io.UncheckedIOException(unreadable);
+            }
+          },
+          type.contentType(),
+          file.size());
+    } catch (MediaStorage.StorageException unavailable) {
+      throw new InboxException(InboxException.Reason.MEDIA_UNAVAILABLE);
+    }
+    QueuedReply queued;
+    try {
+      queued =
+          inbox.enqueueMedia(
+              clinic,
+              conversationId,
+              key,
+              text,
+              new InboxRepository.OutboundFile(
+                  mediaId, storageKey, type.contentType(), file.size(), file.sha256(), fileName),
+              override);
+    } catch (RuntimeException refused) {
+      // Also on an ambiguous commit (connection lost during COMMIT): the row may exist without
+      // its object, and the worker then fails it with STORAGE_UNAVAILABLE after its retries.
+      storage.delete(storageKey);
+      throw refused;
+    }
+    // A concurrent request with the same key won: its file is the one sent.
+    if (!queued.created()) storage.delete(storageKey);
+    return signalled(queued);
+  }
+
+  /** The first bytes, the counted size and the SHA-256 of an upload, read once. */
+  private record Inspected(byte[] head, long size, String sha256) {}
+
+  private static Inspected inspect(MediaUpload upload) {
+    try (InputStream in = upload.opener().open()) {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] head = new byte[MediaType.HEAD_BYTES];
+      int headLength = 0;
+      long total = 0;
+      byte[] buffer = new byte[64 * 1024];
+      int read;
+      while ((read = in.read(buffer)) != -1) {
+        total += read;
+        if (total > MediaType.OUTBOUND_MAX_BYTES) {
+          throw new InboxException(InboxException.Reason.MEDIA_TOO_LARGE);
+        }
+        digest.update(buffer, 0, read);
+        int copy = Math.min(read, head.length - headLength);
+        if (copy > 0) {
+          System.arraycopy(buffer, 0, head, headLength, copy);
+          headLength += copy;
+        }
+      }
+      if (total == 0 || total != upload.size()) throw new InvalidInputException("file");
+      return new Inspected(
+          Arrays.copyOf(head, headLength), total, HexFormat.of().formatHex(digest.digest()));
+    } catch (IOException unreadable) {
+      throw new InvalidInputException("file");
+    } catch (NoSuchAlgorithmException missing) {
+      throw new IllegalStateException("SHA-256 unavailable", missing);
+    }
+  }
+
+  /**
+   * The name the patient sees for a document: the last segment of what the client sent, without
+   * control characters, quotes or separators, at most 120 characters, ending with the extension of
+   * the detected type.
+   */
+  static String fileName(String requested, MediaType type) {
+    String suffix = "." + type.extension();
+    String name = requested == null ? "" : requested;
+    name = name.substring(Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1);
+    name =
+        name.codePoints()
+            .filter(InboxService::visibleNameCharacter)
+            .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+            .toString()
+            .strip();
+    if (name.toLowerCase(Locale.ROOT).endsWith(suffix)) {
+      name = name.substring(0, name.length() - suffix.length()).strip();
+    }
+    if (name.isEmpty()) name = "documento";
+    int max = 120 - suffix.length();
+    if (name.codePointCount(0, name.length()) > max) {
+      name = name.substring(0, name.offsetByCodePoints(0, max)).strip();
+    }
+    return name + suffix;
+  }
+
+  /**
+   * Printable characters only: no control, format (bidirectional overrides that disguise a name),
+   * line or paragraph separators, surrogates or private use; and no quotes or path separators.
+   */
+  private static boolean visibleNameCharacter(int c) {
+    if (c == '"' || c == '/' || c == '\\') return false;
+    return switch (Character.getType(c)) {
+      case Character.CONTROL,
+          Character.FORMAT,
+          Character.LINE_SEPARATOR,
+          Character.PARAGRAPH_SEPARATOR,
+          Character.SURROGATE,
+          Character.PRIVATE_USE,
+          Character.UNASSIGNED ->
+          false;
+      default -> true;
+    };
+  }
+
+  /** 1 to 1024 characters (Meta's caption limit), with the rules of a reply's text. */
+  static String caption(String caption) {
+    if (caption.length() > CAPTION_MAX) throw new InvalidInputException("caption");
+    try {
+      return replyText(caption);
+    } catch (InvalidInputException invalid) {
+      throw new InvalidInputException("caption");
+    }
+  }
+
+  /** Raises the outbound signal (also on a repeated request: the first may have been lost). */
+  private OutboxView signalled(QueuedReply queued) {
+    if (!queued.item().status().equals("FAILED")) channels.signalOutbound(queued.channelId());
+    return outbox(queued.item());
+  }
+
   /** Replies of the conversation still queued, sending, uncertain or recently failed. */
   public List<OutboxView> pendingReplies(UUID tenantId, UUID actor, UUID conversationId) {
     ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_READ);
@@ -186,7 +366,10 @@ public class InboxService {
         item.errorCode(),
         item.requestedBy(),
         item.createdAt(),
-        item.sentAt());
+        item.sentAt(),
+        item.kind(),
+        item.contentType(),
+        item.fileName());
   }
 
   /**

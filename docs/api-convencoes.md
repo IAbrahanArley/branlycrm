@@ -159,6 +159,9 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `CONVERSATION_MEDIA_NOT_READY` | 409 | O arquivo ainda está sendo baixado | Caixa de entrada |
 | `CONVERSATION_MEDIA_REJECTED` | 409 | O arquivo não foi aceito (tipo ou tamanho) ou não pôde ser baixado | Caixa de entrada |
 | `CONVERSATION_MEDIA_UNAVAILABLE` | 503 | O armazenamento de arquivos não está configurado ou não respondeu | Caixa de entrada |
+| `CONVERSATION_MEDIA_TYPE_NOT_ALLOWED` | 415 | Arquivo a enviar de um tipo que o WhatsApp não envia (conferido pelos primeiros bytes) | Caixa de entrada |
+| `CONVERSATION_MEDIA_TOO_LARGE` | 413 | Arquivo a enviar acima do limite do tipo (imagem 5 MB, demais 16 MB) | Caixa de entrada |
+| `FILE_TOO_LARGE` | 413 | Pedido com arquivo acima do limite de upload da API (17 MB) | Global |
 | `CONVERSATION_ASSIGNEE_INVALID` | 409 | O novo responsável não é membro ativo que atende conversas | Caixa de entrada |
 | `CHANNEL_ALREADY_CONNECTED` | 409 | A clínica já tem um número conectado, inclusive com falha: desconecte antes | Canal WhatsApp |
 | `CHANNEL_NOT_CONNECTED` | 409 | Não há número para desconectar | Canal WhatsApp |

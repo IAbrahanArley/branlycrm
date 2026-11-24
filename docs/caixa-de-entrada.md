@@ -1,4 +1,4 @@
-# Caixa de entrada (CRM-083), respostas (CRM-084a) e mídias recebidas (CRM-084b1)
+# Caixa de entrada (CRM-083), respostas (CRM-084a) e mídias (CRM-084b)
 
 Implementada em 22/11/2026. As conversas e mensagens são gravadas pelo worker de entrada ([whatsapp-canal.md](whatsapp-canal.md)); a caixa de entrada as lê e controla quem atende cada conversa.
 
@@ -74,6 +74,31 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
   - Qualquer outro arquivo (executável, HTML, SVG, ZIP comum...) fica `REJECTED`, e a mensagem continua na conversa com a legenda.
 - **Armazenamento:** bucket privado no OCI Object Storage em São Paulo (API compatível com S3, ADR-037), com a chave `clinics/{clínica}/media/{id}`. A chave sai sempre do banco da clínica, nunca do pedido. Os arquivos podem mostrar dados de saúde e seguem a retenção do contato (CRM-073).
 
+## Enviar arquivos (CRM-084b2)
+
+- `POST /{id}/messages/media` (`INBOX_REPLY`), em `multipart/form-data`:
+  - `file`: o arquivo;
+  - `idempotencyKey`: um UUID gerado pela tela para cada envio, como no texto;
+  - `caption` (opcional): legenda de até 1024 caracteres. Áudio não tem legenda: com legenda, `INVALID_INPUT` em `caption`.
+- Responde 202 com o item na fila, como a resposta em texto, com `kind` `MEDIA`, `contentType` (detectado), `fileName` (só documentos) e `text` (a legenda, ou nulo). As respostas em texto vêm com `kind` `TEXT`.
+- **Mesmas regras do texto:** quem responde assume, a janela de 24 horas, a mesma chave devolve o mesmo envio e as mesmas situações (`QUEUED`, `SENT`, `UNCERTAIN`...). A chave repetida não guarda o arquivo de novo.
+- **Tipos aceitos**, pelos primeiros bytes do arquivo (nunca pelo nome ou pelo tipo declarado):
+  - imagens JPEG e PNG, até 5 MB (WebP é só figurinha no WhatsApp e é recusado);
+  - vídeos MP4 e 3GP, até 16 MB;
+  - áudios MP3, M4A, OGG, AAC e AMR, até 16 MB (vão como arquivo de áudio, não como mensagem de voz);
+  - documentos PDF, DOCX, XLSX e PPTX, até 16 MB.
+- **Erros:** `CONVERSATION_MEDIA_TYPE_NOT_ALLOWED` (415), `CONVERSATION_MEDIA_TOO_LARGE` (413), `CONVERSATION_MEDIA_UNAVAILABLE` (503, armazenamento fora) e os do texto. Acima de 17 MB o pedido é cortado antes de chegar à regra: `FILE_TOO_LARGE` (413) na API, ou um 413 do Nginx.
+- **Nome do documento:** o paciente vê o nome enviado, sem pastas, aspas nem caracteres de controle, com no máximo 120 caracteres e terminando na extensão do tipo detectado. Sem nome, `documento.pdf` (ou a extensão do tipo).
+- **Como funciona:**
+  1. a API confere tudo antes de gravar (permissão, conversa, posse, janela e chave), lê o arquivo do disco temporário, detecta o tipo e grava no bucket em `clinics/{clínica}/media/{id}`;
+  2. no banco da clínica, numa só transação, cria a mídia (`OUT`, `STORED`) e o item da fila. Se a regra recusar nesse meio-tempo, o arquivo é apagado do bucket;
+  3. o worker baixa o arquivo do bucket, sobe para a Meta (`/{phone_number_id}/media`) e guarda o id da Meta, que vale para as novas tentativas sem subir de novo;
+  4. envia a mensagem `image`, `video`, `audio` ou `document` com esse id, a legenda e o nome. Daí em diante vale o texto: incerto nunca é reenviado;
+  5. enviada, a mídia aponta para a mensagem. No histórico ela aparece como as recebidas (`type`, `mediaStatus` `STORED`, `mediaMime`) e o link de download funciona igual.
+- Falha ao subir para a Meta não é envio: conexão ou limite de taxa tentam de novo (até 5 vezes); recusa da Meta vira `FAILED` com o código.
+- O worker sobe um arquivo por canal a cada passada e volta às mensagens recebidas antes do próximo. A reserva de um envio é de 6 minutos, para cobrir a leitura do bucket, a subida (até 2 minutos) e o envio.
+- A conferência de tipo é a mesma das mídias recebidas. Alguns arquivos passam por ela e a Meta recusa (por exemplo OGG sem Opus, MP4 só com áudio): o envio fica `FAILED` com o código da Meta.
+
 ## Regras
 
 - **Assumir é atômico:** um único `UPDATE … WHERE assignee_id IS NULL`. Dois atendentes clicando juntos: um assume, o outro recebe `CONVERSATION_TAKEN`. Assumir de novo a própria conversa não muda nada.
@@ -86,6 +111,7 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
 
 ## Fora do escopo
 
-- Enviar mídia (CRM-084b2), modelos e o limite diário (CRM-085), respostas rápidas (CRM-086).
+- Modelos e o limite diário (CRM-085), respostas rápidas (CRM-086).
+- Figurinhas, mensagem de voz gravada na tela e documentos acima de 16 MB.
 - "Não lida" por pessoa.
 - Soltar automaticamente as conversas de quem sai da equipe.
