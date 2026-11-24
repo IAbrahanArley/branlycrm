@@ -1039,6 +1039,39 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - a consulta da caixa por `seq` não traz a mudança de situação de mensagens já mostradas (a tela relê a conversa ao voltar a ela);
   - token ilegível deixa as respostas na fila, com erro no log.
 
+**Estado (23/11/2026):** parte **084b1 (mídias recebidas)** concluída na branch `feat/crm-084b-midias`, criada sobre a 084a. Detalhes em [docs/caixa-de-entrada.md](docs/caixa-de-entrada.md) e [docs/whatsapp-canal.md](docs/whatsapp-canal.md). Falta a **084b2** (enviar mídia), por isso `[-]`.
+- **Decisões aprovadas pelo responsável em 23/11/2026:** divisão em 084b1 e 084b2; mídia recusada fica na conversa como recusada; retenção segue o contato (CRM-073).
+- **Dependência:** SDK da AWS para S3 2.57.9 (o mais novo com mais de duas semanas), com o cliente HTTP leve da AWS. Ficam excluídos Netty, Apache e Apache 5 (`dependency:tree` conferido).
+- **Testes sem dependência nova:** a imagem do MinIO deixou de ser publicada, então os testes usam o Adobe S3Mock num contêiner genérico do Testcontainers, fixado por digest. O módulo MinIO, aprovado antes, não entrou.
+- **Migração de clínica V18:** `whatsapp_media`, com a situação (`PENDING`, `STORED`, `REJECTED`, `FAILED`), o tipo detectado, o tamanho, o SHA-256 e a chave do objeto.
+- **Worker:**
+  - a mídia é registrada junto com a mensagem;
+  - o download roda numa thread própria, a cada 10 segundos, em lotes de 5;
+  - prazo total de 3 minutos por arquivo e limite de bytes contados na leitura;
+  - o token vai só aos domínios de mídia da Meta, em https, sem IP nem porta;
+  - o tipo é conferido pelos primeiros bytes, com o limite do tipo, e o arquivo é gravado em `clinics/{clínica}/media/{id}`;
+  - falhas são tentadas de novo até 5 vezes; token inválido espera a reconexão.
+- **API:** `GET …/conversations/{id}/messages/{messageId}/media` (`INBOX_READ`), com link de 5 minutos para baixar como anexo; `mediaStatus` em cada mensagem.
+- **Testes:**
+  - `MediaTypeTest`: tipos aceitos, executável, HTML, ZIP comum, HEIC, AVIF e QuickTime recusados;
+  - `WhatsappMediaIT`: mídia pendente antes do download; PNG aceito, executável e imagem grande demais recusados; o link baixa o arquivo como anexo e com o tipo certo; mensagem sem mídia, outra conversa e clínica B recebem 404; o sinal da clínica é limpo no fim;
+  - `TenantMigrationRolloutIT` ajustado;
+  - `clean verify`: 258 unitários e 161 de integração, sem falhas.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico. Corrigidos:
+  - **alto:** uma dependência do Apache HTTP 5 tinha entrado pelo SDK;
+  - **alto:** um download sem prazo total podia travar o worker de todas as clínicas; agora tem prazo e thread própria;
+  - erro inesperado deixava a mídia em repetição sem fim;
+  - sem armazenamento configurado, o sinal da clínica nunca era limpo;
+  - o token podia ir a qualquer host https;
+  - token inválido descartava as mídias pendentes;
+  - endpoint inválido dava 500;
+  - HEIC, AVIF e QuickTime eram aceitos como MP4.
+- **Riscos aceitos:**
+  - a API e o worker usam a mesma chave de acesso do bucket; depois, a API deve ter uma chave só de leitura;
+  - falta confirmar, num bucket da OCI real, que o link pré-assinado sai como anexo (o S3Mock confirma; a ADR-037 prevê as Pre-Authenticated Requests da OCI se não funcionar);
+  - a CRM-073 precisa apagar mídias e objetos antes das mensagens.
+- **Para o teste real:** criar na OCI um bucket privado e uma Customer Secret Key, e preencher `WHATSAPP_MEDIA_BUCKET`, `WHATSAPP_MEDIA_ENDPOINT` e a pasta `.whatsapp-storage`.
+
 ### [ ] CRM-085 — Janela de 24 horas e templates (P1)
 **Depende de:** CRM-084.
 **Atende:** WPP-06.
@@ -1540,6 +1573,10 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
   - As respostas pendentes (`GET …/{id}/outbox`) aparecem no fim da conversa: "enviando", "falhou" com o motivo, e "incerta: confira no WhatsApp antes de reenviar". Reenviar uma incerta ou falha cria uma mensagem nova, com chave nova.
   - Erros: `CONVERSATION_WINDOW_CLOSED` (explicar a janela de 24 horas; modelos chegam na CRM-085), `CONVERSATION_TAKEN` e `CONVERSATION_IDEMPOTENCY_CONFLICT`.
   - Mensagens enviadas mostram a situação (`status`: enviada, entregue, lida, falhou).
+- **Mídias recebidas (CRM-084b1):**
+  - mensagem com `mediaStatus`: `PENDING` ("baixando…", conferir de novo na próxima consulta), `STORED` (botão "abrir/baixar"), `REJECTED` ("arquivo não aceito"), `FAILED` ("não foi possível baixar");
+  - o botão pede `GET …/{id}/messages/{messageId}/media` na hora do clique e abre a `url` devolvida, que vale 5 minutos e baixa como anexo. Nunca guardar a URL nem mostrar o arquivo embutido na página;
+  - erros `CONVERSATION_MEDIA_*` com mensagens próprias.
 **Aceite:**
 - `CONVERSATION_TAKEN` mostra que outra pessoa assumiu e recarrega a conversa; `CONVERSATION_STALE` pede para recarregar; `CONVERSATION_NOT_YOURS` e `CONVERSATION_ASSIGNEE_INVALID` têm mensagens próprias; `CONVERSATION_NOT_FOUND` volta para a lista.
 - Somente leitura vê tudo sem nenhum botão de ação.

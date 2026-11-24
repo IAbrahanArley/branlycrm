@@ -18,7 +18,15 @@ public class InboxException extends RuntimeException {
     /** More than 24 hours since the contact's last message: only templates (CRM-085). */
     WINDOW_CLOSED,
     /** The idempotency key was already used for another conversation. */
-    IDEMPOTENCY_CONFLICT
+    IDEMPOTENCY_CONFLICT,
+    /** The message has no media (or is of another conversation). */
+    MEDIA_NOT_FOUND,
+    /** The file is still being downloaded. */
+    MEDIA_NOT_READY,
+    /** The file was not accepted (type or size) or could not be downloaded. */
+    MEDIA_REJECTED,
+    /** The object storage is not configured or did not answer. */
+    MEDIA_UNAVAILABLE
   }
 
   private final Reason reason;

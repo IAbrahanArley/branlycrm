@@ -7,6 +7,7 @@ import br.com.branlycrm.identity.security.SelectedClinic;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
 import br.com.branlycrm.inbox.dto.request.ReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
+import br.com.branlycrm.inbox.dto.response.MediaLinkView;
 import br.com.branlycrm.inbox.dto.response.MessagePageView;
 import br.com.branlycrm.inbox.dto.response.OutboxView;
 import br.com.branlycrm.inbox.services.InboxService;
@@ -141,6 +142,26 @@ public final class InboxController {
       HttpSession session) {
     return inbox.pendingReplies(
         SelectedClinic.require(session), principal.subjectId(), conversationId);
+  }
+
+  @Operation(
+      operationId = "getMessageMedia",
+      summary =
+          "Temporary link (5 min) to the file of a received message (every role); downloads as"
+              + " an attachment")
+  @ApiResponse(responseCode = "200", description = "Link, type and expiry")
+  @ApiResponse(responseCode = "404", description = "CONVERSATION_MEDIA_NOT_FOUND")
+  @ApiResponse(
+      responseCode = "409",
+      description = "CONVERSATION_MEDIA_NOT_READY or CONVERSATION_MEDIA_REJECTED")
+  @GetMapping("/{conversationId}/messages/{messageId}/media")
+  public MediaLinkView media(
+      @PathVariable UUID conversationId,
+      @PathVariable UUID messageId,
+      @AuthenticationPrincipal CrmPrincipal principal,
+      HttpSession session) {
+    return inbox.mediaLink(
+        SelectedClinic.require(session), principal.subjectId(), conversationId, messageId);
   }
 
   @Operation(
