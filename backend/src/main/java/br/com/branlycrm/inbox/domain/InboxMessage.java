@@ -13,6 +13,8 @@ import java.util.UUID;
  * @param sentAt Meta's time of the message (seconds), for display
  * @param status delivery of a message sent from the CRM: SENT, DELIVERED, READ or FAILED; null
  *     otherwise
+ * @param mediaStatus file of a received media: PENDING, STORED, REJECTED or FAILED; null without
+ *     media
  */
 public record InboxMessage(
     UUID id,
@@ -23,4 +25,5 @@ public record InboxMessage(
     String body,
     String mediaMime,
     Instant sentAt,
-    String status) {}
+    String status,
+    String mediaStatus) {}

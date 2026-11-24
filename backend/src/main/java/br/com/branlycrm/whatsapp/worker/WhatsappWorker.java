@@ -43,6 +43,7 @@ public class WhatsappWorker implements SmartLifecycle {
   private final InboundProcessingService inbound;
   private final ChannelOnboardingProcessor onboarding;
   private final OutboundSender outbound;
+  private final MediaDownloader media;
   private final ChannelUnsealer unsealer;
   private final ChannelSealer sealer;
   private final String url;
@@ -54,6 +55,11 @@ public class WhatsappWorker implements SmartLifecycle {
   private final AtomicBoolean connectionsRequested = new AtomicBoolean();
   private volatile ScheduledExecutorService executor;
   private volatile ExecutorService processor;
+
+  /** Media downloads (CRM-084b1) on their own thread: a slow file never delays messages. */
+  private volatile ExecutorService downloads;
+
+  private final AtomicBoolean downloadsRequested = new AtomicBoolean();
   private volatile boolean running;
 
   public WhatsappWorker(
@@ -61,6 +67,7 @@ public class WhatsappWorker implements SmartLifecycle {
       InboundProcessingService inbound,
       ChannelOnboardingProcessor onboarding,
       OutboundSender outbound,
+      MediaDownloader media,
       ChannelUnsealer unsealer,
       ChannelSealer sealer,
       @Value("${spring.datasource.url}") String url,
@@ -71,6 +78,7 @@ public class WhatsappWorker implements SmartLifecycle {
     this.inbound = inbound;
     this.onboarding = onboarding;
     this.outbound = outbound;
+    this.media = media;
     this.unsealer = unsealer;
     this.sealer = sealer;
     this.url = url;
@@ -108,6 +116,14 @@ public class WhatsappWorker implements SmartLifecycle {
     executor.scheduleWithFixedDelay(this::retention, 1, 24 * 60, TimeUnit.MINUTES);
     // Connections: the person waits on the status screen, so they are picked up within seconds.
     executor.scheduleWithFixedDelay(this::connections, 2, 5, TimeUnit.SECONDS);
+    downloads =
+        Executors.newSingleThreadExecutor(
+            task -> {
+              Thread thread = new Thread(task, "whatsapp-media");
+              thread.setDaemon(true);
+              return thread;
+            });
+    executor.scheduleWithFixedDelay(this::requestDownloads, 3, 10, TimeUnit.SECONDS);
     LOG.info("WhatsApp worker started");
   }
 
@@ -118,6 +134,8 @@ public class WhatsappWorker implements SmartLifecycle {
     if (current != null) current.shutdownNow();
     ExecutorService draining = processor;
     if (draining != null) draining.shutdownNow();
+    ExecutorService media = downloads;
+    if (media != null) media.shutdownNow();
     LOG.info("WhatsApp worker stopped");
   }
 
@@ -179,6 +197,29 @@ public class WhatsappWorker implements SmartLifecycle {
       }
     } catch (RuntimeException failure) {
       LOG.warn("WhatsApp sweep failed code={}", failure.getClass().getSimpleName());
+    }
+  }
+
+  /** One media pass at a time, over the channels whose clinic still has work. */
+  private void requestDownloads() {
+    ExecutorService media = downloads;
+    if (!running || media == null) return;
+    if (!downloadsRequested.compareAndSet(false, true)) return;
+    try {
+      media.execute(
+          () -> {
+            downloadsRequested.set(false);
+            try {
+              for (UUID channel : channels.channelsWithPendingEvents()) {
+                if (!running) return;
+                this.media.drain(channel);
+              }
+            } catch (RuntimeException failure) {
+              LOG.warn("WhatsApp media pass failed code={}", failure.getClass().getSimpleName());
+            }
+          });
+    } catch (RuntimeException rejected) {
+      downloadsRequested.set(false);
     }
   }
 

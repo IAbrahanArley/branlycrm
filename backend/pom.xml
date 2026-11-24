@@ -15,8 +15,44 @@
   <description>Branly CRM modular monolith</description>
   <properties>
     <java.version>21</java.version>
+    <!-- CRM-084b: object storage for WhatsApp media (OCI Object Storage through its S3 API). -->
+    <awssdk.version>2.57.9</awssdk.version>
   </properties>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${awssdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
   <dependencies>
+    <!-- S3 client only, on the AWS lightweight HTTP client: no Netty nor Apache (CRM-084b). -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>apache-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>apache5-client</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.tngtech.archunit</groupId>
       <artifactId>archunit</artifactId>

@@ -933,5 +933,6 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
 - **Sem SLA nem suporte** no nível gratuito. A VM única continua sendo ponto único de falha (risco aceito em ADR-022). Reavaliar a hospedagem antes de passar do piloto para clínicas pagantes.
 - **Backup:** dumps diários criptografados antes do envio ao Object Storage, com política de retenção abaixo de 10 GB (o limite por camada enquanto houver créditos ou com conta paga), e restauração testada no ambiente isolado. Ao fim do teste gratuito, objetos acima de 20 GB são apagados pela Oracle.
 - **Links temporários de mídia:** confirmar em CRM-084 que as URLs pré-assinadas pela compatibilidade com S3 funcionam. Se não funcionarem, usar as Pre-Authenticated Requests nativas da OCI.
+  - **Situação (CRM-084b1, 23/11/2026):** implementado com URLs pré-assinadas (SigV4, 5 minutos, `response-content-disposition=attachment`), validado no Adobe S3Mock. Falta conferir num bucket real da OCI.
 - **E-mail:** a porta 25 é bloqueada na OCI; o Resend usa HTTPS (ADR-021), sem impacto.
 - **Limites:** os números do Always Free citados aqui devem ser conferidos na página oficial da Oracle ao criar a conta, porque mudam com o tempo.

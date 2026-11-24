@@ -852,6 +852,21 @@
         },
         "type" : "object"
       },
+      "MediaLinkView" : {
+        "properties" : {
+          "contentType" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "Message" : {
         "properties" : {
           "body" : {
@@ -865,6 +880,9 @@
             "type" : "string"
           },
           "mediaMime" : {
+            "type" : "string"
+          },
+          "mediaStatus" : {
             "type" : "string"
           },
           "sentAt" : {
@@ -5568,6 +5586,105 @@
           "session" : [ ]
         } ],
         "summary" : "Queue a text reply (OWNER, MANAGER, ATTENDANT); takes a conversation nobody serves. The worker sends it; the same idempotencyKey never queues twice",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/messages/{messageId}/media" : {
+      "get" : {
+        "operationId" : "getMessageMedia",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "messageId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MediaLinkView"
+                }
+              }
+            },
+            "description" : "Link, type and expiry"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_MEDIA_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_MEDIA_NOT_READY or CONVERSATION_MEDIA_REJECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Temporary link (5 min) to the file of a received message (every role); downloads as an attachment",
         "tags" : [ "Inbox" ]
       }
     },

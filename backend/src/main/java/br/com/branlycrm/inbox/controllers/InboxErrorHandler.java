@@ -42,6 +42,16 @@ public final class InboxErrorHandler {
               code,
               "Passaram 24 horas desde a última mensagem do paciente. Só modelos aprovados podem"
                   + " ser enviados.");
+      case MEDIA_NOT_FOUND -> ApiErrors.response(404, code, "Esta mensagem não tem arquivo.");
+      case MEDIA_NOT_READY ->
+          ApiErrors.response(409, code, "O arquivo ainda está sendo baixado. Tente em instantes.");
+      case MEDIA_REJECTED ->
+          ApiErrors.response(
+              409, code, "O arquivo não foi aceito (tipo ou tamanho) ou não pôde ser baixado.");
+      case MEDIA_UNAVAILABLE ->
+          ResponseEntity.status(503)
+              .header("Retry-After", "30")
+              .body(new ApiError(code, "Arquivos indisponíveis no momento."));
       case IDEMPOTENCY_CONFLICT ->
           ApiErrors.response(409, code, "Esta chave de envio já foi usada em outra conversa.");
       case ASSIGNEE_INVALID ->

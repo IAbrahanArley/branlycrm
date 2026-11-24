@@ -13,6 +13,7 @@ import br.com.branlycrm.inbox.domain.QueuedReply;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
 import br.com.branlycrm.inbox.dto.request.ReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
+import br.com.branlycrm.inbox.dto.response.MediaLinkView;
 import br.com.branlycrm.inbox.dto.response.MessagePageView;
 import br.com.branlycrm.inbox.dto.response.OutboxView;
 import br.com.branlycrm.inbox.exceptions.InboxException;
@@ -21,7 +22,9 @@ import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicPermission;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.services.TenantAccessService;
+import br.com.branlycrm.whatsapp.domain.MediaType;
 import br.com.branlycrm.whatsapp.repositories.ChannelRegistryRepository;
+import br.com.branlycrm.whatsapp.storage.MediaStorage;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -47,12 +50,20 @@ public class InboxService {
   private final TenantAccessService access;
   private final InboxRepository inbox;
   private final ChannelRegistryRepository channels;
+  private final MediaStorage storage;
+  private final java.time.Clock clock;
 
   public InboxService(
-      TenantAccessService access, InboxRepository inbox, ChannelRegistryRepository channels) {
+      TenantAccessService access,
+      InboxRepository inbox,
+      ChannelRegistryRepository channels,
+      MediaStorage storage,
+      org.springframework.beans.factory.ObjectProvider<java.time.Clock> clock) {
     this.access = access;
     this.inbox = inbox;
     this.channels = channels;
+    this.storage = storage;
+    this.clock = clock.getIfAvailable(java.time.Clock::systemUTC);
   }
 
   /**
@@ -122,7 +133,8 @@ public class InboxService {
                         m.body(),
                         m.mediaMime(),
                         m.sentAt(),
-                        m.status()))
+                        m.status(),
+                        m.mediaStatus()))
             .toList(),
         olderCursor,
         newerCursor);
@@ -175,6 +187,36 @@ public class InboxService {
         item.requestedBy(),
         item.createdAt(),
         item.sentAt());
+  }
+
+  /**
+   * A temporary link to the file of a received message (CRM-084b1, INBOX_READ). The object key
+   * comes from the clinic's database; the link downloads as an attachment with the detected type.
+   */
+  public MediaLinkView mediaLink(UUID tenantId, UUID actor, UUID conversationId, UUID messageId) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_READ);
+    InboxRepository.MediaFile file =
+        inbox
+            .media(clinic, conversationId, messageId)
+            .orElseThrow(() -> new InboxException(InboxException.Reason.MEDIA_NOT_FOUND));
+    switch (file.status()) {
+      case "STORED" -> {}
+      case "PENDING" -> throw new InboxException(InboxException.Reason.MEDIA_NOT_READY);
+      default -> throw new InboxException(InboxException.Reason.MEDIA_REJECTED);
+    }
+    String extension =
+        java.util.Arrays.stream(MediaType.values())
+            .filter(type -> type.contentType().equals(file.contentType()))
+            .map(MediaType::extension)
+            .findFirst()
+            .orElse("bin");
+    try {
+      String url = storage.link(file.storageKey(), file.contentType(), messageId + "." + extension);
+      return new MediaLinkView(
+          url, file.contentType(), clock.instant().plus(MediaStorage.LINK_TTL));
+    } catch (MediaStorage.StorageException unavailable) {
+      throw new InboxException(InboxException.Reason.MEDIA_UNAVAILABLE);
+    }
   }
 
   public ConversationView take(UUID tenantId, UUID actor, UUID conversationId) {

@@ -255,7 +255,8 @@ class ArchitectureTest {
             br.com.branlycrm.whatsapp.repositories.ChannelOnboardingRepository.class,
             br.com.branlycrm.whatsapp.worker.ChannelOnboardingProcessor.class,
             br.com.branlycrm.whatsapp.repositories.OutboundChannelRepository.class,
-            br.com.branlycrm.whatsapp.worker.OutboundSender.class)
+            br.com.branlycrm.whatsapp.worker.OutboundSender.class,
+            br.com.branlycrm.whatsapp.worker.MediaDownloader.class)
         .check(CODE);
   }
 

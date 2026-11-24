@@ -35,6 +35,7 @@ public class InboundProcessingService {
   private final TenantRegistryRepository tenants;
   private final InboundQueueRepository queue;
   private final InboundEventInterpreter interpreter;
+  private final br.com.branlycrm.whatsapp.storage.MediaStorage storage;
   private final Clock clock;
 
   public InboundProcessingService(
@@ -42,7 +43,9 @@ public class InboundProcessingService {
       TenantRegistryRepository tenants,
       InboundQueueRepository queue,
       ObjectProvider<JsonMapper> json,
-      ObjectProvider<Clock> clock) {
+      ObjectProvider<Clock> clock,
+      br.com.branlycrm.whatsapp.storage.MediaStorage storage) {
+    this.storage = storage;
     this.channels = channels;
     this.tenants = tenants;
     this.queue = queue;
@@ -123,7 +126,8 @@ public class InboundProcessingService {
    */
   private void settle(UUID channelId, ChannelAccess access) {
     channels.clearPending(channelId);
-    if (queue.hasRetryable(access)) channels.keepPending(channelId);
+    // Pending media keep the clinic in the sweep only when they can be stored (CRM-084b1).
+    if (queue.hasRetryable(access, storage.configured())) channels.keepPending(channelId);
   }
 
   /** Clears raw payloads older than the retention in every active channel's clinic. */

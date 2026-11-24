@@ -189,6 +189,18 @@ O processo `whatsapp-worker` transforma os eventos gravados pelo webhook em cont
 - **Retenção:** uma vez por dia, o JSON bruto dos eventos processados há mais de 30 dias é apagado, em lotes de 1000. A linha fica, para a deduplicação. Só alcança clínicas e canais ativos.
 - **Desempenho:** no teste local, do webhook ao lead leva bem menos de 5 segundos.
 
+## Armazenamento de mídias (CRM-084b1)
+
+- **Onde:** OCI Object Storage em São Paulo, pela API compatível com S3 (ADR-037), num bucket privado.
+- **Configuração** (API e worker):
+  - `WHATSAPP_MEDIA_BUCKET`: o nome do bucket;
+  - `WHATSAPP_MEDIA_ENDPOINT`: `https://<namespace>.compat.objectstorage.sa-saopaulo-1.oraclecloud.com`;
+  - `WHATSAPP_MEDIA_REGION`: `sa-saopaulo-1` (padrão);
+  - a chave de acesso (uma Customer Secret Key da OCI) em dois arquivos na pasta `${WHATSAPP_STORAGE_DIR:-./.whatsapp-storage}`: `access-key-id` e `secret-access-key`. A pasta é montada como leitura e ignorada pelo Git; os valores nunca vão a variável de ambiente nem a log.
+- **Sem configuração:** as mídias ficam pendentes, o link responde 503 e o resto funciona. Os arquivos de chave são procurados de novo a cada minuto.
+- **Download pelo worker:** numa thread própria, com prazo total de 3 minutos por arquivo. O token vai só aos domínios de mídia da Meta (`*.fbsbx.com`, `*.whatsapp.net`, `*.facebook.com`, `*.fbcdn.net`), em https.
+- **Riscos aceitos:** a mesma chave serve à API (que só gera links) e ao worker (que grava). Separar numa chave só de leitura para a API quando houver usuários distintos na OCI.
+
 ## Limites atuais
 
 - O laço do worker (`LISTEN`, varredura e retenção) não tem teste automatizado; os testes chamam a drenagem diretamente.

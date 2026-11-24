@@ -1,4 +1,4 @@
-# Caixa de entrada (CRM-083) e respostas (CRM-084a)
+# Caixa de entrada (CRM-083), respostas (CRM-084a) e mídias recebidas (CRM-084b1)
 
 Implementada em 22/11/2026. As conversas e mensagens são gravadas pelo worker de entrada ([whatsapp-canal.md](whatsapp-canal.md)); a caixa de entrada as lê e controla quem atende cada conversa.
 
@@ -55,6 +55,25 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
   - Se o worker cair no meio de um envio, a reserva vence e a resposta vira `UNCERTAIN`.
 - **Conciliação pelos status:** cada status de entrega acha a resposta pelo id que a Meta devolve, ou pelo `wamid`. A situação só avança (enviada, entregue, lida); `failed` vence. Uma resposta `UNCERTAIN` que a Meta diz ter enviado vira `SENT`, e a mensagem entra na conversa. Um status que chega antes de a resposta estar gravada é tentado de novo depois.
 
+## Mídias recebidas (CRM-084b1)
+
+- Cada mensagem traz `mediaStatus`:
+  - `PENDING`: sendo baixada;
+  - `STORED`: o arquivo está disponível;
+  - `REJECTED`: tipo ou tamanho não aceito;
+  - `FAILED`: não foi possível baixar;
+  - nulo: mensagem sem mídia.
+- `GET /{id}/messages/{messageId}/media` (`INBOX_READ`, todos os papéis): devolve `{url, contentType, expiresAt}`, um link de 5 minutos que baixa o arquivo como anexo, com o tipo detectado.
+  - Peça um link novo a cada clique; não guarde nem compartilhe o link.
+  - Erros: `CONVERSATION_MEDIA_NOT_READY` (ainda baixando), `CONVERSATION_MEDIA_REJECTED`, `CONVERSATION_MEDIA_NOT_FOUND` e `CONVERSATION_MEDIA_UNAVAILABLE` (503).
+- **Tipos aceitos**, conferidos pelos primeiros bytes do arquivo e nunca pelo tipo declarado:
+  - imagens JPEG, PNG e WebP, até 5 MB;
+  - vídeos MP4 e 3GP, até 16 MB;
+  - áudios OGG/Opus, MP3, AAC, M4A e AMR, até 16 MB;
+  - documentos PDF, DOCX, XLSX e PPTX, até 100 MB.
+  - Qualquer outro arquivo (executável, HTML, SVG, ZIP comum...) fica `REJECTED`, e a mensagem continua na conversa com a legenda.
+- **Armazenamento:** bucket privado no OCI Object Storage em São Paulo (API compatível com S3, ADR-037), com a chave `clinics/{clínica}/media/{id}`. A chave sai sempre do banco da clínica, nunca do pedido. Os arquivos podem mostrar dados de saúde e seguem a retenção do contato (CRM-073).
+
 ## Regras
 
 - **Assumir é atômico:** um único `UPDATE … WHERE assignee_id IS NULL`. Dois atendentes clicando juntos: um assume, o outro recebe `CONVERSATION_TAKEN`. Assumir de novo a própria conversa não muda nada.
@@ -67,6 +86,6 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
 
 ## Fora do escopo
 
-- Mídias (CRM-084b), modelos e o limite diário (CRM-085), respostas rápidas (CRM-086).
+- Enviar mídia (CRM-084b2), modelos e o limite diário (CRM-085), respostas rápidas (CRM-086).
 - "Não lida" por pessoa.
 - Soltar automaticamente as conversas de quem sai da equipe.
