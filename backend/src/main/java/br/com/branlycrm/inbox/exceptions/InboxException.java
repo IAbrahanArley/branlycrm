@@ -14,7 +14,11 @@ public class InboxException extends RuntimeException {
     /** Releasing someone else's conversation needs INBOX_ASSIGN. */
     NOT_YOURS,
     /** The new assignee is not an active member who can reply. */
-    ASSIGNEE_INVALID
+    ASSIGNEE_INVALID,
+    /** More than 24 hours since the contact's last message: only templates (CRM-085). */
+    WINDOW_CLOSED,
+    /** The idempotency key was already used for another conversation. */
+    IDEMPOTENCY_CONFLICT
   }
 
   private final Reason reason;

@@ -36,6 +36,14 @@ public final class InboxErrorHandler {
       case NOT_ASSIGNED -> ApiErrors.response(409, code, "Ninguém está atendendo esta conversa.");
       case NOT_YOURS ->
           ApiErrors.response(409, code, "Só o gestor solta a conversa de outra pessoa.");
+      case WINDOW_CLOSED ->
+          ApiErrors.response(
+              409,
+              code,
+              "Passaram 24 horas desde a última mensagem do paciente. Só modelos aprovados podem"
+                  + " ser enviados.");
+      case IDEMPOTENCY_CONFLICT ->
+          ApiErrors.response(409, code, "Esta chave de envio já foi usada em outra conversa.");
       case ASSIGNEE_INVALID ->
           ApiErrors.response(409, code, "A pessoa escolhida não atende conversas nesta clínica.");
     };

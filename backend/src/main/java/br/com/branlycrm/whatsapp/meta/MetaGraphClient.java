@@ -208,6 +208,74 @@ public class MetaGraphClient {
         Kind.PERMANENT);
   }
 
+  /**
+   * Sends a text message (CRM-084a). {@code callbackData} (the outbox id) comes back in the
+   * delivery statuses and reconciles an uncertain send. Never throws for a network failure: the
+   * result says whether Meta may have received it (ADR-005).
+   *
+   * @param to the recipient's number in digits, without "+"
+   */
+  public MetaSendResult sendText(
+      String token, String phoneNumberId, String to, String text, String callbackData) {
+    requireId(phoneNumberId);
+    if (to == null || !to.matches("[0-9]{6,20}")) throw new IllegalArgumentException("to");
+    if (text == null || text.isEmpty() || text.length() > 4096) {
+      throw new IllegalArgumentException("text");
+    }
+    var payload = json.createObjectNode();
+    payload.put("messaging_product", "whatsapp");
+    payload.put("recipient_type", "individual");
+    payload.put("to", to);
+    payload.put("type", "text");
+    payload.putObject("text").put("body", text).put("preview_url", false);
+    payload.put("biz_opaque_callback_data", callbackData);
+    HttpRequest request;
+    try {
+      request =
+          authorized(token, uri(phoneNumberId + "/messages?appsecret_proof=" + proof(token)))
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(payload)))
+              .timeout(timeout)
+              .build();
+    } catch (MetaGraphException invalid) {
+      return invalid.kind() == Kind.TOKEN_INVALID
+          ? new MetaSendResult.TokenInvalid()
+          : new MetaSendResult.NotSent(invalid.code());
+    }
+    HttpResponse<byte[]> response;
+    try {
+      response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+    } catch (java.net.http.HttpConnectTimeoutException | java.net.ConnectException notConnected) {
+      return new MetaSendResult.NotSent("GRAPH_CONNECT");
+    } catch (java.net.http.HttpTimeoutException timedOut) {
+      return new MetaSendResult.Uncertain("GRAPH_TIMEOUT");
+    } catch (IOException lost) {
+      return new MetaSendResult.Uncertain("GRAPH_NETWORK");
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return new MetaSendResult.Uncertain("GRAPH_INTERRUPTED");
+    }
+    JsonNode body = parse(response.body());
+    int status = response.statusCode();
+    if (status >= 200 && status < 300) {
+      JsonNode id = body.path("messages").path(0).path("id");
+      return id.getNodeType() == JsonNodeType.STRING && !id.asText().isBlank()
+          ? new MetaSendResult.Sent(id.asText())
+          : new MetaSendResult.Uncertain("GRAPH_NO_ID");
+    }
+    JsonNode error = body.path("error");
+    int code =
+        error.path("code").getNodeType() == JsonNodeType.NUMBER ? error.path("code").asInt() : 0;
+    if (code == 190) return new MetaSendResult.TokenInvalid();
+    // Rate limits are refused before processing: nothing was sent.
+    if (status == 429 || RATE_LIMITS.contains(code)) {
+      return new MetaSendResult.NotSent(code == 0 ? "GRAPH_HTTP_429" : "META_" + code);
+    }
+    // A server error may come after Meta accepted the message.
+    if (status >= 500) return new MetaSendResult.Uncertain("GRAPH_HTTP_" + status);
+    return new MetaSendResult.Refused(code == 0 ? "GRAPH_HTTP_" + status : "META_" + code);
+  }
+
   private HttpRequest.Builder authorized(String token, URI uri) {
     if (token == null || !TOKEN.matcher(token).matches()) {
       throw new MetaGraphException(Kind.TOKEN_INVALID, "TOKEN_INVALID");

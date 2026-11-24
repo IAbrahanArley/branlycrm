@@ -12,6 +12,23 @@ public sealed interface InboundAction {
    */
   record Skip(String code) implements InboundAction {}
 
+  /**
+   * A delivery status of a reply sent from the CRM (CRM-084a).
+   *
+   * @param status sent, delivered, read or failed (lower case, as Meta sends it)
+   * @param outboxId the {@code biz_opaque_callback_data}, when it is an outbox id
+   * @param errorCode for failed: META_ and Meta's error code
+   */
+  record Status(
+      String wamid, String status, java.util.UUID outboxId, java.time.Instant at, String errorCode)
+      implements InboundAction {
+    public Status {
+      Objects.requireNonNull(wamid, "wamid");
+      Objects.requireNonNull(status, "status");
+      Objects.requireNonNull(at, "at");
+    }
+  }
+
   /** Contact, lead (RN-01), origin and message, in one transaction. */
   record Store(InboundMessage message) implements InboundAction {
     public Store {

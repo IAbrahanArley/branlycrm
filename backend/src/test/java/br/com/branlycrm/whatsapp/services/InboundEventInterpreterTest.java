@@ -71,7 +71,28 @@ class InboundEventInterpreterTest {
             interpreter.decide(
                 new StoredEvent(
                     UUID.randomUUID(), InboundKind.STATUS, "messages", null, Instant.now(), "{}")))
+        .isEqualTo(new InboundAction.Skip(InboundEventInterpreter.INVALID_PAYLOAD));
+    // A status the CRM does not track is kept with a code; a delivery status is reconciled.
+    assertThat(interpreter.decide(status("deleted", null)))
         .isEqualTo(new InboundAction.Skip(InboundEventInterpreter.DEFERRED_STATUS));
+    UUID outbox = UUID.randomUUID();
+    InboundAction delivered = interpreter.decide(status("delivered", outbox.toString()));
+    assertThat(delivered).isInstanceOf(InboundAction.Status.class);
+    assertThat(((InboundAction.Status) delivered).outboxId()).isEqualTo(outbox);
+    assertThat(((InboundAction.Status) delivered).wamid()).isEqualTo("wamid.S");
+    InboundAction notOurs = interpreter.decide(status("read", "campaign-7"));
+    assertThat(((InboundAction.Status) notOurs).outboxId()).isNull();
+    InboundAction failed =
+        interpreter.decide(
+            new StoredEvent(
+                UUID.randomUUID(),
+                InboundKind.STATUS,
+                "messages",
+                null,
+                Instant.now(),
+                "{\"status\":{\"id\":\"wamid.S\",\"status\":\"failed\","
+                    + "\"errors\":[{\"code\":131047}]}}"));
+    assertThat(((InboundAction.Status) failed).errorCode()).isEqualTo("META_131047");
     assertThat(
             interpreter.decide(
                 new StoredEvent(
@@ -137,6 +158,20 @@ class InboundEventInterpreterTest {
     InboundAction action = interpreter.decide(event(field, message, contacts));
     assertThat(action).isInstanceOf(InboundAction.Store.class);
     return ((InboundAction.Store) action).message();
+  }
+
+  private static StoredEvent status(String value, String callback) {
+    return new StoredEvent(
+        UUID.randomUUID(),
+        InboundKind.STATUS,
+        "messages",
+        null,
+        Instant.now(),
+        "{\"status\":{\"id\":\"wamid.S\",\"status\":\""
+            + value
+            + "\",\"timestamp\":\"1763380001\""
+            + (callback == null ? "" : ",\"biz_opaque_callback_data\":\"" + callback + "\"")
+            + "}}");
   }
 
   private static StoredEvent event(String field, String message, String contacts) {

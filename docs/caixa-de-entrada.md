@@ -1,4 +1,4 @@
-# Caixa de entrada (CRM-083)
+# Caixa de entrada (CRM-083) e respostas (CRM-084a)
 
 Implementada em 22/11/2026. As conversas e mensagens são gravadas pelo worker de entrada ([whatsapp-canal.md](whatsapp-canal.md)); a caixa de entrada as lê e controla quem atende cada conversa.
 
@@ -31,6 +31,30 @@ O novo responsável precisa ser membro ativo que atende conversas (`INBOX_REPLY`
 
 Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
 
+## Responder (CRM-084a)
+
+- `POST /{id}/messages` com `{idempotencyKey, text}` (`INBOX_REPLY`): responde 202 com a resposta na fila. O texto tem de 1 a 4096 caracteres; quebras de linha são mantidas.
+  - A `idempotencyKey` é um UUID gerado pela tela para cada envio. O mesmo pedido repetido (por exemplo, depois de uma queda de rede) devolve a mesma resposta e nunca enfileira duas. A mesma chave em outra conversa recebe `CONVERSATION_IDEMPOTENCY_CONFLICT`.
+  - **Quem responde assume:** sem responsável, quem responde passa a atender. Com outra pessoa atendendo, só o Proprietário e o Gestor (`INBOX_ASSIGN`) respondem; o Atendente recebe `CONVERSATION_TAKEN`.
+  - **Janela de 24 horas:** se a última mensagem do paciente tem mais de 24 horas, `CONVERSATION_WINDOW_CLOSED`. Fora da janela só valem modelos aprovados (CRM-085). O worker confere de novo antes de enviar.
+- `GET /{id}/outbox`: as respostas que ainda pedem atenção, da mais nova para a mais antiga: na fila, enviando, incertas e as que falharam nos últimos 7 dias.
+- **Situações de uma resposta:**
+
+| Situação | Significado |
+|---|---|
+| `QUEUED` | Na fila; o worker envia em segundos |
+| `SENDING` | Sendo enviada |
+| `SENT`, `DELIVERED`, `READ` | Aceita pela Meta, entregue e lida (pelos webhooks de status); a mensagem já está na conversa |
+| `FAILED` | Recusada, com `errorCode`, por exemplo `META_131047` (janela fechada) ou `WINDOW_CLOSED` |
+| `UNCERTAIN` | Pode ter chegado ao paciente: houve tempo esgotado ou a conexão caiu depois do pedido. **Nunca é reenviada sozinha** (ADR-005). A tela pede para conferir no WhatsApp; reenviar cria um pedido novo, com chave nova |
+
+- **Como o worker envia:** pega uma resposta por vez, com uma reserva de 2 minutos, e chama a Graph API com `biz_opaque_callback_data` igual ao id da resposta.
+  - Aceita: `SENT`, e a mensagem entra na conversa com a situação de entrega.
+  - Não chegou à Meta (conexão recusada, limite de taxa): nova tentativa, até 5.
+  - Pode ter chegado (tempo esgotado, conexão perdida, erro 5xx): `UNCERTAIN`.
+  - Se o worker cair no meio de um envio, a reserva vence e a resposta vira `UNCERTAIN`.
+- **Conciliação pelos status:** cada status de entrega acha a resposta pelo id que a Meta devolve, ou pelo `wamid`. A situação só avança (enviada, entregue, lida); `failed` vence. Uma resposta `UNCERTAIN` que a Meta diz ter enviado vira `SENT`, e a mensagem entra na conversa. Um status que chega antes de a resposta estar gravada é tentado de novo depois.
+
 ## Regras
 
 - **Assumir é atômico:** um único `UPDATE … WHERE assignee_id IS NULL`. Dois atendentes clicando juntos: um assume, o outro recebe `CONVERSATION_TAKEN`. Assumir de novo a própria conversa não muda nada.
@@ -43,7 +67,6 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
 
 ## Fora do escopo
 
-- Responder (CRM-084), a janela de 24 horas e os modelos (CRM-085), respostas rápidas (CRM-086).
+- Mídias (CRM-084b), modelos e o limite diário (CRM-085), respostas rápidas (CRM-086).
 - "Não lida" por pessoa.
-- Mensagens na linha do tempo do contato e cards de conversas no dashboard.
 - Soltar automaticamente as conversas de quem sai da equipe.

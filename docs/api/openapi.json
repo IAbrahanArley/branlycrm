@@ -874,6 +874,9 @@
           "sentByApp" : {
             "type" : "boolean"
           },
+          "status" : {
+            "type" : "string"
+          },
           "type" : {
             "type" : "string"
           }
@@ -1066,6 +1069,40 @@
           },
           "receivedAt" : {
             "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "OutboxView" : {
+        "properties" : {
+          "conversationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "errorCode" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "text" : {
             "type" : "string"
           }
         },
@@ -1482,6 +1519,17 @@
               "type" : "string"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ReplyRequest" : {
+        "properties" : {
+          "idempotencyKey" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -5412,6 +5460,115 @@
         } ],
         "summary" : "History, oldest first: the latest messages, the ones before a cursor, or the new ones after a cursor (poll)",
         "tags" : [ "Inbox" ]
+      },
+      "post" : {
+        "operationId" : "replyToConversation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReplyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OutboxView"
+                }
+              }
+            },
+            "description" : "The reply in the outbox"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: idempotencyKey or text"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED (VIEWER); MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_TAKEN, CONVERSATION_WINDOW_CLOSED or CONVERSATION_IDEMPOTENCY_CONFLICT"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Queue a text reply (OWNER, MANAGER, ATTENDANT); takes a conversation nobody serves. The worker sends it; the same idempotencyKey never queues twice",
+        "tags" : [ "Inbox" ]
       }
     },
     "/v1/clinic/inbox/conversations/{conversationId}/needs-human" : {
@@ -5502,6 +5659,90 @@
           "session" : [ ]
         } ],
         "summary" : "Mark or clear \"needs a person\" (OWNER, MANAGER, ATTENDANT)",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/conversations/{conversationId}/outbox" : {
+      "get" : {
+        "operationId" : "listPendingReplies",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/OutboxView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Outbox items, newest first"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Replies still queued, sending or uncertain, and failures of the last 7 days",
         "tags" : [ "Inbox" ]
       }
     },

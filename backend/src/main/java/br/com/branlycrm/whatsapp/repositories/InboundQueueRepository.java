@@ -103,6 +103,8 @@ public class InboundQueueRepository {
             String skipped = null;
             if (action instanceof InboundAction.Store store) {
               apply(session, access, store.message(), at);
+            } else if (action instanceof InboundAction.Status status) {
+              skipped = applyStatus(session, status);
             } else if (action instanceof InboundAction.Skip skip) {
               skipped = skip.code();
             }
@@ -304,6 +306,71 @@ public class InboundQueueRepository {
         .setParameter("sentAt", utc(message.sentAt()))
         .setParameter("at", utc(at))
         .executeUpdate();
+  }
+
+  /** Order of the delivery statuses: a status never moves a reply back. */
+  private static int rank(String status) {
+    return switch (status) {
+      case "SENT" -> 1;
+      case "DELIVERED" -> 2;
+      case "READ" -> 3;
+      default -> 0;
+    };
+  }
+
+  /**
+   * Reconciles a reply with its delivery status (CRM-084a): found by the outbox id Meta echoes
+   * back, or by the wamid. An UNCERTAIN reply that Meta reports as sent becomes SENT and its
+   * message joins the conversation. The outbox row exists before the send and Meta echoes its id,
+   * so a status of a CRM reply always finds it; any other (a message sent from the WhatsApp
+   * Business app, before this release or by another integration) is skipped as untracked.
+   *
+   * @return a skip code, or null when applied
+   */
+  private static String applyStatus(Session session, InboundAction.Status status) {
+    List<Object[]> rows =
+        session
+            .createNativeQuery(
+                "SELECT id, status, conversation_id, body FROM whatsapp_outbox"
+                    + " WHERE id = :outbox OR wamid = :wamid ORDER BY (id = :outbox) DESC LIMIT 1"
+                    + " FOR UPDATE",
+                Object[].class)
+            .setParameter("outbox", status.outboxId(), UUID.class)
+            .setParameter("wamid", status.wamid())
+            .getResultList();
+    if (rows.isEmpty()) return "STATUS_UNTRACKED";
+    UUID id = (UUID) rows.getFirst()[0];
+    String current = (String) rows.getFirst()[1];
+    UUID conversation = (UUID) rows.getFirst()[2];
+    String body = (String) rows.getFirst()[3];
+    String next = status.status().toUpperCase(java.util.Locale.ROOT);
+    boolean failed = next.equals("FAILED");
+    // A status for a QUEUED reply means Meta got it although the send looked refused: it is
+    // marked and never sent again.
+    if (current.equals("FAILED")) return null;
+    if (!failed && rank(next) <= rank(current)) return null;
+    session
+        .createNativeMutationQuery(
+            "UPDATE whatsapp_outbox SET status = :status, wamid = COALESCE(wamid, :wamid),"
+                + " sent_at = COALESCE(sent_at, :at), error_code = :code, lease_until = NULL,"
+                + " updated_at = :at WHERE id = :id")
+        .setParameter("status", next)
+        .setParameter("wamid", status.wamid())
+        .setParameter("at", utc(status.at()))
+        .setParameter("code", failed ? status.errorCode() : null, String.class)
+        .setParameter("id", id)
+        .executeUpdate();
+    if (!failed) {
+      OutboxRepository.insertMessage(
+          session, id, conversation, status.wamid(), body, next, status.at());
+    }
+    session
+        .createNativeMutationQuery(
+            "UPDATE whatsapp_messages SET status = :status WHERE outbox_id = :id")
+        .setParameter("status", next)
+        .setParameter("id", id)
+        .executeUpdate();
+    return null;
   }
 
   private Outcome recordFailure(ChannelAccess access, UUID eventId, RuntimeException failure) {

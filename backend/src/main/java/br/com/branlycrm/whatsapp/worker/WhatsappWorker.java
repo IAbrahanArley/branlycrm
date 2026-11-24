@@ -42,6 +42,7 @@ public class WhatsappWorker implements SmartLifecycle {
   private final ChannelRegistryRepository channels;
   private final InboundProcessingService inbound;
   private final ChannelOnboardingProcessor onboarding;
+  private final OutboundSender outbound;
   private final ChannelUnsealer unsealer;
   private final ChannelSealer sealer;
   private final String url;
@@ -59,6 +60,7 @@ public class WhatsappWorker implements SmartLifecycle {
       ChannelRegistryRepository channels,
       InboundProcessingService inbound,
       ChannelOnboardingProcessor onboarding,
+      OutboundSender outbound,
       ChannelUnsealer unsealer,
       ChannelSealer sealer,
       @Value("${spring.datasource.url}") String url,
@@ -68,6 +70,7 @@ public class WhatsappWorker implements SmartLifecycle {
     this.channels = channels;
     this.inbound = inbound;
     this.onboarding = onboarding;
+    this.outbound = outbound;
     this.unsealer = unsealer;
     this.sealer = sealer;
     this.url = url;
@@ -157,6 +160,18 @@ public class WhatsappWorker implements SmartLifecycle {
           } catch (RuntimeException failure) {
             LOG.warn(
                 "WhatsApp drain failed channel={} code={}",
+                channel,
+                failure.getClass().getSimpleName());
+          }
+        }
+        // Replies (CRM-084a), on the same thread, after the inbox.
+        for (UUID channel : channels.channelsWithPendingOutbound()) {
+          if (!running) return;
+          try {
+            more |= outbound.drain(channel);
+          } catch (RuntimeException failure) {
+            LOG.warn(
+                "WhatsApp send failed channel={} code={}",
                 channel,
                 failure.getClass().getSimpleName());
           }

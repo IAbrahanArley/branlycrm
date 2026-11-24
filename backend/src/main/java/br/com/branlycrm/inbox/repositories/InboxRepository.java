@@ -6,12 +6,15 @@ import br.com.branlycrm.inbox.domain.ConversationSummary;
 import br.com.branlycrm.inbox.domain.InboxFilter;
 import br.com.branlycrm.inbox.domain.InboxMessage;
 import br.com.branlycrm.inbox.domain.MessageCursor;
+import br.com.branlycrm.inbox.domain.OutboxItem;
+import br.com.branlycrm.inbox.domain.QueuedReply;
 import br.com.branlycrm.inbox.exceptions.InboxException;
 import br.com.branlycrm.inbox.exceptions.InboxException.Reason;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.persistence.ClinicPersistence;
 import br.com.branlycrm.tenant.persistence.ClinicTenant;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -54,6 +57,13 @@ public class InboxRepository {
   private static final String COLUMNS =
       "id, contact_id, status, assignee_id, assigned_at, needs_human, last_message_at,"
           + " last_inbound_at, version";
+
+  /** The customer service window of the WhatsApp Business Platform. */
+  static final Duration WINDOW = Duration.ofHours(24);
+
+  private static final String OUTBOX =
+      "SELECT id, conversation_id, status, body, error_code, requested_by, created_at, sent_at"
+          + " FROM whatsapp_outbox";
 
   private final ClinicPersistence persistence;
   private final Clock clock;
@@ -134,7 +144,8 @@ public class InboxRepository {
           String order = after != null ? "ASC" : "DESC";
           var query =
               session.createNativeQuery(
-                  "SELECT id, seq, direction, sent_by_app, message_type, body, media_mime, sent_at"
+                  "SELECT id, seq, direction, sent_by_app, message_type, body, media_mime, sent_at,"
+                      + " status"
                       + " FROM whatsapp_messages WHERE conversation_id = :conversation"
                       + condition
                       + " ORDER BY seq "
@@ -288,6 +299,128 @@ public class InboxRepository {
     if (changed == 0) throw new InboxException(Reason.STALE);
   }
 
+  /**
+   * Queues a reply (CRM-084a) in one transaction with its rules: the conversation is locked; nobody
+   * serving it means the author takes it; someone else serving it needs {@code mayOverride}; the
+   * 24-hour window must be open. The same idempotency key returns the reply it already queued.
+   *
+   * @throws InboxException NOT_FOUND, TAKEN, WINDOW_CLOSED or IDEMPOTENCY_CONFLICT
+   */
+  public QueuedReply enqueue(
+      ClinicAccess access,
+      UUID conversationId,
+      UUID idempotencyKey,
+      String text,
+      boolean mayOverride) {
+    UUID actor = access.subjectId();
+    Instant at = now();
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          List<Object[]> rows =
+              session
+                  .createNativeQuery(
+                      "SELECT channel_id, assignee_id, last_inbound_at FROM whatsapp_conversations"
+                          + " WHERE id = :id FOR UPDATE",
+                      Object[].class)
+                  .setParameter("id", conversationId)
+                  .getResultList();
+          if (rows.isEmpty()) throw new InboxException(Reason.NOT_FOUND);
+          UUID channel = (UUID) rows.getFirst()[0];
+          UUID assignee = (UUID) rows.getFirst()[1];
+          Instant lastInbound = instant(rows.getFirst()[2]);
+          Optional<OutboxItem> existing = outboxByKey(session, idempotencyKey);
+          if (existing.isPresent()) {
+            if (!existing.get().conversationId().equals(conversationId)) {
+              throw new InboxException(Reason.IDEMPOTENCY_CONFLICT);
+            }
+            return new QueuedReply(existing.get(), channel, false);
+          }
+          if (assignee != null && !assignee.equals(actor) && !mayOverride) {
+            throw new InboxException(Reason.TAKEN);
+          }
+          if (lastInbound == null || lastInbound.isBefore(at.minus(WINDOW))) {
+            throw new InboxException(Reason.WINDOW_CLOSED);
+          }
+          if (assignee == null) {
+            session
+                .createNativeMutationQuery(
+                    "UPDATE whatsapp_conversations SET status = 'IN_SERVICE', assignee_id = :actor,"
+                        + " assigned_at = :at, version = version + 1 WHERE id = :id")
+                .setParameter("actor", actor)
+                .setParameter("at", utc(at))
+                .setParameter("id", conversationId)
+                .executeUpdate();
+            event(session, conversationId, "TAKEN", actor, actor, at);
+          }
+          UUID id = UUID.randomUUID();
+          session
+              .createNativeMutationQuery(
+                  "INSERT INTO whatsapp_outbox (id, conversation_id, idempotency_key, kind, body,"
+                      + " next_attempt_at, requested_by, created_at, updated_at)"
+                      + " VALUES (:id, :conversation, :key, 'TEXT', :body, :at, :actor, :at, :at)")
+              .setParameter("id", id)
+              .setParameter("conversation", conversationId)
+              .setParameter("key", idempotencyKey)
+              .setParameter("body", text)
+              .setParameter("at", utc(at))
+              .setParameter("actor", actor)
+              .executeUpdate();
+          return new QueuedReply(outboxByKey(session, idempotencyKey).orElseThrow(), channel, true);
+        });
+  }
+
+  /**
+   * Replies of the conversation that still need attention: queued, sending, uncertain, or failed in
+   * the last 7 days; newest first.
+   *
+   * @throws InboxException NOT_FOUND
+   */
+  public List<OutboxItem> pendingReplies(ClinicAccess access, UUID conversationId) {
+    Instant since = now().minus(Duration.ofDays(7));
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session -> {
+          requireExists(session, conversationId);
+          return session
+              .createNativeQuery(
+                  OUTBOX
+                      + " WHERE conversation_id = :conversation"
+                      + " AND (status IN ('QUEUED', 'SENDING', 'UNCERTAIN')"
+                      + " OR (status = 'FAILED' AND created_at >= :since))"
+                      + " ORDER BY created_at DESC, id LIMIT 50",
+                  Object[].class)
+              .setParameter("conversation", conversationId)
+              .setParameter("since", utc(since))
+              .getResultList()
+              .stream()
+              .map(InboxRepository::outbox)
+              .toList();
+        });
+  }
+
+  private static Optional<OutboxItem> outboxByKey(Session session, UUID key) {
+    return session
+        .createNativeQuery(OUTBOX + " WHERE idempotency_key = :key", Object[].class)
+        .setParameter("key", key)
+        .getResultList()
+        .stream()
+        .findFirst()
+        .map(InboxRepository::outbox);
+  }
+
+  private static OutboxItem outbox(Object[] row) {
+    return new OutboxItem(
+        (UUID) row[0],
+        (UUID) row[1],
+        (String) row[2],
+        (String) row[3],
+        (String) row[4],
+        (UUID) row[5],
+        instant(row[6]),
+        instant(row[7]));
+  }
+
   private static void event(
       Session session, UUID conversation, String type, UUID assignee, UUID actor, Instant at) {
     session
@@ -367,7 +500,8 @@ public class InboxRepository {
         (String) row[4],
         (String) row[5],
         (String) row[6],
-        instant(row[7]));
+        instant(row[7]),
+        (String) row[8]);
   }
 
   private Instant now() {

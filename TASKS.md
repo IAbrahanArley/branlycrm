@@ -994,7 +994,7 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - contato arquivado marcado; cursor inválido sempre 400; transferir para quem já atende não gera evento; a consulta de novas só confere se a conversa existe.
 - **Riscos aceitos:** a conversa de quem saiu da equipe continua com ele até o gestor soltar ou transferir; o responsável é conferido no banco central antes da transação da clínica. A CRM-073 precisa tratar conversas, mensagens e eventos na exclusão do contato.
 
-### [ ] CRM-084 — Envio de mensagens e mídias (P1)
+### [-] CRM-084 — Envio de mensagens e mídias (P1)
 **Depende de:** CRM-083, CRM-080.
 **Atende:** WPP-04.
 **Entregas:**
@@ -1005,6 +1005,39 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
 - Envio repetido por timeout não duplica sem reconciliação.
 - Mídia de uma clínica não é acessível por link ou ID a outra.
 - Tipos e tamanhos validados.
+**Estado (23/11/2026):** parte **084a (envio de texto)** concluída na branch `feat/crm-084a-envio-texto`, detalhada em [docs/caixa-de-entrada.md](docs/caixa-de-entrada.md). Falta a **084b** (mídias), por isso `[-]`.
+- **Decisões aprovadas pelo responsável em 23/11/2026:**
+  1. responder assume a conversa sem responsável; a de outra pessoa só com `INBOX_ASSIGN`;
+  2. janela de 24 horas simples, na API e no worker; modelos na CRM-085;
+  3. envio incerto mostrado e nunca reenviado; reenviar cria pedido novo;
+  4. divisão em 084a (texto) e 084b (mídias);
+  5. na 084b, o SDK oficial da AWS para S3 (`software.amazon.awssdk:s3`), com o cliente HTTP leve da AWS, sem Netty nem Apache.
+- **Migrações:** clínica V17 (`whatsapp_outbox`, e situação e `outbox_id` nas mensagens) e central V18 (`outbound_pending_since`).
+- **API:** `POST …/conversations/{id}/messages` (com chave de idempotência) e `GET …/{id}/outbox`.
+- **Worker:** `OutboundSender` envia com `biz_opaque_callback_data`. O resultado é:
+  - aceito: `SENT`;
+  - não chegou à Meta: nova tentativa, até 5;
+  - pode ter chegado: `UNCERTAIN`, nunca reenviado;
+  - recusado: `FAILED`.
+  - Reserva de 2 minutos: um worker que cai deixa a resposta `UNCERTAIN`.
+- **Conciliação:** os status de entrega acham a resposta pelo id ou pelo `wamid`, só avançam, e um `UNCERTAIN` confirmado vira `SENT` com a mensagem. Status de mensagem que o CRM não enviou (pelo app, por exemplo) fica como `STATUS_UNTRACKED`.
+- **Testes:**
+  - `WhatsappOutboundIT`, com uma Graph API falsa: idempotência, assumir ao responder, `CONVERSATION_TAKEN`, janela fechada, chave em outra conversa, papéis, clínica B, envio aceito com a mensagem na conversa, tempo esgotado virando `UNCERTAIN` sem reenvio e conciliado pelo status, status só avançando, recusa com o código da Meta e nada de texto, telefone ou token no log;
+  - `InboundEventInterpreterTest` com os status;
+  - `BootstrapIT` e `TenantMigrationRolloutIT` ajustados;
+  - `clean verify`: 256 unitários e 160 de integração, sem falhas.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico nem alto; o caminho contra envio duplicado foi confirmado. Corrigidos:
+  - status de mensagem que o CRM não enviou eram tentados 8 vezes e terminavam como erro; agora são pulados;
+  - uma resposta já `FAILED` não vira mensagem enviada;
+  - a mensagem enviada toma a mesma trava por contato da entrada, para o cursor da caixa nunca pular mensagem;
+  - o sinal de envio é repetido quando o pedido é repetido;
+  - status para uma resposta `QUEUED` marca e impede o reenvio;
+  - um problema de rede ou de token encerra o lote do canal, em vez de marcar todas as respostas;
+  - destinatário inválido falha sem envio; documentação de 403 e 404; `toString` sem o texto.
+- **Riscos aceitos:**
+  - o destinatário é o telefone atual do contato, que pode ser editado;
+  - a consulta da caixa por `seq` não traz a mudança de situação de mensagens já mostradas (a tela relê a conversa ao voltar a ela);
+  - token ilegível deixa as respostas na fila, com erro no log.
 
 ### [ ] CRM-085 — Janela de 24 horas e templates (P1)
 **Depende de:** CRM-084.
@@ -1502,7 +1535,11 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
   - **Precisa de humano** (`PUT …/needs-human` com `{version, needsHuman}`);
   - **Transferir** (`PUT …/assignee` com `{version, assigneeId}`), só com `INBOX_ASSIGN` (Proprietário e Gestor), escolhendo entre a equipe ativa que atende.
 - Link para o perfil do contato (`/app/contatos/{contactId}`).
-- Responder fica para a FE da CRM-084: deixar o espaço da caixa de texto desabilitado, com "em breve".
+- **Responder (CRM-084a):** caixa de texto com `POST …/{id}/messages` e `{idempotencyKey, text}`.
+  - A chave é um UUID novo por mensagem, guardado só em memória até a resposta, e reaproveitado se o envio for repetido por falha de rede.
+  - As respostas pendentes (`GET …/{id}/outbox`) aparecem no fim da conversa: "enviando", "falhou" com o motivo, e "incerta: confira no WhatsApp antes de reenviar". Reenviar uma incerta ou falha cria uma mensagem nova, com chave nova.
+  - Erros: `CONVERSATION_WINDOW_CLOSED` (explicar a janela de 24 horas; modelos chegam na CRM-085), `CONVERSATION_TAKEN` e `CONVERSATION_IDEMPOTENCY_CONFLICT`.
+  - Mensagens enviadas mostram a situação (`status`: enviada, entregue, lida, falhou).
 **Aceite:**
 - `CONVERSATION_TAKEN` mostra que outra pessoa assumiu e recarrega a conversa; `CONVERSATION_STALE` pede para recarregar; `CONVERSATION_NOT_YOURS` e `CONVERSATION_ASSIGNEE_INVALID` têm mensagens próprias; `CONVERSATION_NOT_FOUND` volta para a lista.
 - Somente leitura vê tudo sem nenhum botão de ação.

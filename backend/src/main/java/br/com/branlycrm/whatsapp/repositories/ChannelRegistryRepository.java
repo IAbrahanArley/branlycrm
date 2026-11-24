@@ -84,6 +84,48 @@ public class ChannelRegistryRepository {
   }
 
   /**
+   * After queuing a reply (CRM-084a): raises the outbound signal and the same {@code NOTIFY} hint
+   * as the inbox, with only the channel id.
+   */
+  public void signalOutbound(UUID channelId) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET outbound_pending_since = now()"
+            + " WHERE id = ? AND outbound_pending_since IS NULL",
+        channelId);
+    jdbc.query(
+        "SELECT pg_notify('whatsapp_inbound', ?)",
+        (ResultSetExtractor<Void>) result -> null,
+        channelId.toString());
+  }
+
+  /** The worker sent everything due: clears the outbound signal (checked again by the caller). */
+  public void clearOutbound(UUID channelId) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET outbound_pending_since = NULL WHERE id = ?", channelId);
+  }
+
+  /** Raises the outbound signal again without a notification (replies waiting for a retry). */
+  public void keepOutbound(UUID channelId) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET outbound_pending_since = now()"
+            + " WHERE id = ? AND outbound_pending_since IS NULL",
+        channelId);
+  }
+
+  /** Active channels of active clinics with replies to send, oldest signal first. */
+  public List<UUID> channelsWithPendingOutbound() {
+    return jdbc.queryForList(
+        """
+        SELECT c.id FROM whatsapp_channels c JOIN tenants t ON t.tenant_id = c.tenant_id
+        WHERE c.status = 'ACTIVE' AND t.status = 'ACTIVE' AND c.outbound_pending_since IS NOT NULL
+        ORDER BY c.outbound_pending_since, c.id
+        LIMIT ?
+        """,
+        UUID.class,
+        SWEEP_LIMIT);
+  }
+
+  /**
    * The worker drained the clinic: clears the durable signal. The caller checks the clinic again
    * afterwards and raises it back if an event arrived in between (the webhook only raises an empty
    * signal).

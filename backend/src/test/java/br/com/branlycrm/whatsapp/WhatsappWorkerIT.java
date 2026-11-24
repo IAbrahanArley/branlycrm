@@ -208,7 +208,7 @@ class WhatsappWorkerIT {
                     + " 'wamid.A4'"))
         .containsExactly("OUT|t");
 
-    // A status is processed without writing anything (sending comes with CRM-084).
+    // A status of a message the CRM did not send is processed without writing anything.
     deliver(
         delivery(
             "1001",

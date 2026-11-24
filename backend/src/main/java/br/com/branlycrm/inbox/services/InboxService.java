@@ -8,15 +8,20 @@ import br.com.branlycrm.inbox.domain.ConversationSummary;
 import br.com.branlycrm.inbox.domain.InboxFilter;
 import br.com.branlycrm.inbox.domain.InboxMessage;
 import br.com.branlycrm.inbox.domain.MessageCursor;
+import br.com.branlycrm.inbox.domain.OutboxItem;
+import br.com.branlycrm.inbox.domain.QueuedReply;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
+import br.com.branlycrm.inbox.dto.request.ReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
 import br.com.branlycrm.inbox.dto.response.MessagePageView;
+import br.com.branlycrm.inbox.dto.response.OutboxView;
 import br.com.branlycrm.inbox.exceptions.InboxException;
 import br.com.branlycrm.inbox.repositories.InboxRepository;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
 import br.com.branlycrm.tenant.domain.ClinicPermission;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.services.TenantAccessService;
+import br.com.branlycrm.whatsapp.repositories.ChannelRegistryRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -37,13 +42,17 @@ import org.springframework.stereotype.Service;
 public class InboxService {
   static final int MESSAGES_DEFAULT = 50;
   static final int MESSAGES_MAX = 100;
+  static final int REPLY_MAX = 4096;
 
   private final TenantAccessService access;
   private final InboxRepository inbox;
+  private final ChannelRegistryRepository channels;
 
-  public InboxService(TenantAccessService access, InboxRepository inbox) {
+  public InboxService(
+      TenantAccessService access, InboxRepository inbox, ChannelRegistryRepository channels) {
     this.access = access;
     this.inbox = inbox;
+    this.channels = channels;
   }
 
   /**
@@ -112,10 +121,60 @@ public class InboxService {
                         m.type(),
                         m.body(),
                         m.mediaMime(),
-                        m.sentAt()))
+                        m.sentAt(),
+                        m.status()))
             .toList(),
         olderCursor,
         newerCursor);
+  }
+
+  /**
+   * Queues a text reply (CRM-084a): the worker sends it. Answering a conversation nobody serves
+   * takes it; someone else's needs INBOX_ASSIGN. The 24-hour window is checked here and again by
+   * the worker.
+   */
+  public OutboxView reply(UUID tenantId, UUID actor, UUID conversationId, ReplyRequest request) {
+    if (request == null) throw new InvalidInputException("body");
+    UUID key = uuid(request.idempotencyKey(), "idempotencyKey");
+    String text = replyText(request.text());
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_REPLY);
+    QueuedReply queued =
+        inbox.enqueue(
+            clinic, conversationId, key, text, clinic.allows(ClinicPermission.INBOX_ASSIGN));
+    // After the clinic commit. Also on a repeated request: if the first signal was lost (the API
+    // failed after the commit), the retry with the same key raises it. It is idempotent.
+    if (!queued.item().status().equals("FAILED")) channels.signalOutbound(queued.channelId());
+    return outbox(queued.item());
+  }
+
+  /** Replies of the conversation still queued, sending, uncertain or recently failed. */
+  public List<OutboxView> pendingReplies(UUID tenantId, UUID actor, UUID conversationId) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_READ);
+    return inbox.pendingReplies(clinic, conversationId).stream().map(InboxService::outbox).toList();
+  }
+
+  /** 1 to 4096 characters; line breaks and tabs kept, other control characters refused. */
+  static String replyText(String text) {
+    if (text == null || text.isBlank() || text.length() > REPLY_MAX) {
+      throw new InvalidInputException("text");
+    }
+    if (text.chars()
+        .anyMatch(c -> Character.isISOControl(c) && c != 0x0A && c != 0x0D && c != 0x09)) {
+      throw new InvalidInputException("text");
+    }
+    return text;
+  }
+
+  private static OutboxView outbox(OutboxItem item) {
+    return new OutboxView(
+        item.id(),
+        item.conversationId(),
+        item.status(),
+        item.body(),
+        item.errorCode(),
+        item.requestedBy(),
+        item.createdAt(),
+        item.sentAt());
   }
 
   public ConversationView take(UUID tenantId, UUID actor, UUID conversationId) {
