@@ -126,16 +126,21 @@ public class InboundQueueRepository {
   }
 
   /**
-   * True while the clinic has events not yet processed that may still be tried, due now or later.
+   * True while the clinic has events not yet processed that may still be tried, or media still to
+   * download (CRM-084b1), due now or later.
    */
-  public boolean hasRetryable(ChannelAccess access) {
+  public boolean hasRetryable(ChannelAccess access, boolean includeMedia) {
     return persistence.inTransaction(
         ClinicTenant.ofChannel(access),
         session ->
             !session
                 .createNativeQuery(
                     "SELECT 1 FROM whatsapp_inbound_events"
-                        + " WHERE processed_at IS NULL AND attempts < :max LIMIT 1",
+                        + " WHERE processed_at IS NULL AND attempts < :max"
+                        + (includeMedia
+                            ? " UNION ALL SELECT 1 FROM whatsapp_media WHERE status = 'PENDING'"
+                            : "")
+                        + " LIMIT 1",
                     Integer.class)
                 .setParameter("max", MAX_ATTEMPTS)
                 .getResultList()
@@ -284,9 +289,11 @@ public class InboundQueueRepository {
                 message.fromBusinessApp() ? null : utc(message.sentAt()),
                 OffsetDateTime.class)
             .getSingleResult();
-    session
-        .createNativeMutationQuery(
-            """
+    UUID messageId = UUID.randomUUID();
+    int inserted =
+        session
+            .createNativeMutationQuery(
+                """
             INSERT INTO whatsapp_messages (id, conversation_id, wamid, direction, sent_by_app,
                                            message_type, body, media_id, media_mime, sent_at,
                                            created_at)
@@ -294,18 +301,30 @@ public class InboundQueueRepository {
                     :mediaMime, :sentAt, :at)
             ON CONFLICT (wamid) DO NOTHING
             """)
-        .setParameter("id", UUID.randomUUID())
-        .setParameter("conversation", conversation)
-        .setParameter("wamid", message.wamid())
-        .setParameter("direction", message.fromBusinessApp() ? "OUT" : "IN")
-        .setParameter("app", message.fromBusinessApp())
-        .setParameter("type", message.type())
-        .setParameter("body", message.body(), String.class)
-        .setParameter("mediaId", message.mediaId(), String.class)
-        .setParameter("mediaMime", message.mediaMime(), String.class)
-        .setParameter("sentAt", utc(message.sentAt()))
-        .setParameter("at", utc(at))
-        .executeUpdate();
+            .setParameter("id", messageId)
+            .setParameter("conversation", conversation)
+            .setParameter("wamid", message.wamid())
+            .setParameter("direction", message.fromBusinessApp() ? "OUT" : "IN")
+            .setParameter("app", message.fromBusinessApp())
+            .setParameter("type", message.type())
+            .setParameter("body", message.body(), String.class)
+            .setParameter("mediaId", message.mediaId(), String.class)
+            .setParameter("mediaMime", message.mediaMime(), String.class)
+            .setParameter("sentAt", utc(message.sentAt()))
+            .setParameter("at", utc(at))
+            .executeUpdate();
+    // The file is fetched later by the media step (CRM-084b1), never inside this transaction.
+    if (inserted == 1 && message.mediaId() != null) {
+      session
+          .createNativeMutationQuery(
+              "INSERT INTO whatsapp_media (id, message_id, meta_media_id, next_attempt_at,"
+                  + " created_at, updated_at) VALUES (:id, :message, :media, :at, :at, :at)")
+          .setParameter("id", UUID.randomUUID())
+          .setParameter("message", messageId)
+          .setParameter("media", message.mediaId())
+          .setParameter("at", utc(at))
+          .executeUpdate();
+    }
   }
 
   /** Order of the delivery statuses: a status never moves a reply back. */

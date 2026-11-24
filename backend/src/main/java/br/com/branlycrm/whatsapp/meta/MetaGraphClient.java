@@ -276,6 +276,120 @@ public class MetaGraphClient {
     return new MetaSendResult.Refused(code == 0 ? "GRAPH_HTTP_" + status : "META_" + code);
   }
 
+  /**
+   * Downloads a received media (CRM-084b1) into {@code target}: the Graph API gives a short-lived
+   * URL, fetched with the token. Streaming, and stops past {@code maxBytes} whatever the declared
+   * size says. Only an https URL, or one on the configured Graph host (tests), is followed.
+   *
+   * @return the bytes written
+   * @throws MetaGraphException TRANSIENT, PERMANENT (unknown or expired media, too large) or
+   *     TOKEN_INVALID
+   */
+  public long downloadMedia(
+      String token, String mediaId, long maxBytes, java.nio.file.Path target) {
+    if (mediaId == null || !mediaId.matches("[0-9A-Za-z_.-]{1,128}")) {
+      throw new MetaGraphException(Kind.PERMANENT, "MEDIA_ID_INVALID");
+    }
+    JsonNode info =
+        send(
+            authorized(token, uri(mediaId + "?appsecret_proof=" + proof(token))).GET(),
+            Kind.PERMANENT);
+    String url = text(info.get("url"));
+    URI location;
+    try {
+      location = url == null ? null : URI.create(url);
+    } catch (IllegalArgumentException invalid) {
+      location = null;
+    }
+    if (!mediaHostAllowed(location)) {
+      throw new MetaGraphException(Kind.PERMANENT, "MEDIA_URL_INVALID");
+    }
+    HttpResponse<java.io.InputStream> response;
+    try {
+      response =
+          http.send(
+              authorized(token, location).GET().timeout(Duration.ofSeconds(120)).build(),
+              HttpResponse.BodyHandlers.ofInputStream());
+    } catch (IOException failure) {
+      throw new MetaGraphException(Kind.TRANSIENT, "MEDIA_NETWORK");
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new MetaGraphException(Kind.TRANSIENT, "MEDIA_INTERRUPTED");
+    }
+    java.io.InputStream stream = response.body();
+    // The request timeout covers the headers only: a stalled or trickling body is cut by closing
+    // the stream at the deadline, so one download never holds the worker.
+    java.util.concurrent.ScheduledFuture<?> deadline =
+        WATCHDOG.schedule(
+            () -> {
+              try {
+                stream.close();
+              } catch (IOException ignored) {
+                // Closing is the point.
+              }
+            },
+            DOWNLOAD_DEADLINE.toSeconds(),
+            java.util.concurrent.TimeUnit.SECONDS);
+    try (java.io.InputStream body = stream;
+        java.io.OutputStream out = java.nio.file.Files.newOutputStream(target)) {
+      int status = response.statusCode();
+      if (status == 401 || status == 403) {
+        throw new MetaGraphException(Kind.TOKEN_INVALID, "MEDIA_HTTP_" + status);
+      }
+      if (status == 404 || status == 410) {
+        throw new MetaGraphException(Kind.PERMANENT, "MEDIA_GONE");
+      }
+      if (status < 200 || status >= 300) {
+        throw new MetaGraphException(Kind.TRANSIENT, "MEDIA_HTTP_" + status);
+      }
+      byte[] buffer = new byte[64 * 1024];
+      long total = 0;
+      int read;
+      while ((read = body.read(buffer)) != -1) {
+        total += read;
+        if (total > maxBytes) throw new MetaGraphException(Kind.PERMANENT, "MEDIA_TOO_LARGE");
+        out.write(buffer, 0, read);
+      }
+      return total;
+    } catch (IOException failure) {
+      throw new MetaGraphException(Kind.TRANSIENT, "MEDIA_NETWORK");
+    } finally {
+      deadline.cancel(false);
+    }
+  }
+
+  /** Total time of one media download, headers and body. */
+  static final Duration DOWNLOAD_DEADLINE = Duration.ofMinutes(3);
+
+  private static final java.util.concurrent.ScheduledExecutorService WATCHDOG =
+      java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+          task -> {
+            Thread thread = new Thread(task, "whatsapp-media-watchdog");
+            thread.setDaemon(true);
+            return thread;
+          });
+
+  /** Meta's media hosts; the token goes nowhere else. */
+  private static final List<String> MEDIA_HOST_SUFFIXES =
+      List.of(".fbsbx.com", ".whatsapp.net", ".facebook.com", ".fbcdn.net");
+
+  /**
+   * The media URL Meta gave: https on Meta's own hosts, default port, never an IP literal. The
+   * configured Graph host itself is also accepted (it is where tests serve the files).
+   */
+  private boolean mediaHostAllowed(URI location) {
+    if (location == null || location.getHost() == null) return false;
+    String host = location.getHost().toLowerCase(java.util.Locale.ROOT);
+    if (host.equals(graph.getHost())
+        && java.util.Objects.equals(location.getScheme(), graph.getScheme())
+        && location.getPort() == graph.getPort()) {
+      return true;
+    }
+    if (!"https".equals(location.getScheme()) || location.getPort() != -1) return false;
+    if (host.matches("[0-9.]+") || host.contains(":")) return false;
+    return MEDIA_HOST_SUFFIXES.stream().anyMatch(host::endsWith);
+  }
+
   private HttpRequest.Builder authorized(String token, URI uri) {
     if (token == null || !TOKEN.matcher(token).matches()) {
       throw new MetaGraphException(Kind.TOKEN_INVALID, "TOKEN_INVALID");

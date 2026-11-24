@@ -365,8 +365,9 @@ class TenantMigrationRolloutIT {
     forgetNewerHistory(database);
   }
 
-  /** Everything V3 to V17 created. */
+  /** Everything V3 to V18 created. */
   private void dropNewerObjects(TenantDatabase database) throws SQLException {
+    asOwner(database, "DROP TABLE whatsapp_media");
     asOwner(database, "DROP TABLE whatsapp_conversation_events");
     asOwner(database, "DROP TABLE whatsapp_messages, whatsapp_outbox, whatsapp_conversations");
     asOwner(database, "DROP TABLE whatsapp_inbound_events");

@@ -139,16 +139,18 @@ public class InboxRepository {
         session -> {
           requireExists(session, id);
           String condition = "";
-          if (before != null) condition = " AND seq < :cursor";
-          if (after != null) condition = " AND seq > :cursor";
+          if (before != null) condition = " AND m.seq < :cursor";
+          if (after != null) condition = " AND m.seq > :cursor";
           String order = after != null ? "ASC" : "DESC";
           var query =
               session.createNativeQuery(
-                  "SELECT id, seq, direction, sent_by_app, message_type, body, media_mime, sent_at,"
-                      + " status"
-                      + " FROM whatsapp_messages WHERE conversation_id = :conversation"
+                  "SELECT m.id, m.seq, m.direction, m.sent_by_app, m.message_type, m.body,"
+                      + " COALESCE(md.content_type, m.media_mime), m.sent_at, m.status, md.status"
+                      + " FROM whatsapp_messages m"
+                      + " LEFT JOIN whatsapp_media md ON md.message_id = m.id"
+                      + " WHERE m.conversation_id = :conversation"
                       + condition
-                      + " ORDER BY seq "
+                      + " ORDER BY m.seq "
                       + order
                       + " LIMIT :limit",
                   Object[].class);
@@ -501,7 +503,43 @@ public class InboxRepository {
         (String) row[5],
         (String) row[6],
         instant(row[7]),
-        (String) row[8]);
+        (String) row[8],
+        (String) row[9]);
+  }
+
+  /**
+   * The stored file of a message of the conversation (CRM-084b1); the storage key comes from this
+   * row only.
+   *
+   * @return empty for a message without media, or of another conversation or clinic
+   */
+  public Optional<MediaFile> media(ClinicAccess access, UUID conversationId, UUID messageId) {
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session ->
+            session
+                .createNativeQuery(
+                    "SELECT md.status, md.storage_key, md.content_type, md.error_code"
+                        + " FROM whatsapp_media md JOIN whatsapp_messages m ON m.id = md.message_id"
+                        + " WHERE m.id = :message AND m.conversation_id = :conversation",
+                    Object[].class)
+                .setParameter("message", messageId)
+                .setParameter("conversation", conversationId)
+                .getResultList()
+                .stream()
+                .findFirst()
+                .map(
+                    row ->
+                        new MediaFile(
+                            (String) row[0], (String) row[1], (String) row[2], (String) row[3])));
+  }
+
+  /** A media row as the link needs it; the key never leaves the server. */
+  public record MediaFile(String status, String storageKey, String contentType, String errorCode) {
+    @Override
+    public String toString() {
+      return "MediaFile[status=" + status + "]";
+    }
   }
 
   private Instant now() {

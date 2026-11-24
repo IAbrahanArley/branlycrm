@@ -10,3 +10,5 @@
 # WhatsApp app secret and webhook verification token (ADR-036): never versioned.
 .whatsapp-webhook/
 .whatsapp-meta/
+# Object storage access key (CRM-084b1): never versioned.
+.whatsapp-storage/

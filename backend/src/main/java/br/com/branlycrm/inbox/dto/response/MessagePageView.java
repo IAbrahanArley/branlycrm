@@ -20,6 +20,8 @@ public record MessagePageView(List<Message> items, String before, String after) 
    * @param direction IN (from the contact) or OUT (sent by the clinic)
    * @param sentByApp sent from the WhatsApp Business app
    * @param status delivery of a reply sent from the CRM (SENT, DELIVERED, READ, FAILED), or null
+   * @param mediaStatus file of a received media: PENDING (downloading), STORED (link available),
+   *     REJECTED (type or size not accepted) or FAILED; null without media
    */
   public record Message(
       UUID id,
@@ -29,5 +31,6 @@ public record MessagePageView(List<Message> items, String before, String after) 
       String body,
       String mediaMime,
       Instant sentAt,
-      String status) {}
+      String status,
+      String mediaStatus) {}
 }
