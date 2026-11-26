@@ -61,6 +61,21 @@ public final class InboxErrorHandler {
       case MEDIA_TOO_LARGE ->
           ApiErrors.response(
               413, code, "Arquivo grande demais: imagens até 5 MB, outros arquivos até 16 MB.");
+      case TEMPLATE_NOT_FOUND -> ApiErrors.response(404, code, "Modelo não encontrado.");
+      case TEMPLATE_NOT_APPROVED ->
+          ApiErrors.response(
+              409,
+              code,
+              "Este modelo não está aprovado pela Meta ou não é suportado. Sincronize os modelos"
+                  + " e escolha outro.");
+      case TEMPLATE_OPTED_OUT ->
+          ApiErrors.response(
+              409, code, "O contato pediu para não receber mensagens de marketing pelo WhatsApp.");
+      case TEMPLATE_LIMIT ->
+          ApiErrors.response(
+              429, code, "A clínica atingiu o limite diário de envio de modelos. Tente amanhã.");
+      case CHANNEL_NOT_CONNECTED ->
+          ApiErrors.response(409, code, "A clínica não tem WhatsApp conectado.");
       case IDEMPOTENCY_CONFLICT ->
           ApiErrors.response(409, code, "Esta chave de envio já foi usada em outra conversa.");
       case ASSIGNEE_INVALID ->

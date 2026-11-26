@@ -13,10 +13,12 @@ import br.com.branlycrm.inbox.domain.OutboxItem;
 import br.com.branlycrm.inbox.domain.QueuedReply;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
 import br.com.branlycrm.inbox.dto.request.ReplyRequest;
+import br.com.branlycrm.inbox.dto.request.TemplateReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
 import br.com.branlycrm.inbox.dto.response.MediaLinkView;
 import br.com.branlycrm.inbox.dto.response.MessagePageView;
 import br.com.branlycrm.inbox.dto.response.OutboxView;
+import br.com.branlycrm.inbox.dto.response.TemplateView;
 import br.com.branlycrm.inbox.exceptions.InboxException;
 import br.com.branlycrm.inbox.repositories.InboxRepository;
 import br.com.branlycrm.tenant.domain.ClinicAccess;
@@ -24,6 +26,7 @@ import br.com.branlycrm.tenant.domain.ClinicPermission;
 import br.com.branlycrm.tenant.exceptions.TenantAccessException;
 import br.com.branlycrm.tenant.services.TenantAccessService;
 import br.com.branlycrm.whatsapp.domain.MediaType;
+import br.com.branlycrm.whatsapp.domain.MessageTemplate;
 import br.com.branlycrm.whatsapp.repositories.ChannelRegistryRepository;
 import br.com.branlycrm.whatsapp.storage.MediaStorage;
 import java.io.IOException;
@@ -34,6 +37,7 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -62,18 +66,23 @@ public class InboxService {
   private final ChannelRegistryRepository channels;
   private final MediaStorage storage;
   private final java.time.Clock clock;
+  private final int templateDailyLimit;
 
   public InboxService(
       TenantAccessService access,
       InboxRepository inbox,
       ChannelRegistryRepository channels,
       MediaStorage storage,
-      org.springframework.beans.factory.ObjectProvider<java.time.Clock> clock) {
+      org.springframework.beans.factory.ObjectProvider<java.time.Clock> clock,
+      @org.springframework.beans.factory.annotation.Value(
+              "${app.whatsapp.templates.daily-limit:200}")
+          int templateDailyLimit) {
     this.access = access;
     this.inbox = inbox;
     this.channels = channels;
     this.storage = storage;
     this.clock = clock.getIfAvailable(java.time.Clock::systemUTC);
+    this.templateDailyLimit = templateDailyLimit;
   }
 
   /**
@@ -338,6 +347,91 @@ public class InboxService {
     if (!queued.item().status().equals("FAILED")) channels.signalOutbound(queued.channelId());
     return outbox(queued.item());
   }
+
+  /**
+   * Queues an approved template (CRM-085), inside or outside the 24-hour window, with the other
+   * rules of {@link #reply}. The values are checked against the template's parameters with Meta's
+   * rules; the history keeps the text as the patient sees it.
+   */
+  public OutboxView sendTemplate(
+      UUID tenantId, UUID actor, UUID conversationId, TemplateReplyRequest request) {
+    if (request == null) throw new InvalidInputException("body");
+    UUID key = uuid(request.idempotencyKey(), "idempotencyKey");
+    UUID templateId = uuid(request.templateId(), "templateId");
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_REPLY);
+    boolean override = clinic.allows(ClinicPermission.INBOX_ASSIGN);
+    // A repeated request returns what the first one queued, even if the template changed since.
+    Optional<QueuedReply> repeated = inbox.checkReply(clinic, conversationId, key, override, false);
+    if (repeated.isPresent()) return signalled(repeated.get());
+    InboxRepository.TemplateOption option =
+        inbox
+            .template(clinic, templateId)
+            .orElseThrow(() -> new InboxException(InboxException.Reason.TEMPLATE_NOT_FOUND));
+    MessageTemplate template = option.template();
+    if (!template.approved() || !template.supported()) {
+      throw new InboxException(InboxException.Reason.TEMPLATE_NOT_APPROVED);
+    }
+    Map<String, String> header = request.header() == null ? Map.of() : request.header();
+    Map<String, String> body = request.body() == null ? Map.of() : request.body();
+    String text;
+    try {
+      text = template.render(header, body);
+    } catch (IllegalArgumentException invalid) {
+      throw new InvalidInputException(invalid.getMessage());
+    }
+    String values = templateValues(header, body);
+    QueuedReply queued =
+        inbox.enqueueTemplate(
+            clinic, conversationId, key, templateId, text, values, templateDailyLimit, override);
+    return signalled(queued);
+  }
+
+  /** The clinic's templates, approved and supported first (CRM-085, INBOX_READ). */
+  public List<TemplateView> templates(UUID tenantId, UUID actor) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.INBOX_READ);
+    return inbox.templates(clinic).stream().map(InboxService::templateView).toList();
+  }
+
+  /**
+   * Asks the worker to copy the templates again, for one approved minutes ago (CRM-085,
+   * CHANNEL_CONNECT).
+   */
+  public void requestTemplateSync(UUID tenantId, UUID actor) {
+    ClinicAccess clinic = access.require(tenantId, actor, ClinicPermission.CHANNEL_CONNECT);
+    if (!channels.requestTemplateSync(clinic.tenantId())) {
+      throw new InboxException(InboxException.Reason.CHANNEL_NOT_CONNECTED);
+    }
+  }
+
+  private static TemplateView templateView(InboxRepository.TemplateOption option) {
+    MessageTemplate t = option.template();
+    return new TemplateView(
+        option.id(),
+        t.name(),
+        t.language(),
+        t.category(),
+        t.status(),
+        t.supported(),
+        t.approved() && t.supported(),
+        t.headerText(),
+        t.bodyText(),
+        t.footerText(),
+        t.headerParams(),
+        t.bodyParams(),
+        option.syncedAt());
+  }
+
+  private static String templateValues(Map<String, String> header, Map<String, String> body) {
+    var root = TEMPLATE_JSON.createObjectNode();
+    var headerNode = root.putObject("header");
+    header.forEach(headerNode::put);
+    var bodyNode = root.putObject("body");
+    body.forEach(bodyNode::put);
+    return TEMPLATE_JSON.writeValueAsString(root);
+  }
+
+  private static final tools.jackson.databind.json.JsonMapper TEMPLATE_JSON =
+      tools.jackson.databind.json.JsonMapper.builder().build();
 
   /** Replies of the conversation still queued, sending, uncertain or recently failed. */
   public List<OutboxView> pendingReplies(UUID tenantId, UUID actor, UUID conversationId) {

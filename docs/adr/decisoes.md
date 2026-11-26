@@ -846,6 +846,7 @@ O "profissional" da venda é cadastro da clínica, sem login. Admin da agência 
   - **Conciliação:** pelo `biz_opaque_callback_data` que volta nos webhooks de status. Um status com `wamid` desconhecido fica pendente para nova tentativa.
   - **Regras de envio:** a janela de 24 horas e os modelos (CRM-085) são conferidos na API e de novo no worker.
   - **Limite diário de modelos:** 200 por clínica, configurável, com contador atômico. Acima dele, a mensagem fica `BLOCKED_LIMIT`.
+    - **Na implementação (CRM-085, 26/11/2026, aprovado pelo responsável):** o contador fica no banco da clínica, por dia no fuso da clínica, e sobe ao enfileirar. Acima do limite, a API recusa na hora (`CONVERSATION_TEMPLATE_LIMIT`, 429) e nada entra na fila, em vez da situação `BLOCKED_LIMIT`. O limite é global (`app.whatsapp.templates.daily-limit`); por clínica fica para depois.
   - **Pagamento:** a clínica paga a Meta na própria conta (termos de uso); sem meio de pagamento, os modelos falham, e a tela avisa.
   - **Na implementação (CRM-084a, 23/11/2026):** a fila de saída tem reserva de 2 minutos; vencida, a resposta vira `UNCERTAIN`. Só conexão recusada e limite de taxa contam como "não enviado" e são tentados de novo; tempo esgotado, conexão perdida e erro 5xx são incertos. Status de mensagens que o CRM não enviou são pulados (`STATUS_UNTRACKED`), porque a linha da fila existe antes do envio e a Meta devolve o id dela. Responder assume a conversa sem responsável.
 

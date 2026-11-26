@@ -45,6 +45,7 @@ final class WebhookPayloadParser {
           "business_capability_update",
           "message_template_status_update",
           "message_template_quality_update",
+          "message_template_components_update",
           "template_category_update",
           "phone_number_name_update",
           "phone_number_quality_update");

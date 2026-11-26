@@ -22,7 +22,7 @@ public class OutboundChannelRepository {
   }
 
   /** An active channel's sending data; the token stays sealed here. */
-  public record Sender(String phoneNumberId, SealedSecret token) {
+  public record Sender(String phoneNumberId, SealedSecret token, String wabaId) {
     @Override
     public String toString() {
       return "Sender[redacted]";
@@ -32,12 +32,13 @@ public class OutboundChannelRepository {
   public Optional<Sender> sender(UUID channelId) {
     return jdbc
         .query(
-            "SELECT phone_number_id, sealed_token, key_version FROM whatsapp_channels"
+            "SELECT phone_number_id, sealed_token, key_version, waba_id FROM whatsapp_channels"
                 + " WHERE id = ? AND status = 'ACTIVE' AND sealed_token IS NOT NULL",
             (row, index) ->
                 new Sender(
                     row.getString("phone_number_id"),
-                    new SealedSecret(row.getBytes("sealed_token"), row.getInt("key_version"))),
+                    new SealedSecret(row.getBytes("sealed_token"), row.getInt("key_version")),
+                    row.getString("waba_id")),
             channelId)
         .stream()
         .findFirst();

@@ -153,7 +153,7 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `CONVERSATION_STALE` | 409 | A conversa mudou desde a leitura (`version`) | Caixa de entrada |
 | `CONVERSATION_NOT_ASSIGNED` | 409 | Soltar uma conversa que ninguém atende | Caixa de entrada |
 | `CONVERSATION_NOT_YOURS` | 409 | O Atendente soltando a conversa de outra pessoa | Caixa de entrada |
-| `CONVERSATION_WINDOW_CLOSED` | 409 | Passaram 24 horas desde a última mensagem do paciente: só modelos (CRM-085) | Caixa de entrada |
+| `CONVERSATION_WINDOW_CLOSED` | 409 | Passaram 24 horas desde a última mensagem do paciente: só modelos (`…/messages/template`) | Caixa de entrada |
 | `CONVERSATION_IDEMPOTENCY_CONFLICT` | 409 | A chave de envio já foi usada em outra conversa | Caixa de entrada |
 | `CONVERSATION_MEDIA_NOT_FOUND` | 404 | A mensagem não tem arquivo, ou é de outra conversa ou clínica | Caixa de entrada |
 | `CONVERSATION_MEDIA_NOT_READY` | 409 | O arquivo ainda está sendo baixado | Caixa de entrada |
@@ -162,6 +162,11 @@ Todo erro tem este corpo, inclusive os gerados pelos filtros de segurança antes
 | `CONVERSATION_MEDIA_TYPE_NOT_ALLOWED` | 415 | Arquivo a enviar de um tipo que o WhatsApp não envia (conferido pelos primeiros bytes) | Caixa de entrada |
 | `CONVERSATION_MEDIA_TOO_LARGE` | 413 | Arquivo a enviar acima do limite do tipo (imagem 5 MB, demais 16 MB) | Caixa de entrada |
 | `FILE_TOO_LARGE` | 413 | Pedido com arquivo acima do limite de upload da API (17 MB) | Global |
+| `CONVERSATION_TEMPLATE_NOT_FOUND` | 404 | Modelo inexistente na clínica | Caixa de entrada |
+| `CONVERSATION_TEMPLATE_NOT_APPROVED` | 409 | Modelo não aprovado pela Meta ou não suportado pelo CRM | Caixa de entrada |
+| `CONVERSATION_TEMPLATE_OPTED_OUT` | 409 | Modelo de marketing para contato que recusou WhatsApp | Caixa de entrada |
+| `CONVERSATION_TEMPLATE_LIMIT` | 429 | A clínica atingiu o limite diário de modelos | Caixa de entrada |
+| `CONVERSATION_CHANNEL_NOT_CONNECTED` | 409 | Pedido de cópia dos modelos sem número conectado | Caixa de entrada |
 | `CONVERSATION_ASSIGNEE_INVALID` | 409 | O novo responsável não é membro ativo que atende conversas | Caixa de entrada |
 | `CHANNEL_ALREADY_CONNECTED` | 409 | A clínica já tem um número conectado, inclusive com falha: desconecte antes | Canal WhatsApp |
 | `CHANNEL_NOT_CONNECTED` | 409 | Não há número para desconectar | Canal WhatsApp |

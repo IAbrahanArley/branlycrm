@@ -57,6 +57,14 @@ public class WhatsappWebhookService {
   private final WebhookPayloadParser parser;
   private final Semaphore permits;
 
+  /** Account events that change a template's status, quality, category or content. */
+  static final java.util.Set<String> TEMPLATE_FIELDS =
+      java.util.Set.of(
+          "message_template_status_update",
+          "message_template_quality_update",
+          "message_template_components_update",
+          "template_category_update");
+
   public WhatsappWebhookService(
       WebhookSecrets secrets,
       ChannelRegistryRepository channels,
@@ -130,6 +138,19 @@ public class WhatsappWebhookService {
     Map<String, Optional<LiveChannel>> numbers = new HashMap<>();
     Map<String, List<LiveChannel>> accounts = new HashMap<>();
     int discarded = 0;
+    // A template changed (CRM-085): the account's channels copy their templates again. Only a
+    // signal; the event itself is routed like any account event.
+    java.util.Set<String> templateAccounts = new java.util.LinkedHashSet<>();
+    for (RoutedEvent routed : parsed.events()) {
+      if (TEMPLATE_FIELDS.contains(routed.event().field())) {
+        templateAccounts.add(routed.route().wabaId());
+      }
+    }
+    try {
+      templateAccounts.forEach(channels::requestTemplateSyncForAccount);
+    } catch (RuntimeException failure) {
+      throw storageFailed(null, failure);
+    }
     for (RoutedEvent routed : parsed.events()) {
       List<LiveChannel> targets;
       try {

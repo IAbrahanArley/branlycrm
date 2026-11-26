@@ -143,6 +143,79 @@ public class ChannelRegistryRepository {
         channelId);
   }
 
+  /**
+   * Asks the worker to copy the templates of the clinic's active channel again (CRM-085, "sync
+   * now").
+   *
+   * @return false when the clinic has no active channel
+   */
+  public boolean requestTemplateSync(UUID tenantId) {
+    return jdbc.update(
+            "UPDATE whatsapp_channels SET templates_sync_requested_at = now()"
+                + " WHERE tenant_id = ? AND status = 'ACTIVE'",
+            tenantId)
+        > 0;
+  }
+
+  /**
+   * A template of the account changed (webhook): every active channel of the account copies its
+   * templates again. Templates belong to the account, so a shared account syncs each clinic.
+   */
+  public void requestTemplateSyncForAccount(String wabaId) {
+    if (wabaId == null || !wabaId.matches("[0-9]{1,32}")) return;
+    jdbc.update(
+        "UPDATE whatsapp_channels SET templates_sync_requested_at = now()"
+            + " WHERE waba_id = ? AND status = 'ACTIVE'",
+        wabaId);
+  }
+
+  /**
+   * Active channels of active clinics whose templates are due: never copied, requested, or copied
+   * more than {@code every} ago; oldest first.
+   */
+  public List<UUID> channelsDueForTemplates(java.time.Duration every, int limit) {
+    return jdbc.queryForList(
+        """
+        SELECT c.id FROM whatsapp_channels c JOIN tenants t ON t.tenant_id = c.tenant_id
+        WHERE c.status = 'ACTIVE' AND t.status = 'ACTIVE'
+          AND (c.templates_synced_at IS NULL OR c.templates_sync_requested_at IS NOT NULL
+               OR c.templates_synced_at < now() - make_interval(secs => ?))
+        ORDER BY c.templates_sync_requested_at NULLS LAST, c.templates_synced_at NULLS FIRST, c.id
+        LIMIT ?
+        """,
+        UUID.class,
+        (double) every.toSeconds(),
+        limit);
+  }
+
+  /**
+   * Records a copy that started at {@code started}: a request made after it stays, so a template
+   * approved during the copy is copied again.
+   */
+  public void templatesSynced(UUID channelId, java.time.Instant started) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET templates_synced_at = now(),"
+            + " templates_sync_requested_at = CASE WHEN templates_sync_requested_at"
+            + " > ? THEN templates_sync_requested_at END WHERE id = ?",
+        java.sql.Timestamp.from(started),
+        channelId);
+  }
+
+  /** The database's current time. */
+  public java.time.Instant databaseNow() {
+    return jdbc.queryForObject("SELECT now()", java.sql.Timestamp.class).toInstant();
+  }
+
+  /** A failed copy is tried again after {@code retryIn}, whatever was requested. */
+  public void templatesFailed(
+      UUID channelId, java.time.Duration every, java.time.Duration retryIn) {
+    jdbc.update(
+        "UPDATE whatsapp_channels SET templates_sync_requested_at = NULL,"
+            + " templates_synced_at = now() - make_interval(secs => ?) WHERE id = ?",
+        (double) every.minus(retryIn).toSeconds(),
+        channelId);
+  }
+
   /** Every active channel, for daily maintenance such as retention. */
   public List<UUID> activeChannels() {
     return jdbc.queryForList(

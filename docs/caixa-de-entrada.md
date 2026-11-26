@@ -1,4 +1,4 @@
-# Caixa de entrada (CRM-083), respostas (CRM-084a) e mídias (CRM-084b)
+# Caixa de entrada (CRM-083), respostas (CRM-084a), mídias (CRM-084b) e modelos (CRM-085)
 
 Implementada em 22/11/2026. As conversas e mensagens são gravadas pelo worker de entrada ([whatsapp-canal.md](whatsapp-canal.md)); a caixa de entrada as lê e controla quem atende cada conversa.
 
@@ -99,6 +99,28 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
 - O worker sobe um arquivo por canal a cada passada e volta às mensagens recebidas antes do próximo. A reserva de um envio é de 6 minutos, para cobrir a leitura do bucket, a subida (até 2 minutos) e o envio.
 - A conferência de tipo é a mesma das mídias recebidas. Alguns arquivos passam por ela e a Meta recusa (por exemplo OGG sem Opus, MP4 só com áudio): o envio fica `FAILED` com o código da Meta.
 
+## Modelos (CRM-085)
+
+Fora da janela de 24 horas, só modelos aprovados pela Meta podem ser enviados (WPP-06). Os modelos são criados e aprovados no WhatsApp Manager da Meta; o CRM só os copia e envia.
+
+- **Cópia dos modelos:** o worker lê os modelos da conta do número conectado e guarda uma cópia no banco da clínica:
+  - logo depois de conectar;
+  - a cada 6 horas;
+  - quando a Meta avisa pelo webhook que um modelo mudou (aprovado, pausado, desativado);
+  - quando o Proprietário ou o Gestor pede (`POST /v1/clinic/inbox/templates/sync`, `CHANNEL_CONNECT`, 202). Em até 30 segundos o worker copia de novo.
+  - Uma cópia que falha é tentada de novo em 30 minutos. Modelo apagado na Meta fica `DELETED` e some da lista.
+- `GET /v1/clinic/inbox/templates` (`INBOX_READ`): os modelos, primeiro os que podem ser enviados. Cada um traz `status` (da Meta), `supported`, `sendable`, os textos (`headerText`, `bodyText`, `footerText`) e as chaves das variáveis em ordem (`headerParams`, `bodyParams`: `"1"`, `"2"`... ou nomes).
+- **Suportados no MVP:** cabeçalho de texto (ou nenhum), corpo com variáveis, rodapé e botões sem variável (resposta rápida, telefone, link fixo). Cabeçalho com imagem, vídeo ou documento, botão com variável e modelos de autenticação aparecem com `supported: false`.
+- `POST /v1/clinic/inbox/conversations/{id}/messages/template` (`INBOX_REPLY`) com `{idempotencyKey, templateId, header, body}`. `header` e `body` são objetos com o valor de cada chave, por exemplo `{"1": "Ana", "2": "amanhã"}`.
+  - Vale dentro e fora da janela, com as outras regras do texto: quem responde assume e a mesma chave nunca gera dois envios.
+  - Responde 202 com o item na fila (`kind` `TEMPLATE`), e `text` traz o modelo como o paciente vai ver. É esse texto que fica no histórico, com `type` `template`.
+  - **Regras da Meta para os valores:** todos preenchidos, sem chave a mais, sem quebra de linha, tabulação ou mais de quatro espaços seguidos; até 1024 caracteres no corpo e 60 no cabeçalho. Fora disso, `INVALID_INPUT` com o campo `body.CHAVE` ou `header.CHAVE`.
+  - **Marketing:** recusado (`CONVERSATION_TEMPLATE_OPTED_OUT`) quando o último consentimento de WhatsApp do contato é `OPT_OUT`. Modelos de utilidade continuam permitidos.
+  - **Limite diário:** 200 modelos por clínica por dia, contados no fuso da clínica e ao enfileirar (configuração `app.whatsapp.templates.daily-limit`). Acima dele, `CONVERSATION_TEMPLATE_LIMIT` (429) e nada entra na fila. Um envio recusado depois não devolve a vaga.
+  - Erros: `CONVERSATION_TEMPLATE_NOT_FOUND` (404), `CONVERSATION_TEMPLATE_NOT_APPROVED` (409, não aprovado ou não suportado), `CONVERSATION_TEMPLATE_OPTED_OUT` (409), `CONVERSATION_TEMPLATE_LIMIT` (429) e os do texto. Na sincronização sem número conectado, `CONVERSATION_CHANNEL_NOT_CONNECTED` (409).
+- **Worker:** antes de enviar, confere de novo se o modelo continua aprovado na última cópia; se foi pausado ou desativado, a resposta fica `FAILED` com `TEMPLATE_NOT_APPROVED`. O envio segue as regras do texto (incerto nunca reenviado).
+- **Pagamento:** modelos são cobrados pela Meta na conta da clínica. Sem meio de pagamento, a Meta recusa e a resposta fica `FAILED` com o código dela (por exemplo `META_131042`); a tela deve explicar.
+
 ## Regras
 
 - **Assumir é atômico:** um único `UPDATE … WHERE assignee_id IS NULL`. Dois atendentes clicando juntos: um assume, o outro recebe `CONVERSATION_TAKEN`. Assumir de novo a própria conversa não muda nada.
@@ -111,7 +133,8 @@ Os erros estão em [api-convencoes.md](api-convencoes.md) (`CONVERSATION_*`).
 
 ## Fora do escopo
 
-- Modelos e o limite diário (CRM-085), respostas rápidas (CRM-086).
+- Respostas rápidas (CRM-086).
+- Criar ou editar modelos pelo CRM (WPP-10, Fase 2), modelos com mídia no cabeçalho ou botão com variável, e limite diário por clínica (hoje é um valor global).
 - Figurinhas, mensagem de voz gravada na tela e documentos acima de 16 MB.
 - "Não lida" por pessoa.
 - Soltar automaticamente as conversas de quem sai da equipe.

@@ -151,7 +151,38 @@ public class OutboundSender {
   private boolean send(
       ChannelAccess access, UUID channelId, String phoneNumberId, String token, Outbound reply) {
     Instant now = clock.instant();
-    if (reply.lastInboundAt() == null
+    if (reply.isTemplate()) {
+      // A template goes outside the window too, but only while still approved and supported.
+      var definition = reply.template().definition();
+      boolean sameKeys =
+          reply
+                  .template()
+                  .header()
+                  .keySet()
+                  .equals(new java.util.HashSet<>(definition.headerParams()))
+              && reply
+                  .template()
+                  .body()
+                  .keySet()
+                  .equals(new java.util.HashSet<>(definition.bodyParams()));
+      if (!sameKeys) {
+        // Edited in Meta after queuing: what was recorded is no longer what would be sent.
+        outbox.fail(access, reply.id(), "TEMPLATE_CHANGED", now);
+        LOG.info(
+            "WhatsApp reply refused code=TEMPLATE_CHANGED channel={} reply={}",
+            channelId,
+            reply.id());
+        return true;
+      }
+      if (!definition.approved() || !definition.supported()) {
+        outbox.fail(access, reply.id(), "TEMPLATE_NOT_APPROVED", now);
+        LOG.info(
+            "WhatsApp reply refused code=TEMPLATE_NOT_APPROVED channel={} reply={}",
+            channelId,
+            reply.id());
+        return true;
+      }
+    } else if (reply.lastInboundAt() == null
         || reply.lastInboundAt().isBefore(now.minus(OutboxRepository.WINDOW))) {
       outbox.fail(access, reply.id(), "WINDOW_CLOSED", now);
       LOG.info(
@@ -160,7 +191,17 @@ public class OutboundSender {
     }
     MetaSendResult result;
     try {
-      if (reply.isMedia()) {
+      if (reply.isTemplate()) {
+        result =
+            meta.sendTemplate(
+                token,
+                phoneNumberId,
+                reply.toDigits(),
+                reply.template().definition(),
+                reply.template().header(),
+                reply.template().body(),
+                reply.id().toString());
+      } else if (reply.isMedia()) {
         Upload uploaded = upload(access, channelId, phoneNumberId, token, reply);
         if (uploaded.mediaId() == null) return uploaded.continues();
         result =
@@ -180,7 +221,10 @@ public class OutboundSender {
       }
     } catch (IllegalArgumentException invalid) {
       // Checked before any request: nothing was sent.
-      String code = reply.isMedia() ? "INVALID_MEDIA" : "INVALID_RECIPIENT";
+      String code =
+          reply.isTemplate()
+              ? "INVALID_TEMPLATE"
+              : reply.isMedia() ? "INVALID_MEDIA" : "INVALID_RECIPIENT";
       outbox.fail(access, reply.id(), code, now);
       LOG.warn("WhatsApp reply failed code={} channel={} reply={}", code, channelId, reply.id());
       return true;

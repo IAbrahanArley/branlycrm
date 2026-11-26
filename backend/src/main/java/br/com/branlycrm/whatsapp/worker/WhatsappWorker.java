@@ -44,6 +44,7 @@ public class WhatsappWorker implements SmartLifecycle {
   private final ChannelOnboardingProcessor onboarding;
   private final OutboundSender outbound;
   private final MediaDownloader media;
+  private final TemplateSynchronizer templates;
   private final ChannelUnsealer unsealer;
   private final ChannelSealer sealer;
   private final String url;
@@ -60,6 +61,7 @@ public class WhatsappWorker implements SmartLifecycle {
   private volatile ExecutorService downloads;
 
   private final AtomicBoolean downloadsRequested = new AtomicBoolean();
+  private final AtomicBoolean templatesRequested = new AtomicBoolean();
   private volatile boolean running;
 
   public WhatsappWorker(
@@ -68,6 +70,7 @@ public class WhatsappWorker implements SmartLifecycle {
       ChannelOnboardingProcessor onboarding,
       OutboundSender outbound,
       MediaDownloader media,
+      TemplateSynchronizer templates,
       ChannelUnsealer unsealer,
       ChannelSealer sealer,
       @Value("${spring.datasource.url}") String url,
@@ -79,6 +82,7 @@ public class WhatsappWorker implements SmartLifecycle {
     this.onboarding = onboarding;
     this.outbound = outbound;
     this.media = media;
+    this.templates = templates;
     this.unsealer = unsealer;
     this.sealer = sealer;
     this.url = url;
@@ -124,6 +128,8 @@ public class WhatsappWorker implements SmartLifecycle {
               return thread;
             });
     executor.scheduleWithFixedDelay(this::requestDownloads, 3, 10, TimeUnit.SECONDS);
+    // Templates (CRM-085): network calls, so on the media thread, never on the inbox one.
+    executor.scheduleWithFixedDelay(this::requestTemplates, 4, 30, TimeUnit.SECONDS);
     LOG.info("WhatsApp worker started");
   }
 
@@ -197,6 +203,28 @@ public class WhatsappWorker implements SmartLifecycle {
       }
     } catch (RuntimeException failure) {
       LOG.warn("WhatsApp sweep failed code={}", failure.getClass().getSimpleName());
+    }
+  }
+
+  /** Copies the due templates on the media thread (CRM-085). */
+  private void requestTemplates() {
+    ExecutorService media = downloads;
+    if (!running || media == null) return;
+    if (!templatesRequested.compareAndSet(false, true)) return;
+    try {
+      media.execute(
+          () -> {
+            templatesRequested.set(false);
+            try {
+              templates.syncDue();
+            } catch (RuntimeException failure) {
+              LOG.warn(
+                  "WhatsApp templates pass failed code={}", failure.getClass().getSimpleName());
+            }
+          });
+    } catch (RuntimeException rejected) {
+      // Stopping: the next start copies them.
+      templatesRequested.set(false);
     }
   }
 

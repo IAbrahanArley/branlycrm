@@ -203,6 +203,14 @@ O processo `whatsapp-worker` transforma os eventos gravados pelo webhook em cont
 - **Riscos aceitos:** a mesma chave serve à API e ao worker, os dois com leitura e escrita. Restringir a API ao prefixo `clinics/` quando houver usuários distintos na OCI.
 - **Limite de upload:** o Nginx aceita até 18 MB só na rota de envio de arquivo (10 MB no resto da API), e o Spring corta acima de 17 MB. A regra da API é 16 MB.
 
+## Modelos (CRM-085)
+
+- **Migração central V19:** `templates_sync_requested_at` e `templates_synced_at` em `whatsapp_channels`. A API pode marcar o pedido; só o worker grava a hora da cópia.
+- **Migração de clínica V20:** `whatsapp_templates` (a cópia), `whatsapp_template_usage` (contador por dia) e o tipo `TEMPLATE` na fila de saída.
+- **Cópia:** `TemplateSynchronizer`, na thread de mídias, a cada 30 segundos verifica os canais devidos (nunca copiados, com pedido ou copiados há mais de 6 horas), até 20 por vez. Lê `/{waba_id}/message_templates` com paginação (até 10 páginas de 100).
+- **Conta compartilhada (agência):** os modelos são da conta, então cada clínica que usa a conta recebe a sua cópia, e o aviso de mudança vale para todas.
+- Os logs trazem só o id do canal e as contagens.
+
 ## Limites atuais
 
 - O laço do worker (`LISTEN`, varredura e retenção) não tem teste automatizado; os testes chamam a drenagem diretamente.

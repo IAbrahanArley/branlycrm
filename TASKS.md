@@ -1111,11 +1111,55 @@ Total: cerca de **6 semanas de backend**, sem folga, até o piloto, com as telas
   - a detecção de tipo é larga para envio (qualquer `ftyp` não recusado vira MP4, OGG sem Opus): a Meta recusa, e o envio fica `FAILED` com o código dela;
   - um POST sem login e sem CSRF ainda pode mandar até 18 MB, que o Spring lê para o disco antes de recusar; um limite de taxa no Nginx nessa rota ajudaria.
 
-### [ ] CRM-085 — Janela de 24 horas e templates (P1)
+### [x] CRM-085 — Janela de 24 horas e templates (P1)
 **Depende de:** CRM-084.
 **Atende:** WPP-06.
 **Entregas:** cálculo da janela por conversa; fora dela, só envio de template aprovado (sincronizado ou referenciado do fornecedor) com variáveis.
 **Aceite:** envio livre fora da janela é bloqueado no servidor; template inexistente ou não aprovado é recusado.
+
+**Estado (26/11/2026):** concluída na branch `feat/crm-085-modelos`. Detalhes em [docs/caixa-de-entrada.md](docs/caixa-de-entrada.md#modelos-crm-085) e [docs/whatsapp-canal.md](docs/whatsapp-canal.md#modelos-crm-085).
+- **Decisões aprovadas pelo responsável em 26/11/2026:**
+  - os modelos são copiados da Meta, nunca digitados;
+  - suportados: cabeçalho de texto (ou nenhum), corpo com variáveis, rodapé e botões sem variável;
+  - categorias de utilidade e marketing; marketing é recusado para contato com opt-out de WhatsApp;
+  - 200 modelos por clínica por dia, no fuso da clínica, recusados na hora (429) em vez da situação `BLOCKED_LIMIT` da ADR-036 (nota na ADR);
+  - quem envia é `INBOX_REPLY`;
+  - sem dependência nova.
+- **Migrações:**
+  - central V19: pedido e hora da cópia de modelos no canal;
+  - de clínica V20: `whatsapp_templates`, `whatsapp_template_usage` e o tipo `TEMPLATE` na fila, com os valores em JSON.
+- **API:**
+  - `GET /v1/clinic/inbox/templates` (`INBOX_READ`);
+  - `POST /v1/clinic/inbox/templates/sync` (`CHANNEL_CONNECT`);
+  - `POST …/conversations/{id}/messages/template` (`INBOX_REPLY`), com as regras da Meta para os valores e o texto montado guardado no histórico.
+- **Worker:** cópia a cada 6 horas, ao conectar, por aviso do webhook (status, qualidade, categoria e conteúdo do modelo) ou a pedido; envio do modelo com os valores em ordem (posicionais ou nomeados); recusa o modelo pausado, desativado ou editado depois de enfileirado.
+- **Testes:**
+  - `MessageTemplateTest`: suportados e não suportados, valores com as regras da Meta, texto montado acima do limite, parâmetros nomeados;
+  - `WhatsappTemplateIT`:
+    - cópia em duas páginas;
+    - lista por papel; clínica B sem modelos;
+    - texto livre recusado fora da janela e modelo enviado;
+    - mesma chave; valores inválidos; não suportado, pendente e inexistente; VIEWER (403); clínica B (404);
+    - o corpo enviado à Meta e o histórico;
+    - pausa pelo webhook com nova cópia e recusa no worker; a mesma chave depois da pausa ainda devolve o envio;
+    - limite diário (429); marketing com opt-out (409); "sincronizar agora" por papel e sem número;
+  - `BootstrapIT` e `TenantMigrationRolloutIT` ajustados;
+  - `clean verify`: 261 unitários (2 ignorados) e 163 de integração, sem falhas; `docs/api/openapi.json` regerado.
+- **Revisão (`reviewer`, também no papel de security):** nenhum crítico ou alto. Corrigidos:
+  - texto montado acima do limite da Meta dava erro 500;
+  - a mudança de categoria (utilidade para marketing) não pedia nova cópia, e o opt-out podia ser pulado por até 6 horas; agora só utilidade e marketing são suportados;
+  - uma lista da Meta cortada no meio marcava modelos como apagados;
+  - modelo editado entre enfileirar e enviar mandava um texto diferente do histórico (agora `TEMPLATE_CHANGED`);
+  - a mesma chave depois da pausa dava 409 em vez do envio original;
+  - o relógio da API e o do banco eram comparados na cópia;
+  - a cópia de 20 canais por vez podia atrasar os downloads de mídia (agora 5);
+  - a chave desconhecida era devolvida na resposta.
+- **Riscos aceitos:**
+  - a conta compartilhada por clínicas (agência) dá a cada clínica a sua cópia dos mesmos modelos;
+  - o papel de runtime da clínica, usado pela API e pelo worker, pode gravar na tabela de modelos (ADR-036);
+  - os valores preenchidos (nomes, datas) ficam na fila de saída: a CRM-073 precisa apagá-los com a conversa;
+  - o limite é global; por clínica fica para depois.
+- **Para o teste real:** um modelo aprovado no WhatsApp Manager da conta conectada e um meio de pagamento na conta da Meta.
 
 ### [ ] CRM-086 — Respostas rápidas (P1)
 **Depende de:** CRM-083.
@@ -1614,7 +1658,7 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
 - **Responder (CRM-084a):** caixa de texto com `POST …/{id}/messages` e `{idempotencyKey, text}`.
   - A chave é um UUID novo por mensagem, guardado só em memória até a resposta, e reaproveitado se o envio for repetido por falha de rede.
   - As respostas pendentes (`GET …/{id}/outbox`) aparecem no fim da conversa: "enviando", "falhou" com o motivo, e "incerta: confira no WhatsApp antes de reenviar". Reenviar uma incerta ou falha cria uma mensagem nova, com chave nova.
-  - Erros: `CONVERSATION_WINDOW_CLOSED` (explicar a janela de 24 horas; modelos chegam na CRM-085), `CONVERSATION_TAKEN` e `CONVERSATION_IDEMPOTENCY_CONFLICT`.
+  - Erros: `CONVERSATION_WINDOW_CLOSED` (explicar a janela de 24 horas e oferecer um modelo), `CONVERSATION_TAKEN` e `CONVERSATION_IDEMPOTENCY_CONFLICT`.
   - Mensagens enviadas mostram a situação (`status`: enviada, entregue, lida, falhou).
 - **Mídias recebidas (CRM-084b1):**
   - mensagem com `mediaStatus`: `PENDING` ("baixando…", conferir de novo na próxima consulta), `STORED` (botão "abrir/baixar"), `REJECTED` ("arquivo não aceito"), `FAILED` ("não foi possível baixar");
@@ -1626,6 +1670,13 @@ Na `main` de 16/11/2026 passam `npm ci`, `lint`, `typecheck`, os testes de `fron
   - Na fila, o item vem com `kind` `MEDIA`, `contentType` e `fileName`: mostrar "enviando arquivo…" com o nome ou o tipo.
   - Erros: `CONVERSATION_MEDIA_TYPE_NOT_ALLOWED` (415), `CONVERSATION_MEDIA_TOO_LARGE` e `FILE_TOO_LARGE` (413), `CONVERSATION_MEDIA_UNAVAILABLE` (503), além dos do texto.
   - Enviado, o arquivo aparece no histórico como os recebidos, com o mesmo botão "abrir/baixar".
+- **Modelos (CRM-085):** com a janela fechada (ou a qualquer momento), o botão "enviar modelo" abre a lista (`GET /api/v1/clinic/inbox/templates`, só os `sendable`).
+  - Ao escolher, mostrar o texto e um campo por chave de `headerParams` e `bodyParams`.
+  - Enviar `POST …/{id}/messages/template` com `{idempotencyKey, templateId, header, body}`.
+  - Explicar que modelos são cobrados pela Meta.
+  - Erros: `CONVERSATION_TEMPLATE_NOT_APPROVED` (recarregar a lista), `CONVERSATION_TEMPLATE_OPTED_OUT`, `CONVERSATION_TEMPLATE_LIMIT` (429) e `INVALID_INPUT` com `body.CHAVE`/`header.CHAVE` no campo certo.
+  - Para Proprietário e Gestor, o botão "sincronizar modelos" (`POST …/templates/sync`).
+  - Falha `META_131042` na fila: avisar que falta meio de pagamento na conta da Meta.
 **Aceite:**
 - `CONVERSATION_TAKEN` mostra que outra pessoa assumiu e recarrega a conversa; `CONVERSATION_STALE` pede para recarregar; `CONVERSATION_NOT_YOURS` e `CONVERSATION_ASSIGNEE_INVALID` têm mensagens próprias; `CONVERSATION_NOT_FOUND` volta para a lista.
 - Somente leitura vê tudo sem nenhum botão de ação.

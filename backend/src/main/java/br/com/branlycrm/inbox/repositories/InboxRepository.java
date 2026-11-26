@@ -320,6 +320,7 @@ public class InboxRepository {
         conversationId,
         idempotencyKey,
         mayOverride,
+        true,
         (session, id, at) ->
             session
                 .createNativeMutationQuery(
@@ -345,7 +346,18 @@ public class InboxRepository {
    */
   public Optional<QueuedReply> checkReply(
       ClinicAccess access, UUID conversationId, UUID idempotencyKey, boolean mayOverride) {
-    QueuedReply checked = queue(access, conversationId, idempotencyKey, mayOverride, null);
+    return checkReply(access, conversationId, idempotencyKey, mayOverride, true);
+  }
+
+  /** {@link #checkReply}, with the 24-hour window checked or not (templates, CRM-085). */
+  public Optional<QueuedReply> checkReply(
+      ClinicAccess access,
+      UUID conversationId,
+      UUID idempotencyKey,
+      boolean mayOverride,
+      boolean windowRequired) {
+    QueuedReply checked =
+        queue(access, conversationId, idempotencyKey, mayOverride, windowRequired, null);
     return checked.created() ? Optional.empty() : Optional.of(checked);
   }
 
@@ -367,6 +379,7 @@ public class InboxRepository {
         conversationId,
         idempotencyKey,
         mayOverride,
+        true,
         (session, id, at) -> {
           session
               .createNativeMutationQuery(
@@ -402,6 +415,168 @@ public class InboxRepository {
   }
 
   /**
+   * Queues an approved template (CRM-085), inside or outside the 24-hour window, with the other
+   * rules of {@link #enqueue}. In the same transaction: the template must still be APPROVED and
+   * supported; a MARKETING template is refused to a contact whose latest WhatsApp consent is
+   * OPT_OUT; and the day's counter (clinic time zone) goes up by one only while under {@code
+   * dailyLimit}.
+   *
+   * @param text the template as the patient sees it, for the history
+   * @param values the values as JSON: {"header": {...}, "body": {...}}
+   * @throws InboxException NOT_FOUND, TAKEN, IDEMPOTENCY_CONFLICT, TEMPLATE_NOT_FOUND,
+   *     TEMPLATE_NOT_APPROVED, TEMPLATE_OPTED_OUT or TEMPLATE_LIMIT
+   */
+  public QueuedReply enqueueTemplate(
+      ClinicAccess access,
+      UUID conversationId,
+      UUID idempotencyKey,
+      UUID templateId,
+      String text,
+      String values,
+      int dailyLimit,
+      boolean mayOverride) {
+    return queue(
+        access,
+        conversationId,
+        idempotencyKey,
+        mayOverride,
+        false,
+        (session, id, at) -> {
+          List<Object[]> template =
+              session
+                  .createNativeQuery(
+                      "SELECT status, supported, category FROM whatsapp_templates WHERE id = :id"
+                          + " FOR SHARE",
+                      Object[].class)
+                  .setParameter("id", templateId)
+                  .getResultList();
+          if (template.isEmpty()) throw new InboxException(Reason.TEMPLATE_NOT_FOUND);
+          if (!"APPROVED".equals(template.getFirst()[0])
+              || !Boolean.TRUE.equals(template.getFirst()[1])) {
+            throw new InboxException(Reason.TEMPLATE_NOT_APPROVED);
+          }
+          if ("MARKETING".equals(template.getFirst()[2]) && optedOut(session, conversationId)) {
+            throw new InboxException(Reason.TEMPLATE_OPTED_OUT);
+          }
+          int counted =
+              session
+                  .createNativeMutationQuery(
+                      """
+                      INSERT INTO whatsapp_template_usage (day, queued)
+                      VALUES ((CAST(:at AS timestamptz)
+                               AT TIME ZONE (SELECT time_zone FROM clinic_settings))::date, 1)
+                      ON CONFLICT (day) DO UPDATE SET queued = whatsapp_template_usage.queued + 1
+                      WHERE whatsapp_template_usage.queued < :limit
+                      """)
+                  .setParameter("at", utc(at))
+                  .setParameter("limit", dailyLimit)
+                  .executeUpdate();
+          if (counted == 0 || dailyLimit <= 0) throw new InboxException(Reason.TEMPLATE_LIMIT);
+          return session
+              .createNativeMutationQuery(
+                  "INSERT INTO whatsapp_outbox (id, conversation_id, idempotency_key, kind, body,"
+                      + " template_id, template_values, next_attempt_at, requested_by,"
+                      + " created_at, updated_at) VALUES (:id, :conversation, :key, 'TEMPLATE',"
+                      + " :body, :template, CAST(:values AS jsonb), :at, :actor, :at, :at)")
+              .setParameter("id", id)
+              .setParameter("conversation", conversationId)
+              .setParameter("key", idempotencyKey)
+              .setParameter("body", text)
+              .setParameter("template", templateId)
+              .setParameter("values", values)
+              .setParameter("at", utc(at))
+              .setParameter("actor", access.subjectId())
+              .executeUpdate();
+        });
+  }
+
+  /** The latest WhatsApp consent of the conversation's contact is OPT_OUT. */
+  private static boolean optedOut(Session session, UUID conversationId) {
+    return !session
+        .createNativeQuery(
+            """
+            SELECT 1 FROM (
+                SELECT cc.status FROM contact_consents cc
+                JOIN whatsapp_conversations c ON c.contact_id = cc.contact_id
+                WHERE c.id = :conversation AND cc.channel = 'WHATSAPP'
+                ORDER BY cc.recorded_at DESC, cc.id DESC LIMIT 1) latest
+            WHERE latest.status = 'OPT_OUT'
+            """,
+            Integer.class)
+        .setParameter("conversation", conversationId)
+        .getResultList()
+        .isEmpty();
+  }
+
+  /** The clinic's synced templates, except deleted ones; approved and supported first. */
+  public List<TemplateOption> templates(ClinicAccess access) {
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session ->
+            session
+                .createNativeQuery(
+                    TEMPLATES
+                        + " WHERE status <> 'DELETED'"
+                        + " ORDER BY (status = 'APPROVED' AND supported) DESC, name, language",
+                    Object[].class)
+                .getResultList()
+                .stream()
+                .map(InboxRepository::templateOption)
+                .toList());
+  }
+
+  /** One template of the clinic (deleted ones included, so a send names the right refusal). */
+  public Optional<TemplateOption> template(ClinicAccess access, UUID id) {
+    return persistence.inTransaction(
+        ClinicTenant.of(access),
+        session ->
+            session
+                .createNativeQuery(TEMPLATES + " WHERE id = :id", Object[].class)
+                .setParameter("id", id)
+                .getResultList()
+                .stream()
+                .findFirst()
+                .map(InboxRepository::templateOption));
+  }
+
+  private static final String TEMPLATES =
+      "SELECT id, meta_template_id, name, language, category, status, supported,"
+          + " parameter_format, header_text, body_text, footer_text, header_params::text,"
+          + " body_params::text, synced_at FROM whatsapp_templates";
+
+  private static final tools.jackson.databind.json.JsonMapper JSON =
+      tools.jackson.databind.json.JsonMapper.builder().build();
+
+  private static TemplateOption templateOption(Object[] row) {
+    return new TemplateOption(
+        (UUID) row[0],
+        new br.com.branlycrm.whatsapp.domain.MessageTemplate(
+            (String) row[1],
+            (String) row[2],
+            (String) row[3],
+            (String) row[4],
+            (String) row[5],
+            (Boolean) row[6],
+            "NAMED".equals(row[7]),
+            (String) row[8],
+            (String) row[9],
+            (String) row[10],
+            keys((String) row[11]),
+            keys((String) row[12])),
+        instant(row[13]));
+  }
+
+  private static List<String> keys(String json) {
+    List<String> keys = new ArrayList<>();
+    JSON.readTree(json).forEach(node -> keys.add(node.asText()));
+    return List.copyOf(keys);
+  }
+
+  /** A synced template and our id for it (CRM-085). */
+  public record TemplateOption(
+      UUID id, br.com.branlycrm.whatsapp.domain.MessageTemplate template, Instant syncedAt) {}
+
+  /**
    * A file stored in the bucket by the API, to send (CRM-084b2); the key never leaves the server.
    */
   public record OutboundFile(
@@ -432,6 +607,7 @@ public class InboxRepository {
       UUID conversationId,
       UUID idempotencyKey,
       boolean mayOverride,
+      boolean windowRequired,
       OutboxWriter writer) {
     UUID actor = access.subjectId();
     Instant at = now();
@@ -460,7 +636,7 @@ public class InboxRepository {
           if (assignee != null && !assignee.equals(actor) && !mayOverride) {
             throw new InboxException(Reason.TAKEN);
           }
-          if (lastInbound == null || lastInbound.isBefore(at.minus(WINDOW))) {
+          if (windowRequired && (lastInbound == null || lastInbound.isBefore(at.minus(WINDOW)))) {
             throw new InboxException(Reason.WINDOW_CLOSED);
           }
           if (writer == null) return new QueuedReply(null, channel, true);

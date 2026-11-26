@@ -1959,6 +1959,81 @@
         },
         "type" : "object"
       },
+      "TemplateReplyRequest" : {
+        "properties" : {
+          "body" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "header" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "idempotencyKey" : {
+            "type" : "string"
+          },
+          "templateId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TemplateView" : {
+        "properties" : {
+          "bodyParams" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "bodyText" : {
+            "type" : "string"
+          },
+          "category" : {
+            "type" : "string"
+          },
+          "footerText" : {
+            "type" : "string"
+          },
+          "headerParams" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "headerText" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "sendable" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "supported" : {
+            "type" : "boolean"
+          },
+          "syncedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "TimeZoneRequest" : {
         "properties" : {
           "timeZone" : {
@@ -5749,6 +5824,127 @@
         "tags" : [ "Inbox" ]
       }
     },
+    "/v1/clinic/inbox/conversations/{conversationId}/messages/template" : {
+      "post" : {
+        "operationId" : "sendConversationTemplate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "conversationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TemplateReplyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OutboxView"
+                }
+              }
+            },
+            "description" : "The template in the outbox (kind TEMPLATE)"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INVALID_INPUT: idempotencyKey, templateId, header.KEY or body.KEY"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED (VIEWER); MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_NOT_FOUND or CONVERSATION_TEMPLATE_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_TAKEN, CONVERSATION_IDEMPOTENCY_CONFLICT, CONVERSATION_TEMPLATE_NOT_APPROVED or CONVERSATION_TEMPLATE_OPTED_OUT"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_TEMPLATE_LIMIT"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Queue an approved template, inside or outside the 24-hour window (OWNER, MANAGER, ATTENDANT), with the values of its parameters; at most 200 a day per clinic",
+        "tags" : [ "Inbox" ]
+      }
+    },
     "/v1/clinic/inbox/conversations/{conversationId}/messages/{messageId}/media" : {
       "get" : {
         "operationId" : "getMessageMedia",
@@ -6192,6 +6388,136 @@
           "session" : [ ]
         } ],
         "summary" : "Take a conversation nobody serves (OWNER, MANAGER, ATTENDANT); atomic",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/templates" : {
+      "get" : {
+        "operationId" : "listTemplates",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TemplateView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Templates, sendable first"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "MFA_ENROLLMENT_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Templates of the clinic's WhatsApp account (every role); sendable ones are approved by Meta and supported by the CRM",
+        "tags" : [ "Inbox" ]
+      }
+    },
+    "/v1/clinic/inbox/templates/sync" : {
+      "post" : {
+        "operationId" : "syncTemplates",
+        "responses" : {
+          "202" : {
+            "description" : "Requested"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "AUTHENTICATION_REQUIRED or SESSION_REVOKED; MFA_REQUIRED"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CLINIC_ACCESS_DENIED; MFA_ENROLLMENT_REQUIRED; CSRF_INVALID"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "CONVERSATION_CHANNEL_NOT_CONNECTED"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "SERVICE_UNAVAILABLE; honor Retry-After"
+          }
+        },
+        "security" : [ {
+          "session" : [ ]
+        } ],
+        "summary" : "Ask for a new copy of the templates from Meta within a minute (OWNER, MANAGER); for a template approved minutes ago",
         "tags" : [ "Inbox" ]
       }
     },
