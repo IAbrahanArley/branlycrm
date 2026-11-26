@@ -258,6 +258,119 @@ public class MetaGraphClient {
     return sendMessage(token, phoneNumberId, payload);
   }
 
+  /**
+   * Sends an approved template (CRM-085), with the guarantees of {@link #sendText}. The values go
+   * in the order of the template's keys; named templates also carry each key.
+   */
+  public MetaSendResult sendTemplate(
+      String token,
+      String phoneNumberId,
+      String to,
+      br.com.branlycrm.whatsapp.domain.MessageTemplate template,
+      Map<String, String> header,
+      Map<String, String> body,
+      String callbackData) {
+    requireId(phoneNumberId);
+    if (to == null || !to.matches("[0-9]{6,20}")) throw new IllegalArgumentException("to");
+    var payload = message(to, "template", callbackData);
+    var content = payload.putObject("template");
+    content.put("name", template.name());
+    content.putObject("language").put("code", template.language());
+    var components = content.putArray("components");
+    parameters(components, "header", template.headerParams(), header, template.named());
+    parameters(components, "body", template.bodyParams(), body, template.named());
+    return sendMessage(token, phoneNumberId, payload);
+  }
+
+  private static void parameters(
+      tools.jackson.databind.node.ArrayNode components,
+      String type,
+      List<String> keys,
+      Map<String, String> values,
+      boolean named) {
+    if (keys.isEmpty()) return;
+    var component = components.addObject().put("type", type);
+    var parameters = component.putArray("parameters");
+    for (String key : keys) {
+      String value = values == null ? null : values.get(key);
+      if (value == null) throw new IllegalArgumentException(type + "." + key);
+      var parameter = parameters.addObject().put("type", "text");
+      if (named) parameter.put("parameter_name", key);
+      parameter.put("text", value);
+    }
+  }
+
+  /**
+   * The message templates of an account (CRM-085), following Meta's pages up to {@link
+   * #TEMPLATE_PAGES} pages of 100. Definitions Meta returns malformed are left out.
+   *
+   * @throws MetaGraphException TRANSIENT, PERMANENT or TOKEN_INVALID
+   */
+  public TemplateList templates(String token, String wabaId) {
+    requireId(wabaId);
+    List<br.com.branlycrm.whatsapp.domain.MessageTemplate> templates = new ArrayList<>();
+    List<String> unreadable = new ArrayList<>();
+    String after = null;
+    for (int page = 0; page < TEMPLATE_PAGES; page++) {
+      String query =
+          wabaId
+              + "/message_templates?fields=id,name,language,status,category,parameter_format,"
+              + "components&limit=100&appsecret_proof="
+              + proof(token)
+              + (after == null ? "" : "&after=" + encode(after));
+      JsonNode body = send(authorized(token, uri(query)).GET(), Kind.PERMANENT);
+      for (JsonNode item : array(body.get("data"))) {
+        List<br.com.branlycrm.whatsapp.domain.MessageTemplate.Component> components =
+            new ArrayList<>();
+        for (JsonNode component : array(item.get("components"))) {
+          List<br.com.branlycrm.whatsapp.domain.MessageTemplate.Button> buttons = new ArrayList<>();
+          for (JsonNode button : array(component.get("buttons"))) {
+            buttons.add(
+                new br.com.branlycrm.whatsapp.domain.MessageTemplate.Button(
+                    text(button.get("type")), text(button.get("url"))));
+          }
+          components.add(
+              new br.com.branlycrm.whatsapp.domain.MessageTemplate.Component(
+                  text(component.get("type")),
+                  text(component.get("format")),
+                  text(component.get("text")),
+                  buttons));
+        }
+        String id = text(item.get("id"));
+        var template =
+            br.com.branlycrm.whatsapp.domain.MessageTemplate.of(
+                id,
+                text(item.get("name")),
+                text(item.get("language")),
+                text(item.get("category")),
+                text(item.get("status")),
+                text(item.get("parameter_format")),
+                components);
+        if (template.isPresent()) templates.add(template.get());
+        else if (id != null && ID.matcher(id).matches()) unreadable.add(id);
+      }
+      if (body.path("paging").get("next") == null) {
+        return new TemplateList(List.copyOf(templates), List.copyOf(unreadable));
+      }
+      after = text(body.path("paging").path("cursors").get("after"));
+      if (after == null || !after.matches("[0-9A-Za-z=_-]{1,512}")) {
+        // A list cut short would mark the rest as deleted.
+        throw new MetaGraphException(Kind.TRANSIENT, "TEMPLATES_PAGING");
+      }
+    }
+    throw new MetaGraphException(Kind.TRANSIENT, "TEMPLATES_TOO_MANY");
+  }
+
+  /**
+   * The account's templates, complete: the ones read, and the ids of definitions Meta returned
+   * malformed (kept as they were, never marked deleted).
+   */
+  public record TemplateList(
+      List<br.com.branlycrm.whatsapp.domain.MessageTemplate> templates, List<String> unreadable) {}
+
+  /** At most 1000 templates per account (Meta allows up to 250 per account by default). */
+  static final int TEMPLATE_PAGES = 10;
+
   private tools.jackson.databind.node.ObjectNode message(
       String to, String type, String callbackData) {
     var payload = json.createObjectNode();

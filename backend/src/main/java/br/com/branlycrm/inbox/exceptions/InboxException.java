@@ -30,7 +30,17 @@ public class InboxException extends RuntimeException {
     /** A file to send of a type WhatsApp does not send, found by its first bytes (CRM-084b2). */
     MEDIA_TYPE_NOT_ALLOWED,
     /** A file to send above the limit of its type (CRM-084b2). */
-    MEDIA_TOO_LARGE
+    MEDIA_TOO_LARGE,
+    /** No such template in the clinic (CRM-085). */
+    TEMPLATE_NOT_FOUND,
+    /** The template is not approved by Meta, or not supported by the CRM (CRM-085). */
+    TEMPLATE_NOT_APPROVED,
+    /** A marketing template to a contact who opted out of WhatsApp (CRM-085). */
+    TEMPLATE_OPTED_OUT,
+    /** The clinic reached its daily limit of templates (CRM-085). */
+    TEMPLATE_LIMIT,
+    /** The clinic has no active WhatsApp channel to copy templates from (CRM-085). */
+    CHANNEL_NOT_CONNECTED
   }
 
   private final Reason reason;

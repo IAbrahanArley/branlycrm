@@ -41,9 +41,14 @@ public class OutboxRepository {
       String toDigits,
       Instant lastInboundAt,
       int attempts,
-      OutboundMedia media) {
+      OutboundMedia media,
+      OutboundTemplate template) {
     public boolean isMedia() {
       return media != null;
+    }
+
+    public boolean isTemplate() {
+      return template != null;
     }
 
     @Override
@@ -67,6 +72,55 @@ public class OutboxRepository {
     public String toString() {
       return "OutboundMedia[id=" + id + "]";
     }
+  }
+
+  /**
+   * The template of a TEMPLATE reply (CRM-085), as synced now (the worker refuses one no longer
+   * approved), and the values filled in.
+   */
+  public record OutboundTemplate(
+      br.com.branlycrm.whatsapp.domain.MessageTemplate definition,
+      java.util.Map<String, String> header,
+      java.util.Map<String, String> body) {
+    @Override
+    public String toString() {
+      return "OutboundTemplate[" + definition.name() + "]";
+    }
+  }
+
+  private static final tools.jackson.databind.json.JsonMapper JSON =
+      tools.jackson.databind.json.JsonMapper.builder().build();
+
+  private static OutboundTemplate template(Object[] row, int from) {
+    if (row[from] == null) return null;
+    var definition =
+        new br.com.branlycrm.whatsapp.domain.MessageTemplate(
+            (String) row[from],
+            (String) row[from + 1],
+            (String) row[from + 2],
+            (String) row[from + 3],
+            (String) row[from + 4],
+            (Boolean) row[from + 5],
+            "NAMED".equals(row[from + 6]),
+            null,
+            null,
+            null,
+            strings((String) row[from + 7]),
+            strings((String) row[from + 8]));
+    tools.jackson.databind.JsonNode values = JSON.readTree((String) row[from + 9]);
+    return new OutboundTemplate(definition, map(values.path("header")), map(values.path("body")));
+  }
+
+  private static List<String> strings(String json) {
+    java.util.ArrayList<String> keys = new java.util.ArrayList<>();
+    JSON.readTree(json).forEach(node -> keys.add(node.asText()));
+    return List.copyOf(keys);
+  }
+
+  private static java.util.Map<String, String> map(tools.jackson.databind.JsonNode node) {
+    java.util.LinkedHashMap<String, String> values = new java.util.LinkedHashMap<>();
+    node.properties().forEach(entry -> values.put(entry.getKey(), entry.getValue().asText()));
+    return java.util.Collections.unmodifiableMap(values);
   }
 
   /** The WhatsApp message type of a sent file's detected type ({@code document} by default). */
@@ -102,11 +156,14 @@ public class OutboxRepository {
                       """
                       SELECT o.id, o.conversation_id, o.body, ct.phone_e164, c.last_inbound_at,
                              o.attempts, md.id, md.storage_key, md.content_type, md.file_name,
-                             md.meta_media_id
+                             md.meta_media_id, t.meta_template_id, t.name, t.language,
+                             t.category, t.status, t.supported, t.parameter_format,
+                             t.header_params::text, t.body_params::text, o.template_values::text
                       FROM whatsapp_outbox o
                       JOIN whatsapp_conversations c ON c.id = o.conversation_id
                       JOIN contacts ct ON ct.id = c.contact_id
                       LEFT JOIN whatsapp_media md ON md.id = o.media_id
+                      LEFT JOIN whatsapp_templates t ON t.id = o.template_id
                       WHERE o.status = 'QUEUED' AND o.next_attempt_at <= :now
                       ORDER BY o.created_at, o.id
                       LIMIT 1
@@ -143,7 +200,8 @@ public class OutboxRepository {
                           (String) row[7],
                           (String) row[8],
                           (String) row[9],
-                          (String) row[10])));
+                          (String) row[10]),
+                  template(row, 11)));
         });
   }
 
@@ -262,7 +320,7 @@ public class OutboxRepository {
     Object[] reply =
         session
             .createNativeQuery(
-                "SELECT o.body, o.media_id, md.content_type FROM whatsapp_outbox o"
+                "SELECT o.body, o.media_id, md.content_type, o.kind FROM whatsapp_outbox o"
                     + " LEFT JOIN whatsapp_media md ON md.id = o.media_id WHERE o.id = :id",
                 Object[].class)
             .setParameter("id", outboxId)
@@ -293,7 +351,11 @@ public class OutboxRepository {
         .setParameter("id", UUID.randomUUID())
         .setParameter("conversation", conversationId)
         .setParameter("wamid", wamid)
-        .setParameter("type", mediaId == null ? "text" : messageType(contentType))
+        .setParameter(
+            "type",
+            "TEMPLATE".equals(reply[3])
+                ? "template"
+                : mediaId == null ? "text" : messageType(contentType))
         .setParameter("body", body, String.class)
         .setParameter("mime", contentType, String.class)
         .setParameter("at", utc(at))

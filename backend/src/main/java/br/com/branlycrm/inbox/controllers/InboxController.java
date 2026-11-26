@@ -7,6 +7,7 @@ import br.com.branlycrm.identity.security.SelectedClinic;
 import br.com.branlycrm.inbox.domain.MediaUpload;
 import br.com.branlycrm.inbox.dto.request.ConversationChangeRequest;
 import br.com.branlycrm.inbox.dto.request.ReplyRequest;
+import br.com.branlycrm.inbox.dto.request.TemplateReplyRequest;
 import br.com.branlycrm.inbox.dto.response.ConversationView;
 import br.com.branlycrm.inbox.dto.response.MediaLinkView;
 import br.com.branlycrm.inbox.dto.response.MessagePageView;
@@ -174,6 +175,38 @@ public final class InboxController {
                 idempotencyKey,
                 caption,
                 new MediaUpload(file.getOriginalFilename(), file.getSize(), file::getInputStream)));
+  }
+
+  @Operation(
+      operationId = "sendConversationTemplate",
+      summary =
+          "Queue an approved template, inside or outside the 24-hour window (OWNER, MANAGER,"
+              + " ATTENDANT), with the values of its parameters; at most 200 a day per clinic")
+  @ApiResponse(responseCode = "202", description = "The template in the outbox (kind TEMPLATE)")
+  @ApiResponse(
+      responseCode = "400",
+      description = "INVALID_INPUT: idempotencyKey, templateId, header.KEY or body.KEY")
+  @ApiResponse(responseCode = "403", description = "CLINIC_ACCESS_DENIED (VIEWER)")
+  @ApiResponse(
+      responseCode = "404",
+      description = "CONVERSATION_NOT_FOUND or CONVERSATION_TEMPLATE_NOT_FOUND")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "CONVERSATION_TAKEN, CONVERSATION_IDEMPOTENCY_CONFLICT,"
+              + " CONVERSATION_TEMPLATE_NOT_APPROVED or CONVERSATION_TEMPLATE_OPTED_OUT")
+  @ApiResponse(responseCode = "429", description = "CONVERSATION_TEMPLATE_LIMIT")
+  @SecurityRequirement(name = "csrf")
+  @PostMapping("/{conversationId}/messages/template")
+  public ResponseEntity<OutboxView> sendTemplate(
+      @PathVariable UUID conversationId,
+      @RequestBody TemplateReplyRequest request,
+      @AuthenticationPrincipal CrmPrincipal principal,
+      HttpSession session) {
+    return ResponseEntity.accepted()
+        .body(
+            inbox.sendTemplate(
+                SelectedClinic.require(session), principal.subjectId(), conversationId, request));
   }
 
   @Operation(
